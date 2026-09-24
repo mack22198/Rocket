@@ -1,6 +1,9 @@
 --!strict
--- The in-game HUD: scoreboard + clock, countdown and GOAL text, boost gauge, Mega Shot meter,
--- and the lobby panel (Scrap, next unlock, Garage button, next-match timer).
+-- The in-game HUD. While driving: the scoreboard and clock, a boost dial, the Mega Shot meter and big centre
+-- text (countdown, GO!, GOAL!). In the lobby: your Scrap, the next car you're saving for, the match timer and a
+-- big Garage button (with a badge when one of your cars is ready to evolve).
+--
+-- Everything stays clear of Roblox's own buttons in the top corners.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,6 +12,8 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local CarCatalog = require(Shared.Config.CarCatalog)
+local Evolution = require(Shared.Config.Evolution)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 local Remotes = require(Shared.Net.Remotes)
@@ -28,34 +33,44 @@ local C = Theme.Colors
 local Phases = MatchState.Phases
 local Attr = MatchState.Attr
 local CarAttr = MatchState.CarAttr
+local rgb = Color3.fromRGB
+
+local DIAL_SEGMENTS = 20
 
 local localPlayer = Players.LocalPlayer
 local stateObject = MatchState.getObject()
 
 local gui: ScreenGui
+-- Match
 local scoreboard: Frame
 local blueScore: TextLabel
 local orangeScore: TextLabel
 local clockLabel: TextLabel
 local clockNote: TextLabel
+local youTag: TextLabel
 local bigText: TextLabel
 local subText: TextLabel
-local boostPanel: Frame
-local boostFill: Frame
+local dial: Frame
+local dialSegments: { Frame } = {}
+local dialColors: { Color3 } = {}
 local boostNumber: TextLabel
 local megaPanel: Frame
-local megaFill: Frame
+local megaBar: Theme.Bar
 local megaLabel: TextLabel
-local lobbyPanel: Frame
-local scrapLabel: TextLabel
-local goalLabel: TextLabel
-local goalFill: Frame
-local bannerLabel: TextLabel
-local teamBadge: TextLabel
-local camLabel: TextLabel
+local camPill: TextLabel
+-- Lobby
+local lobbyInfo: Frame
+local scrapPill: TextLabel
+local nextName: TextLabel
+local nextAmount: TextLabel
+local nextBar: Theme.Bar
+local garageArea: Frame
+local evolveBadge: TextLabel
+local banner: TextLabel
 
 local messageUntil = 0
 local lastPhase = ""
+local evolveReady = false
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
@@ -71,215 +86,300 @@ function HUD.flash(text: string, color: Color3, sub: string?, duration: number?)
 	messageUntil = os.clock() + (duration or 1.5)
 	bigText.Size = UDim2.fromOffset(700, 60)
 	TweenService:Create(bigText, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Size = UDim2.fromOffset(700, 130),
+		Size = UDim2.fromOffset(700, 140),
 	}):Play()
 end
 
-local function build()
-	gui = Theme.screen("TurboHUD", 5)
-
-	-- Scoreboard.
+local function buildScoreboard()
 	scoreboard = Instance.new("Frame")
 	scoreboard.Name = "Scoreboard"
-	scoreboard.Size = UDim2.fromOffset(360, 62)
-	scoreboard.Position = UDim2.new(0.5, 0, 0, 10)
+	scoreboard.Size = UDim2.fromOffset(420, 96)
+	scoreboard.Position = UDim2.new(0.5, 0, 0, 8)
 	scoreboard.AnchorPoint = Vector2.new(0.5, 0)
 	scoreboard.BackgroundTransparency = 1
 	scoreboard.Parent = gui
 
-	local function scoreBox(name: string, color: Color3, x: number): TextLabel
-		local box = Instance.new("Frame")
-		box.Name = name
-		box.Size = UDim2.fromOffset(92, 62)
-		box.Position = UDim2.fromOffset(x, 0)
-		box.BackgroundColor3 = color
-		box.Parent = scoreboard
-		Theme.corner(box, 14)
-		Theme.stroke(box, Color3.new(0, 0, 0), 2)
-		return Theme.label(box, { size = UDim2.fromScale(1, 0.9), position = UDim2.fromScale(0, 0.05), text = "0" })
+	local function teamBlock(team: string, color: Color3, x: number): TextLabel
+		local block = Instance.new("Frame")
+		block.Name = team
+		block.Size = UDim2.fromOffset(100, 66)
+		block.Position = UDim2.fromOffset(x, 0)
+		block.BackgroundColor3 = color
+		block.Parent = scoreboard
+		Theme.corner(block, 16)
+		Theme.stroke(block, color:Lerp(rgb(0, 0, 0), 0.55), 3)
+		Theme.gradient(block, rgb(255, 255, 255), rgb(200, 200, 200))
+		Theme.label(block, {
+			name = "Team",
+			size = UDim2.fromScale(1, 0.24),
+			position = UDim2.fromScale(0, 0.72),
+			text = string.upper(team),
+			font = Enum.Font.GothamBlack,
+			stroke = false,
+		})
+		return Theme.label(block, {
+			name = "Score",
+			size = UDim2.fromScale(1, 0.72),
+			position = UDim2.fromScale(0, 0.02),
+			text = "0",
+		})
 	end
-	blueScore = scoreBox("Blue", C.Blue, 0)
-	orangeScore = scoreBox("Orange", C.Orange, 268)
+	blueScore = teamBlock("Blue", C.Blue, 0)
+	orangeScore = teamBlock("Orange", C.Orange, 320)
 
-	local clockBox = Instance.new("Frame")
-	clockBox.Name = "Clock"
-	clockBox.Size = UDim2.fromOffset(164, 62)
-	clockBox.Position = UDim2.fromOffset(98, 0)
-	clockBox.BackgroundColor3 = C.Panel
-	clockBox.Parent = scoreboard
-	Theme.corner(clockBox, 14)
-	Theme.stroke(clockBox, Color3.new(0, 0, 0), 2)
-	clockLabel =
-		Theme.label(clockBox, { size = UDim2.fromScale(1, 0.9), position = UDim2.fromScale(0, 0.05), text = "5:00" })
-	clockNote = Theme.label(scoreboard, {
-		size = UDim2.fromOffset(360, 22),
-		position = UDim2.fromOffset(0, 66),
+	local clock = Instance.new("Frame")
+	clock.Name = "Clock"
+	clock.Size = UDim2.fromOffset(200, 58)
+	clock.Position = UDim2.fromOffset(110, 4)
+	clock.BackgroundColor3 = C.Panel
+	clock.Parent = scoreboard
+	Theme.corner(clock, 14)
+	Theme.stroke(clock, rgb(255, 255, 255), 2).Transparency = 0.8
+	clockLabel = Theme.label(clock, {
+		size = UDim2.new(1, -20, 0.84, 0),
+		position = UDim2.new(0, 10, 0.08, 0),
+		text = "5:00",
+		stroke = false,
+	})
+	clockNote = Theme.pill(scoreboard, {
+		name = "Note",
+		size = UDim2.fromOffset(240, 26),
+		position = UDim2.fromOffset(90, 68),
 		text = "",
 		color = C.Gold,
+		font = Enum.Font.GothamBlack,
 	})
+	youTag = Theme.pill(scoreboard, {
+		name = "You",
+		size = UDim2.fromOffset(64, 24),
+		position = UDim2.fromOffset(18, 70),
+		text = "▲ YOU",
+		font = Enum.Font.GothamBlack,
+		background = C.Text,
+		color = C.Ink,
+		transparency = 0,
+	})
+end
 
-	teamBadge = Theme.label(gui, {
-		name = "TeamBadge",
-		size = UDim2.fromOffset(220, 30),
-		position = UDim2.fromOffset(16, 14),
+local function buildBoostDial()
+	dial = Instance.new("Frame")
+	dial.Name = "Boost"
+	dial.Size = UDim2.fromOffset(156, 156)
+	dial.Position = UDim2.new(1, -22, 1, -22)
+	dial.AnchorPoint = Vector2.new(1, 1)
+	dial.BackgroundColor3 = C.Panel
+	dial.BackgroundTransparency = 0.12
+	dial.Parent = gui
+	Theme.corner(dial, 78)
+	Theme.stroke(dial, rgb(255, 255, 255), 2).Transparency = 0.8
+	-- A 270 degree arc of segments, like a speedometer.
+	for i = 1, DIAL_SEGMENTS do
+		local t = (i - 0.5) / DIAL_SEGMENTS
+		local angle = math.rad(-135 + 270 * t)
+		local segment = Instance.new("Frame")
+		segment.Name = `Segment{i}`
+		segment.Size = UDim2.fromOffset(10, 22)
+		segment.AnchorPoint = Vector2.new(0.5, 0.5)
+		segment.Position = UDim2.new(0.5, math.sin(angle) * 60, 0.5, -math.cos(angle) * 60)
+		segment.Rotation = math.deg(angle)
+		segment.BorderSizePixel = 0
+		segment.Parent = dial
+		Theme.corner(segment, 4)
+		table.insert(dialSegments, segment)
+		table.insert(dialColors, rgb(255, 236, 110):Lerp(rgb(255, 84, 30), t))
+	end
+	boostNumber = Theme.label(dial, {
+		size = UDim2.fromOffset(90, 54),
+		position = UDim2.new(0.5, 0, 0.5, -4),
+		anchor = Vector2.new(0.5, 0.5),
+		text = "0",
+	})
+	Theme.label(dial, {
+		size = UDim2.fromOffset(80, 18),
+		position = UDim2.new(0.5, 0, 1, -24),
+		anchor = Vector2.new(0.5, 1),
+		text = "BOOST",
+		font = Enum.Font.GothamBlack,
+		color = C.Boost,
+		stroke = false,
+	})
+	camPill = Theme.pill(gui, {
+		name = "BallCam",
+		size = UDim2.fromOffset(170, 30),
+		position = UDim2.new(1, -22, 1, -190),
+		anchor = Vector2.new(1, 1),
+		text = "",
+		font = Enum.Font.GothamBold,
+		color = C.Muted,
+	})
+end
+
+local function buildMegaMeter()
+	megaPanel = Instance.new("Frame")
+	megaPanel.Name = "Mega"
+	megaPanel.Size = UDim2.fromOffset(400, 54)
+	megaPanel.Position = UDim2.new(0.5, 0, 1, -20)
+	megaPanel.AnchorPoint = Vector2.new(0.5, 1)
+	megaPanel.BackgroundColor3 = C.Panel
+	megaPanel.BackgroundTransparency = 0.12
+	megaPanel.Parent = gui
+	Theme.corner(megaPanel, 27)
+	Theme.stroke(megaPanel, rgb(255, 255, 255), 2).Transparency = 0.8
+	local icon = Theme.label(megaPanel, {
+		name = "Icon",
+		size = UDim2.fromOffset(46, 46),
+		position = UDim2.fromOffset(4, 4),
+		text = "💥",
+		stroke = false,
+	})
+	icon.BackgroundColor3 = C.Mega
+	icon.BackgroundTransparency = 0
+	Theme.corner(icon, 23)
+	megaBar = Theme.bar(megaPanel, UDim2.new(1, -70, 0, 30), UDim2.fromOffset(58, 12), C.Mega)
+	megaLabel = Theme.label(megaPanel, {
+		size = UDim2.new(1, -86, 0, 24),
+		position = UDim2.fromOffset(66, 15),
+		text = "MEGA SHOT",
+		zIndex = 3,
+	})
+end
+
+local function buildLobby()
+	lobbyInfo = Instance.new("Frame")
+	lobbyInfo.Name = "LobbyInfo"
+	lobbyInfo.Size = UDim2.fromOffset(310, 150)
+	lobbyInfo.Position = UDim2.fromOffset(16, 68)
+	lobbyInfo.BackgroundTransparency = 1
+	lobbyInfo.Parent = gui
+	scrapPill = Theme.pill(lobbyInfo, {
+		name = "Scrap",
+		size = UDim2.fromOffset(210, 48),
+		text = "🔩 0",
+		color = C.Scrap,
+	})
+	local card = Theme.panel(lobbyInfo, "NextCar", UDim2.fromOffset(310, 86), UDim2.fromOffset(0, 58))
+	Theme.label(card, {
+		size = UDim2.fromOffset(200, 16),
+		position = UDim2.fromOffset(14, 10),
+		text = "SAVING UP FOR",
+		font = Enum.Font.GothamBlack,
+		color = C.Muted,
+		align = Enum.TextXAlignment.Left,
+		stroke = false,
+	})
+	nextName = Theme.label(card, {
+		size = UDim2.new(1, -28, 0, 26),
+		position = UDim2.fromOffset(14, 28),
 		text = "",
 		align = Enum.TextXAlignment.Left,
 	})
+	nextBar = Theme.bar(card, UDim2.new(1, -118, 0, 14), UDim2.fromOffset(14, 62), C.Good)
+	nextAmount = Theme.label(card, {
+		size = UDim2.fromOffset(92, 18),
+		position = UDim2.new(1, -100, 0, 60),
+		text = "",
+		font = Theme.Body,
+		color = C.Muted,
+		align = Enum.TextXAlignment.Right,
+		stroke = false,
+	})
+
+	garageArea = Instance.new("Frame")
+	garageArea.Name = "GarageArea"
+	garageArea.Size = UDim2.fromOffset(300, 72)
+	garageArea.Position = UDim2.new(0.5, 0, 1, -24)
+	garageArea.AnchorPoint = Vector2.new(0.5, 1)
+	garageArea.BackgroundTransparency = 1
+	garageArea.Parent = gui
+	local garageButton = Theme.button(garageArea, {
+		name = "GarageButton",
+		size = UDim2.fromScale(1, 1),
+		text = "🚗  GARAGE",
+	})
+	garageButton.Activated:Connect(function()
+		HUD.GarageRequested:Fire()
+	end)
+	evolveBadge = Theme.pill(garageArea, {
+		name = "EvolveBadge",
+		size = UDim2.fromOffset(200, 32),
+		position = UDim2.new(0.5, 0, 0, -8),
+		anchor = Vector2.new(0.5, 1),
+		text = "✨ READY TO EVOLVE!",
+		background = C.Evolve,
+		transparency = 0,
+	})
+	evolveBadge.Rotation = -3
+
+	banner = Theme.pill(gui, {
+		name = "Banner",
+		size = UDim2.fromOffset(580, 42),
+		position = UDim2.new(0.5, 0, 0, 12),
+		anchor = Vector2.new(0.5, 0),
+		text = "",
+		color = C.Gold,
+	})
+end
+
+local function build()
+	gui = Theme.screen("TurboHUD", 5)
+	buildScoreboard()
+	buildBoostDial()
+	buildMegaMeter()
+	buildLobby()
 
 	-- Centre messages.
 	bigText = Theme.label(gui, {
 		name = "BigText",
-		size = UDim2.fromOffset(700, 130),
+		size = UDim2.fromOffset(700, 140),
 		position = UDim2.fromScale(0.5, 0.3),
 		anchor = Vector2.new(0.5, 0.5),
 		text = "",
 		zIndex = 5,
 	})
 	bigText.Visible = false
-	local bigStroke = Instance.new("UIStroke")
-	bigStroke.Thickness = 4
-	bigStroke.Color = Color3.new(0, 0, 0)
-	bigStroke.Parent = bigText
+	Theme.stroke(bigText, rgb(0, 0, 0), 5).ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	subText = Theme.label(gui, {
 		name = "SubText",
-		size = UDim2.fromOffset(700, 44),
-		position = UDim2.new(0.5, 0, 0.3, 80),
+		size = UDim2.fromOffset(760, 40),
+		position = UDim2.new(0.5, 0, 0.3, 84),
 		anchor = Vector2.new(0.5, 0),
 		text = "",
 		zIndex = 5,
 	})
 	subText.Visible = false
 
-	-- Boost gauge.
-	boostPanel = Theme.panel(gui, "Boost", UDim2.fromOffset(130, 130), UDim2.new(1, -20, 1, -20), Vector2.new(1, 1))
-	local fillBack = Instance.new("Frame")
-	fillBack.Size = UDim2.new(1, -20, 1, -20)
-	fillBack.Position = UDim2.fromOffset(10, 10)
-	fillBack.BackgroundColor3 = C.PanelDark
-	fillBack.ClipsDescendants = true
-	fillBack.Parent = boostPanel
-	Theme.corner(fillBack, 10)
-	boostFill = Instance.new("Frame")
-	boostFill.AnchorPoint = Vector2.new(0, 1)
-	boostFill.Position = UDim2.fromScale(0, 1)
-	boostFill.Size = UDim2.fromScale(1, 0.33)
-	boostFill.BackgroundColor3 = C.Boost
-	boostFill.BorderSizePixel = 0
-	boostFill.Parent = fillBack
-	Theme.gradient(boostFill, Color3.fromRGB(255, 230, 110), Color3.fromRGB(255, 120, 30))
-	boostNumber = Theme.label(boostPanel, {
-		size = UDim2.fromScale(1, 0.55),
-		position = UDim2.fromScale(0, 0.12),
-		text = "33",
-		zIndex = 3,
-	})
-	Theme.label(boostPanel, {
-		size = UDim2.fromScale(1, 0.2),
-		position = UDim2.fromScale(0, 0.68),
-		text = "BOOST",
-		zIndex = 3,
-	})
-
-	-- Mega Shot meter.
-	megaPanel = Theme.panel(gui, "Mega", UDim2.fromOffset(330, 40), UDim2.new(0.5, 0, 1, -18), Vector2.new(0.5, 1))
-	local megaBack = Instance.new("Frame")
-	megaBack.Size = UDim2.new(1, -12, 1, -12)
-	megaBack.Position = UDim2.fromOffset(6, 6)
-	megaBack.BackgroundColor3 = C.PanelDark
-	megaBack.ClipsDescendants = true
-	megaBack.Parent = megaPanel
-	Theme.corner(megaBack, 8)
-	megaFill = Instance.new("Frame")
-	megaFill.Size = UDim2.fromScale(0, 1)
-	megaFill.BackgroundColor3 = C.Mega
-	megaFill.BorderSizePixel = 0
-	megaFill.Parent = megaBack
-	Theme.gradient(megaFill, Color3.fromRGB(255, 210, 80), Color3.fromRGB(255, 70, 30))
-	megaLabel = Theme.label(megaPanel, {
-		size = UDim2.new(1, -16, 1, -8),
-		position = UDim2.fromOffset(8, 4),
-		text = "MEGA SHOT",
-		zIndex = 3,
-	})
-	camLabel = Theme.label(gui, {
-		size = UDim2.fromOffset(200, 22),
-		position = UDim2.new(1, -20, 1, -156),
-		anchor = Vector2.new(1, 1),
-		text = "",
-		font = Theme.Body,
-		color = C.Muted,
-		align = Enum.TextXAlignment.Right,
-	})
-
-	-- Lobby panel: Scrap, next unlock, Garage button, match timer.
-	lobbyPanel = Theme.panel(gui, "Lobby", UDim2.fromOffset(300, 168), UDim2.fromOffset(16, 16), Vector2.zero)
-	Theme.padding(lobbyPanel, 10)
-	scrapLabel = Theme.label(lobbyPanel, {
-		size = UDim2.new(1, 0, 0, 34),
-		text = "🔩 0 Scrap",
-		color = C.Scrap,
-		align = Enum.TextXAlignment.Left,
-	})
-	goalLabel = Theme.label(lobbyPanel, {
-		size = UDim2.new(1, 0, 0, 22),
-		position = UDim2.fromOffset(0, 38),
-		text = "",
-		font = Theme.Body,
-		align = Enum.TextXAlignment.Left,
-	})
-	local goalBack = Instance.new("Frame")
-	goalBack.Size = UDim2.new(1, 0, 0, 12)
-	goalBack.Position = UDim2.fromOffset(0, 64)
-	goalBack.BackgroundColor3 = C.PanelDark
-	goalBack.Parent = lobbyPanel
-	Theme.corner(goalBack, 6)
-	goalFill = Instance.new("Frame")
-	goalFill.Size = UDim2.fromScale(0, 1)
-	goalFill.BackgroundColor3 = C.Good
-	goalFill.Parent = goalBack
-	Theme.corner(goalFill, 6)
-	local garageButton = Theme.button(lobbyPanel, {
-		name = "GarageButton",
-		size = UDim2.new(1, 0, 0, 44),
-		position = UDim2.fromOffset(0, 84),
-		text = "🚗 GARAGE",
-	})
-	garageButton.Activated:Connect(function()
-		HUD.GarageRequested:Fire()
-	end)
-	bannerLabel = Theme.label(gui, {
-		name = "Banner",
-		size = UDim2.fromOffset(700, 36),
-		position = UDim2.new(0.5, 0, 0, 14),
-		anchor = Vector2.new(0.5, 0),
-		text = "",
-		color = C.Gold,
-	})
-
 	local scaledObjects: { GuiObject } =
-		{ scoreboard, bigText, subText, boostPanel, megaPanel, camLabel, lobbyPanel, bannerLabel, teamBadge }
+		{ scoreboard, bigText, subText, dial, camPill, megaPanel, lobbyInfo, garageArea, banner }
 	for _, object in scaledObjects do
 		Theme.scaled(object)
 	end
-
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
 end
 
 local function refreshData()
 	local data = PlayerDataClient.get()
-	scrapLabel.Text = `🔩 {Theme.formatNumber(data.scrap)} Scrap`
+	scrapPill.Text = `🔩 {Theme.formatNumber(data.scrap)}`
 	local goal = Rewards.nextGoal(data.owned, data.scrap)
 	if goal then
-		goalLabel.Text = if goal.canAfford
-			then `{goal.emoji} {goal.displayName}: ready to unlock!`
-			else `{goal.emoji} {goal.displayName}: {Theme.formatNumber(goal.have)} / {Theme.formatNumber(
-				goal.price
-			)}`
-		goalFill.Size = UDim2.fromScale(math.clamp(goal.have / goal.price, 0, 1), 1)
-		goalFill.BackgroundColor3 = if goal.canAfford then C.Gold else C.Good
+		nextName.Text = `{goal.emoji} {goal.displayName}`
+		nextAmount.Text = if goal.canAfford
+			then "UNLOCK IT!"
+			else `{Theme.formatNumber(goal.have)} / {Theme.formatNumber(goal.price)}`
+		nextAmount.TextColor3 = if goal.canAfford then C.Gold else C.Muted
+		nextBar.set(goal.have / math.max(goal.price, 1))
+		nextBar.fill.BackgroundColor3 = if goal.canAfford then C.Gold else C.Good
 	else
-		goalLabel.Text = "You own every car! 🏆"
-		goalFill.Size = UDim2.fromScale(1, 1)
+		nextName.Text = "🏆 Every car unlocked!"
+		nextAmount.Text = ""
+		nextBar.set(1)
+	end
+	-- Is any car ready to evolve?
+	evolveReady = false
+	for id in data.owned do
+		local def = CarCatalog.get(id)
+		if def and Evolution.progress(def, data.carXp[id] or 0, data.carStage[id] or 1).ready then
+			evolveReady = true
+		end
 	end
 end
 
@@ -295,7 +395,7 @@ local function update()
 	local driving = car ~= nil
 	local inMatchPhase = phase == Phases.Countdown or phase == Phases.Playing or phase == Phases.GoalScored
 
-	-- Scoreboard is visible to everyone while a match is on (spectators too).
+	-- The scoreboard shows for everyone while a match is on (spectators too).
 	scoreboard.Visible = inMatchPhase or phase == Phases.Results
 	blueScore.Text = tostring(numberAttr(Attr.BlueScore))
 	orangeScore.Text = tostring(numberAttr(Attr.OrangeScore))
@@ -304,12 +404,13 @@ local function update()
 	clockLabel.Text = if overtime then "+" .. MatchState.formatClock(seconds) else MatchState.formatClock(seconds)
 	clockLabel.TextColor3 = if overtime then C.Gold elseif seconds <= 30 then C.Bad else C.Text
 	if stateObject:GetAttribute(Attr.WaitingForBall) == true then
-		clockNote.Text = "0:00 - play on until the ball hits the ground!"
+		clockNote.Text = "LAST CHANCE - UNTIL THE BALL LANDS!"
 	elseif overtime then
-		clockNote.Text = "OVERTIME - next goal wins!"
+		clockNote.Text = "OVERTIME - NEXT GOAL WINS!"
 	else
 		clockNote.Text = ""
 	end
+	clockNote.Visible = clockNote.Text ~= ""
 
 	-- Countdown before kickoff.
 	if phase == Phases.Countdown then
@@ -330,53 +431,73 @@ local function update()
 		subText.Visible = false
 	end
 
-	-- Driving widgets.
-	boostPanel.Visible = driving and inMatchPhase
-	megaPanel.Visible = driving and inMatchPhase
-	camLabel.Visible = driving and inMatchPhase
+	-- Driving widgets. On touch screens the boost amount shows on the BOOST button instead (see TouchControls).
+	local showDriving = driving and inMatchPhase
+	local touchOnly = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	dial.Visible = showDriving and not touchOnly
+	megaPanel.Visible = showDriving
+	camPill.Visible = showDriving and not touchOnly
+	youTag.Visible = false
 	if car then
 		local boost = car:GetAttribute(CarAttr.Boost)
 		local boostValue = if type(boost) == "number" then boost else 0
 		boostNumber.Text = tostring(math.floor(boostValue))
-		boostFill.Size = UDim2.fromScale(1, math.clamp(boostValue / 100, 0, 1))
+		local lit = math.floor(boostValue / 100 * DIAL_SEGMENTS + 0.5)
+		for i, segment in dialSegments do
+			local on = i <= lit
+			segment.BackgroundColor3 = if on then dialColors[i] else C.Text
+			segment.BackgroundTransparency = if on then 0 else 0.82
+		end
+
 		local mega = car:GetAttribute(CarAttr.Mega)
 		local megaValue = if type(mega) == "number" then mega else 0
 		local armed = car:GetAttribute(CarAttr.MegaArmed) == true
-		megaFill.Size = UDim2.fromScale(math.clamp(megaValue / GameConfig.Mega.Max, 0, 1), 1)
+		megaBar.set(megaValue / GameConfig.Mega.Max)
 		local key = if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-			then "tap MEGA"
-			elseif UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled then "press X"
-			else "press F"
+			then "TAP MEGA"
+			elseif UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled then "PRESS X"
+			else "PRESS F"
+		local pulse = math.floor(os.clock() * 4) % 2 == 0
 		if armed then
-			megaLabel.Text = "🔥 MEGA ARMED - HIT THE BALL! 🔥"
+			megaLabel.Text = "🔥 ARMED - HIT THE BALL!"
 			megaLabel.TextColor3 = C.Gold
+			megaBar.fill.BackgroundColor3 = C.Gold
 		elseif megaValue >= GameConfig.Mega.Max then
-			megaLabel.Text = `⚡ MEGA READY - {key}! ⚡`
-			megaLabel.TextColor3 = if math.floor(os.clock() * 4) % 2 == 0 then C.Gold else C.Text
+			megaLabel.Text = `MEGA READY - {key}!`
+			megaLabel.TextColor3 = C.Text
+			megaBar.fill.BackgroundColor3 = if pulse then C.Gold else C.Mega
 		else
 			megaLabel.Text = "MEGA SHOT"
 			megaLabel.TextColor3 = C.Text
+			megaBar.fill.BackgroundColor3 = C.Mega
 		end
-		camLabel.Text = if CameraController.isBallCam() then "Ball cam: ON (C)" else "Ball cam: OFF (C)"
+		camPill.Text = if CameraController.isBallCam() then "📷 BALL CAM: ON" else "📷 BALL CAM: OFF"
+
 		local team = car:GetAttribute(CarAttr.Team)
-		teamBadge.Text = if type(team) == "string" then `{string.upper(team)} TEAM` else ""
-		teamBadge.TextColor3 = Theme.teamColor(if type(team) == "string" then team else nil)
+		if team == "Blue" or team == "Orange" then
+			youTag.Visible = scoreboard.Visible
+			youTag.Position = UDim2.fromOffset(if team == "Blue" then 18 else 338, 70)
+		end
 	end
-	teamBadge.Visible = driving
 
 	-- Lobby.
-	lobbyPanel.Visible = not driving
-	local banner = stateObject:GetAttribute(Attr.Banner)
-	if not driving and phase == Phases.Intermission then
-		bannerLabel.Text = `Next match in {math.ceil(MatchState.phaseSecondsLeft(stateObject, now))}s!`
-	elseif not driving and inMatchPhase then
-		bannerLabel.Text = "Match in progress - you'll jump in when a seat opens!"
-	elseif not driving and type(banner) == "string" then
-		bannerLabel.Text = banner
-	else
-		bannerLabel.Text = ""
+	lobbyInfo.Visible = not driving
+	garageArea.Visible = not driving
+	evolveBadge.Visible = evolveReady
+	if evolveReady then
+		evolveBadge.Rotation = -3 + math.sin(os.clock() * 5) * 2
 	end
-	bannerLabel.Visible = not scoreboard.Visible and bannerLabel.Text ~= ""
+	local bannerText = ""
+	local status = stateObject:GetAttribute(Attr.Banner)
+	if not driving and phase == Phases.Intermission then
+		bannerText = `NEXT MATCH IN {math.ceil(MatchState.phaseSecondsLeft(stateObject, now))}`
+	elseif not driving and inMatchPhase then
+		bannerText = "MATCH IN PROGRESS - YOU'LL JOIN WHEN A SEAT OPENS"
+	elseif not driving and type(status) == "string" then
+		bannerText = string.upper(status)
+	end
+	banner.Text = bannerText
+	banner.Visible = not scoreboard.Visible and bannerText ~= ""
 end
 
 function HUD.start()

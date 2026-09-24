@@ -24,6 +24,7 @@ export type CarDef = {
 	Description: string,
 	Hitbox: Vector3, -- width, height, length of the physics box
 	Stats: CarStats,
+	StageNames: { string }, -- the car's name at each evolution stage
 }
 
 local CarCatalog = {}
@@ -49,6 +50,7 @@ local cars: { CarDef } = {
 		Tagline = "Balanced",
 		Description = "Hot, fresh and good at everything. Extra cheese included.",
 		Hitbox = STANDARD_HITBOX,
+		StageNames = { "Pizza Car", "Burnt Pizza Car", "Lava Pizza Car", "Galaxy Pizza Car" },
 		Stats = { Speed = 1, Acceleration = 1, Handling = 1, Weight = 1, BumpPower = 1, AirControl = 1, Jump = 1 },
 	},
 	{
@@ -60,6 +62,7 @@ local cars: { CarDef } = {
 		Tagline = "Slippery turns",
 		Description = "Turns on a dime, but gets knocked around easily.",
 		Hitbox = Vector3.new(5.2, 2.2, 8.8),
+		StageNames = { "Banana Car", "Ripe Banana Car", "Lava Banana Car", "Galaxy Banana Car" },
 		Stats = {
 			Speed = 1.02,
 			Acceleration = 1,
@@ -79,6 +82,7 @@ local cars: { CarDef } = {
 		Tagline = "Zoom zoom",
 		Description = "Incredible acceleration. Very light, so big cars bully it.",
 		Hitbox = Vector3.new(5, 1.9, 7.6),
+		StageNames = { "Tiny Kart", "Turbo Kart", "Lava Kart", "Galaxy Kart" },
 		Stats = {
 			Speed = 0.96,
 			Acceleration = 1.25,
@@ -98,6 +102,7 @@ local cars: { CarDef } = {
 		Tagline = "Fast hunter",
 		Description = "Fast with great turning. Its bumps are more of a nibble.",
 		Hitbox = Vector3.new(5.4, 2.2, 9),
+		StageNames = { "Neon Shark", "Tiger Shark", "Lava Shark", "Galaxy Shark" },
 		Stats = {
 			Speed = 1.07,
 			Acceleration = 1.02,
@@ -117,6 +122,7 @@ local cars: { CarDef } = {
 		Tagline = "Heavy hitter",
 		Description = "Heavy with huge bumps, but slow to turn.",
 		Hitbox = Vector3.new(6, 3, 9.2),
+		StageNames = { "Monster Truck", "Mega Monster Truck", "Lava Monster Truck", "Galaxy Monster Truck" },
 		Stats = {
 			Speed = 0.96,
 			Acceleration = 0.95,
@@ -136,6 +142,7 @@ local cars: { CarDef } = {
 		Tagline = "Floaty flyer",
 		Description = "Out of this world air control and bouncy jumps. Not great at bumping.",
 		Hitbox = Vector3.new(6.6, 2.2, 7.8),
+		StageNames = { "UFO", "Golden UFO", "Lava UFO", "Galaxy UFO" },
 		Stats = {
 			Speed = 1,
 			Acceleration = 1.03,
@@ -167,6 +174,11 @@ function CarCatalog.ordered(): { CarDef }
 		return a.Price < b.Price
 	end)
 	return list
+end
+
+-- The car's name at an evolution stage (1 = as unlocked).
+function CarCatalog.stageName(def: CarDef, stage: number): string
+	return def.StageNames[math.clamp(stage, 1, #def.StageNames)] or def.DisplayName
 end
 
 function CarCatalog.isValidId(id: unknown): boolean

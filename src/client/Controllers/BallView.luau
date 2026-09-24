@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ArenaShape = require(Shared.Arena.ArenaShape)
+local BallModelBuilder = require(Shared.Ball.BallModelBuilder)
 local BallSim = require(Shared.Physics.BallSim)
 local GameConfig = require(Shared.Config.GameConfig)
 local HitModel = require(Shared.Physics.HitModel)
@@ -66,36 +67,8 @@ local function hasFlag(flags: number, flag: number): boolean
 end
 
 local function buildBall()
-	local model = Instance.new("Model")
-	model.Name = "Ball"
-
-	local part = Instance.new("Part")
-	part.Name = "Ball"
-	part.Shape = Enum.PartType.Ball
-	part.Size = Vector3.one * RADIUS * 2
-	part.Color = Color3.fromRGB(245, 245, 250)
-	part.Material = Enum.Material.SmoothPlastic
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.Parent = model
-
-	-- Coloured bands so you can see the ball spin.
-	for i, axis in { CFrame.Angles(0, 0, 0), CFrame.Angles(math.rad(90), 0, 0) } do
-		local band = Instance.new("Part")
-		band.Name = "Band"
-		band.Shape = Enum.PartType.Cylinder
-		band.Size = Vector3.new(0.6, RADIUS * 2 + 0.1, RADIUS * 2 + 0.1)
-		band.CFrame = part.CFrame * axis * CFrame.Angles(0, 0, math.rad(90 * (i - 1)))
-		band.Color = if i == 1 then Color3.fromRGB(255, 190, 40) else Color3.fromRGB(70, 150, 255)
-		band.Material = Enum.Material.Neon
-		band.Anchored = true
-		band.CanCollide = false
-		band.CanQuery = false
-		band.CanTouch = false
-		band.Parent = model
-	end
+	local model = BallModelBuilder.build()
+	local part = model.PrimaryPart :: Part
 
 	local top = Instance.new("Attachment")
 	top.Position = Vector3.new(0, RADIUS * 0.6, 0)

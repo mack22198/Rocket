@@ -13,19 +13,21 @@ Theme.Title = Enum.Font.FredokaOne
 Theme.Body = Enum.Font.GothamBold
 
 Theme.Colors = {
-	Panel = rgb(24, 28, 48),
-	PanelLight = rgb(42, 50, 84),
-	PanelDark = rgb(14, 16, 30),
+	Panel = rgb(22, 26, 48),
+	PanelLight = rgb(40, 48, 84),
+	PanelDark = rgb(12, 14, 28),
 	Text = rgb(255, 255, 255),
-	Muted = rgb(175, 185, 215),
-	Gold = rgb(255, 208, 64),
-	Scrap = rgb(255, 170, 60),
-	Good = rgb(90, 225, 120),
-	Bad = rgb(255, 95, 95),
+	Muted = rgb(170, 182, 214),
+	Gold = rgb(255, 204, 51),
+	Scrap = rgb(255, 176, 64),
+	Good = rgb(88, 222, 118),
+	Bad = rgb(255, 92, 92),
 	Blue = GameConfig.Teams.Blue.Color,
 	Orange = GameConfig.Teams.Orange.Color,
 	Mega = rgb(255, 120, 40),
 	Boost = rgb(255, 200, 50),
+	Evolve = rgb(186, 120, 255), -- car XP and evolving
+	Ink = rgb(10, 12, 24), -- outlines and text on bright buttons
 }
 
 function Theme.teamColor(team: string?): Color3
@@ -76,10 +78,15 @@ function Theme.panel(parent: Instance, name: string, size: UDim2, position: UDim
 	frame.Position = position
 	frame.AnchorPoint = anchor or Vector2.zero
 	frame.BackgroundColor3 = Theme.Colors.Panel
+	frame.BackgroundTransparency = 0.04
 	frame.BorderSizePixel = 0
 	frame.Parent = parent
-	Theme.corner(frame, 14)
-	Theme.stroke(frame, rgb(255, 255, 255), 2).Transparency = 0.85
+	Theme.corner(frame, 16)
+	Theme.stroke(frame, rgb(255, 255, 255), 2).Transparency = 0.82
+	local shade = Instance.new("UIGradient")
+	shade.Color = ColorSequence.new(rgb(255, 255, 255), rgb(170, 175, 195))
+	shade.Rotation = 90
+	shade.Parent = frame
 	return frame
 end
 
@@ -131,29 +138,123 @@ export type ButtonOptions = {
 	textColor: Color3?,
 }
 
+-- A chunky button: bright colour, a darker rim and a little shine on top.
 function Theme.button(parent: Instance, options: ButtonOptions): TextButton
+	local color = options.color or Theme.Colors.Gold
 	local button = Instance.new("TextButton")
 	button.Name = options.name or "Button"
 	button.Size = options.size
 	button.Position = options.position or UDim2.new()
 	button.AnchorPoint = options.anchor or Vector2.zero
-	button.BackgroundColor3 = options.color or Theme.Colors.Gold
+	button.BackgroundColor3 = color
 	button.BorderSizePixel = 0
 	button.AutoButtonColor = true
 	button.Text = options.text
 	button.Font = Theme.Title
 	button.TextScaled = true
-	button.TextColor3 = options.textColor or rgb(40, 30, 10)
+	button.TextColor3 = options.textColor or Theme.Colors.Ink
 	button.Parent = parent
-	Theme.corner(button, 12)
-	Theme.stroke(button, rgb(0, 0, 0), 2).Transparency = 0.6
+	Theme.corner(button, 14)
+	Theme.stroke(button, color:Lerp(rgb(0, 0, 0), 0.5), 3)
+	local shine = Instance.new("UIGradient")
+	shine.Color = ColorSequence.new(rgb(255, 255, 255), rgb(205, 205, 205))
+	shine.Rotation = 90
+	shine.Parent = button
 	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0.15, 0)
-	padding.PaddingBottom = UDim.new(0.15, 0)
-	padding.PaddingLeft = UDim.new(0, 8)
-	padding.PaddingRight = UDim.new(0, 8)
+	padding.PaddingTop = UDim.new(0.18, 0)
+	padding.PaddingBottom = UDim.new(0.18, 0)
+	padding.PaddingLeft = UDim.new(0, 10)
+	padding.PaddingRight = UDim.new(0, 10)
 	padding.Parent = button
 	return button
+end
+
+-- Sets a Theme.button's colour (keeping its rim in step).
+function Theme.setButtonColor(button: TextButton, color: Color3, textColor: Color3?)
+	button.BackgroundColor3 = color
+	button.TextColor3 = textColor or Theme.Colors.Ink
+	local stroke = button:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Color = color:Lerp(rgb(0, 0, 0), 0.5)
+	end
+end
+
+export type PillOptions = {
+	name: string?,
+	size: UDim2,
+	position: UDim2?,
+	anchor: Vector2?,
+	text: string,
+	color: Color3?, -- text colour
+	background: Color3?,
+	transparency: number?,
+	font: Enum.Font?,
+}
+
+-- A rounded label with its own background, for short bits of status.
+function Theme.pill(parent: Instance, options: PillOptions): TextLabel
+	local label = Instance.new("TextLabel")
+	label.Name = options.name or "Pill"
+	label.Size = options.size
+	label.Position = options.position or UDim2.new()
+	label.AnchorPoint = options.anchor or Vector2.zero
+	label.BackgroundColor3 = options.background or Theme.Colors.Panel
+	label.BackgroundTransparency = options.transparency or 0.1
+	label.BorderSizePixel = 0
+	label.Text = options.text
+	label.Font = options.font or Theme.Title
+	label.TextScaled = true
+	label.TextColor3 = options.color or Theme.Colors.Text
+	label.Parent = parent
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.5, 0)
+	corner.Parent = label
+	Theme.stroke(label, rgb(255, 255, 255), 2).Transparency = 0.8
+	local padding = Instance.new("UIPadding")
+	padding.PaddingTop = UDim.new(0.2, 0)
+	padding.PaddingBottom = UDim.new(0.2, 0)
+	padding.PaddingLeft = UDim.new(0, 14)
+	padding.PaddingRight = UDim.new(0, 14)
+	padding.Parent = label
+	return label
+end
+
+export type Bar = { frame: Frame, fill: Frame, set: (fraction: number) -> () }
+
+-- A rounded progress bar. Call bar.set(0..1) to fill it.
+function Theme.bar(parent: Instance, size: UDim2, position: UDim2, color: Color3): Bar
+	local frame = Instance.new("Frame")
+	frame.Name = "Bar"
+	frame.Size = size
+	frame.Position = position
+	frame.BackgroundColor3 = Theme.Colors.PanelDark
+	frame.BorderSizePixel = 0
+	frame.Parent = parent
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.5, 0)
+	corner.Parent = frame
+	Theme.stroke(frame, rgb(255, 255, 255), 1.5).Transparency = 0.85
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.fromScale(0, 1)
+	fill.BackgroundColor3 = color
+	fill.BorderSizePixel = 0
+	fill.Parent = frame
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(0.5, 0)
+	fillCorner.Parent = fill
+	local shine = Instance.new("UIGradient")
+	shine.Color = ColorSequence.new(rgb(255, 255, 255), rgb(200, 200, 200))
+	shine.Rotation = 90
+	shine.Parent = fill
+	return {
+		frame = frame,
+		fill = fill,
+		set = function(fraction: number)
+			fill.Size = UDim2.fromScale(math.clamp(fraction, 0, 1), 1)
+			fill.Visible = fraction > 0.005
+		end,
+	}
 end
 
 -- UI is laid out in pixels for a 1280x720 screen and scaled per panel, so it's a sensible size from phones

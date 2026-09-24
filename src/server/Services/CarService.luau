@@ -82,7 +82,7 @@ end
 -- Builds the participant's car at `cframe`, frozen in place until release() is called.
 function CarService.spawn(p: Participant, cframe: CFrame)
 	CarService.despawn(p)
-	local model = CarModelBuilder.build(p.def, { teamColor = teamColor(p.team) })
+	local model = CarModelBuilder.build(p.def, { teamColor = teamColor(p.team), stage = p.stage })
 	model.Name = p.name
 	model:SetAttribute(A.OwnerUserId, if p.player then p.player.UserId else 0)
 	model:SetAttribute(A.IsBot, p.isBot)

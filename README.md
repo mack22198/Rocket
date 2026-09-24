@@ -11,8 +11,10 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
 
 - **3v3 matches, 5 minutes long.** Bots fill any empty seats, so one kid alone still gets a full game. Players who
   join mid-match take over a bot's seat right away.
-- **Car soccer:** a curved-wall arena with glowing goals, boost pads, kickoff countdowns, a scoreboard and clock,
-  a play-on-at-0:00 rule, and golden-goal overtime.
+- **Car soccer:** a curved-wall arena with glowing goals and nets, boost pads, kickoff countdowns, a scoreboard and
+  clock, a play-on-at-0:00 rule, and golden-goal overtime.
+- **A real stadium:** team-coloured stands packed with fans (who jump when someone scores), advert boards, glass
+  walls, floodlights and giant screens showing the live score, all under a sunny sky with hills and trees around.
 - **Arcade driving:** boost, jump, double jump, flips (dodges), air control and air roll, driving up the curved
   walls, and bumping other cars.
 - **Mega Shot:** touching the ball, making saves and doing style moves fills a meter. When it's full, press
@@ -21,10 +23,15 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   Saves, style moves and MVP are all announced.
 - **Rewards:** everyone earns **Scrap** every match (more for winning, goals, saves and style). Scrap is the
   only currency and there are no loot boxes.
-- **6 collectible cars:** Pizza Car (starter), Banana Car, Tiny Kart, Neon Shark, Monster Truck and UFO. Each has
-  real strengths and weaknesses, and rarity never means "better".
-- **Garage:** spinning 3D previews, stats, prices and unlock/equip. A car showroom in the lobby plus an
-  "X more Scrap to unlock" bar on the results screen keep the next goal in sight.
+- **6 collectible cars with faces:** Pizza Car (starter), Banana Car, Tiny Kart, Neon Shark, Monster Truck and UFO.
+  Each has real strengths and weaknesses, and rarity never means "better".
+- **Car evolutions:** every car earns XP while you drive it (as much as the Scrap you win) and evolves through
+  four looks, e.g. Pizza Car → Burnt Pizza Car → Lava Pizza Car → Galaxy Pizza Car. Evolving is earned by playing,
+  never bought, and only changes looks. You can switch back to any look you've unlocked, and bots sometimes
+  drive evolved cars to show what's possible.
+- **Garage:** spinning 3D previews, stats, prices, unlock/equip, and each car's evolution track with an EVOLVE!
+  button. The lobby showroom, the "saving up for" panel and the results screen keep the next goal in sight.
+- **Lobby:** a VIP deck built into the stands, looking out over the pitch, with the car showroom on turntables.
 - **Works on computer, gamepad and phone/tablet** (on-screen stick and buttons).
 - **Progress saves** with DataStores (once the game is published).
 
@@ -36,12 +43,13 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
      green run, and download **TurboBall-place** under *Artifacts* (it's a zip; unzip it).
    - Or build it yourself (see [Working on the code](#working-on-the-code)).
 3. Double-click `TurboBall.rbxlx` to open it in Studio (or **File → Open from File**).
-4. Press **Play** (F5). You spawn on the viewing deck next to the stadium. After a few seconds you're put
+4. Press **Play** (F5). You spawn on the VIP deck overlooking the pitch. After a few seconds you're put
    into a car and the countdown starts.
 5. To try it with more than one player: **Test** tab → *Clients and Servers* → choose 2+ players → **Start**.
 
 When testing in Studio your progress isn't saved unless the place is published and API access is on (see below).
-To try the garage without grinding, set `StudioStartingScrap` in `GameConfig.luau`, e.g. to `5000`.
+To try the garage without grinding, set `StudioStartingScrap` in `GameConfig.luau`, e.g. to `5000`. To see
+evolutions quickly, lower the numbers in `GameConfig.Evolution.Xp`.
 
 ## Controls
 
@@ -73,9 +81,13 @@ Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
   boost, jump height, gravity, bot skill, Mega Shot, boost pads and Studio shortcuts.
 - [`CarCatalog.luau`](src/shared/Config/CarCatalog.luau): the cars, prices and stats.
 - [`Rewards.luau`](src/shared/Config/Rewards.luau): how much Scrap each thing is worth.
+- `GameConfig.Evolution`: how much XP each evolution stage needs.
 
-Car looks are built from plain parts in [`CarModelBuilder.luau`](src/shared/Cars/CarModelBuilder.luau), so new
-cars need no uploaded models. Sounds use Roblox's built-in ones; to add a goal horn or crowd cheer, paste audio
+Car looks (and every evolution stage) are built from plain parts in
+[`CarModelBuilder.luau`](src/shared/Cars/CarModelBuilder.luau), so new cars need no uploaded models. The stadium,
+lobby and scenery are built the same way in [`src/server/Arena`](src/server/Arena); their colours are in
+[`Palette.luau`](src/server/Arena/Palette.luau), and the lighting (sun, haze, glow) is set in
+[`default.project.json`](default.project.json). Sounds use Roblox's built-in ones; to add a goal horn or crowd cheer, paste audio
 IDs from the Creator Store into `SOUNDS` in
 [`EffectsController.luau`](src/client/Controllers/EffectsController.luau).
 
@@ -108,26 +120,36 @@ luau-lsp analyze --definitions=@roblox=roblox.d.luau --sourcemap=sourcemap.json 
 (`roblox.d.luau` comes from
 [luau-lsp](https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/1.70.0/scripts/globalTypes.None.d.luau).)
 
+### Previews without Studio
+
+[`tools/preview`](tools/preview) draws the stadium, the cars and the UI screens in a web browser using the game's
+real building code, which is handy for checking changes to how things look from any computer. See its
+[README](tools/preview/README.md).
+
 ## How it's built
 
 ```
 src/
   shared/   (ReplicatedStorage.Shared: used by both server and client)
-    Config/       GameConfig, CarCatalog, Rewards
+    Config/       GameConfig, CarCatalog, Rewards, Evolution
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits)
     Bots/         BotBrain (bot decisions)
-    Cars/         CarModelBuilder (car looks), CarDriver (connects CarPhysics to a real car)
+    Cars/         CarModelBuilder (car looks at every evolution stage), CarDriver (connects CarPhysics to a car)
+    Ball/         BallModelBuilder (the ball's look)
     Net/          Remotes
   server/   (ServerScriptService.Server)
-    Arena/        ArenaBuilder, LobbyBuilder: build the stadium and lobby when the server starts
+    Arena/        ArenaBuilder (pitch, walls, goals), StadiumBuilder (stands, crowd, roof, screens),
+                  LobbyBuilder (VIP deck and showroom), EnvironmentBuilder (terrain, trees), PartKit, Palette
     Services/     MatchService (the game loop), BallService, CarService, BotService, StatsService,
                   BoostPadService, BumpService, DataService (saving), GarageService
   client/   (StarterPlayerScripts.Client)
-    Controllers/  InputController, CarController, BallView, CameraController, EffectsController
+    Controllers/  InputController, CarController, BallView, CameraController, EffectsController,
+                  StadiumController (live scoreboards, cheering crowd, spinning showroom)
     UI/           HUD, Announcer, ResultsScreen, Garage, TouchControls, Theme
 tests/      Lune unit tests (run outside Roblox)
+tools/      Offline previews of the 3D world and the UI
 ```
 
 - **The ball doesn't use Roblox physics.** `BallSim` is a small deterministic simulation against the exact arena
@@ -145,17 +167,16 @@ tests/      Lune unit tests (run outside Roblox)
 Ideas from the design, roughly in order:
 
 1. Daily missions with a "pick 1 of 3" reward chest (predictable, not gambling).
-2. Car evolutions, e.g. Pizza Car → Burnt → Lava → Galaxy Pizza.
-3. Collectible goal celebrations ("Show Off").
-4. Short, predictable arena events such as low gravity, ice, or a tornado.
-5. A bigger lobby hub with a practice area, mini-games and secrets.
-6. Seasons (Spaceball, Dinosaurs, Pirates, Candy...) with new arenas and cars.
-7. Car fusion (Shark + Lightning = Storm Shark).
+2. Collectible goal celebrations ("Show Off").
+3. Short, predictable arena events such as low gravity, ice, or a tornado.
+4. A bigger lobby hub with a practice area, mini-games and secrets.
+5. Seasons (Spaceball, Dinosaurs, Pirates, Candy...) with new arenas and cars.
+6. Car fusion (Shark + Lightning = Storm Shark).
 
 ## Known limitations
 
-- This first version was built and checked outside Roblox: unit tests, a simulated bot match, the Roblox
-  type checker and a Rojo build. It hasn't been play-tested in Studio yet, so expect some tuning
-  (car feel, bot difficulty, UI sizes) after the first real session.
+- This version was built and checked outside Roblox: unit tests, a simulated bot match, the Roblox type checker,
+  a Rojo build, and the offline previews above. It hasn't been play-tested in Studio yet, so expect some tuning
+  (car feel, bot difficulty, UI sizes, lighting) after the first real session.
 - Other players' hits reach you after a short network delay (standard for online games). Your own hits are instant.
 - Sounds are Roblox's built-in placeholders.

@@ -1,5 +1,5 @@
 --!strict
--- The client's copy of this player's saved data (Scrap, owned cars, equipped car), kept fresh by the server.
+-- The client's copy of this player's saved data (Scrap, cars, evolutions), kept fresh by the server.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -13,6 +13,9 @@ export type Data = {
 	owned: { [string]: boolean },
 	equipped: string,
 	stats: { [string]: number },
+	carXp: { [string]: number },
+	carStage: { [string]: number },
+	carLook: { [string]: number },
 }
 
 local PlayerDataClient = {}
@@ -24,6 +27,9 @@ local current: Data = {
 	owned = { [CarCatalog.StarterId] = true },
 	equipped = CarCatalog.StarterId,
 	stats = {},
+	carXp = {},
+	carStage = {},
+	carLook = {},
 }
 local loaded = false
 
@@ -36,6 +42,9 @@ local function apply(raw: any)
 		owned = if type(raw.owned) == "table" then raw.owned else { [CarCatalog.StarterId] = true },
 		equipped = if type(raw.equipped) == "string" then raw.equipped else CarCatalog.StarterId,
 		stats = if type(raw.stats) == "table" then raw.stats else {},
+		carXp = if type(raw.carXp) == "table" then raw.carXp else {},
+		carStage = if type(raw.carStage) == "table" then raw.carStage else {},
+		carLook = if type(raw.carLook) == "table" then raw.carLook else {},
 	}
 	loaded = true
 	PlayerDataClient.Changed:Fire(current)

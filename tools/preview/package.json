@@ -1,0 +1,12 @@
+{
+  "name": "turbo-ball-preview",
+  "private": true,
+  "description": "Offline previews of the stadium, cars and UI (see README.md)",
+  "type": "module",
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
+}

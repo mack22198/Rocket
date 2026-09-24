@@ -95,6 +95,10 @@ function Announcer.popup(text: string, color: Color3)
 			return
 		end
 		TweenService:Create(popup, TweenInfo.new(0.3), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+		task.wait(0.35)
+		if token == popupToken then
+			popup.Visible = false
+		end
 	end)
 end
 

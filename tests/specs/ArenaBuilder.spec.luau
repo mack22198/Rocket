@@ -66,12 +66,41 @@ return function(t)
 		end
 	end)
 
+	local function corners(part: BasePart): { Vector3 }
+		local list = {}
+		local half = part.Size / 2
+		for _, sx in { -1, 1 } do
+			for _, sy in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					table.insert(list, part.CFrame * Vector3.new(sx * half.X, sy * half.Y, sz * half.Z))
+				end
+			end
+		end
+		return list
+	end
+
 	t.test("side walls' inner faces match the arena edges", function()
-		for _, part in parts("Wall") do
-			local centre = part.CFrame.Position
-			local inner = part.CFrame * Vector3.new(-math.sign(centre.X) * part.Size.X / 2, 0, 0)
-			if math.abs(centre.Z) < 1 and math.abs(centre.X) > 100 then
-				expect.near(math.abs(inner.X), GameConfig.Arena.Width / 2, 1e-3)
+		local checked = 0
+		for _, name in { "Wall", "Boards" } do
+			for _, part in parts(name) do
+				local centre = part.CFrame.Position
+				if math.abs(centre.Z) < 70 and math.abs(centre.X) > 100 then
+					local nearest = math.huge
+					for _, corner in corners(part) do
+						nearest = math.min(nearest, math.abs(corner.X))
+					end
+					expect.near(nearest, GameConfig.Arena.Width / 2, 1e-3)
+					checked += 1
+				end
+			end
+		end
+		expect.atLeast(checked, 6)
+	end)
+
+	t.test("no solid part pokes into the playing space", function()
+		for _, part in parts() do
+			for _, corner in corners(part) do
+				expect.falsy(shape:contains(corner, 0.02), `{part.Name} corner {corner} sticks into the field`)
 			end
 		end
 	end)

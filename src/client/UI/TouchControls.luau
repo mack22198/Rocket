@@ -2,7 +2,11 @@
 -- On-screen controls for phones and tablets: a thumbstick on the left (steer + drive) and big buttons on the right.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+
+local MatchState = require(ReplicatedStorage:WaitForChild("Shared").Match.MatchState)
 
 local CameraController = require(script.Parent.Parent.Controllers.CameraController)
 local CarController = require(script.Parent.Parent.Controllers.CarController)
@@ -155,9 +159,24 @@ local function build()
 		end
 	end)
 
-	local boost = makeButton("Boost", "BOOST", Color3.fromRGB(255, 140, 30), 120, 95, 110)
+	-- The BOOST button also shows how much boost is left.
+	local boost = makeButton("Boost", "0", Color3.fromRGB(255, 140, 30), 120, 95, 110)
+	local boostCaption = Theme.label(boost, {
+		name = "Caption",
+		size = UDim2.fromScale(1, 0.3),
+		position = UDim2.fromScale(0.5, 1.42),
+		anchor = Vector2.new(0.5, 1),
+		text = "BOOST",
+		font = Enum.Font.GothamBlack,
+	})
+	boostCaption.ZIndex = 2
 	holdButton(boost, function(held)
 		InputController.setTouchButton("boost", held)
+	end)
+	RunService.RenderStepped:Connect(function()
+		local car = CarController.getCar()
+		local amount = if car then car:GetAttribute(MatchState.CarAttr.Boost) else nil
+		boost.Text = tostring(math.floor(if type(amount) == "number" then amount else 0))
 	end)
 	local jump = makeButton("Jump", "JUMP", Color3.fromRGB(60, 160, 255), 100, 215, 70)
 	holdButton(jump, function(held)

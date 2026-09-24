@@ -32,6 +32,9 @@ export type SavedData = {
 	owned: { [string]: boolean },
 	equipped: string,
 	stats: LifetimeStats,
+	carXp: { [string]: number }, -- XP each car has earned (see Evolution)
+	carStage: { [string]: number }, -- how far each car has evolved (1 = not yet)
+	carLook: { [string]: number }, -- which unlocked stage each car shows off
 }
 
 type Profile = {
@@ -42,7 +45,7 @@ type Profile = {
 
 local DataService = {}
 
-local DATA_VERSION = 1
+local DATA_VERSION = 2
 local LOAD_ATTEMPTS = 6
 local LOAD_RETRY_DELAY = 3
 
@@ -58,6 +61,9 @@ local function defaultData(): SavedData
 		owned = { [CarCatalog.StarterId] = true },
 		equipped = CarCatalog.StarterId,
 		stats = { matches = 0, wins = 0, goals = 0, assists = 0, saves = 0, shots = 0, megaShots = 0, scrapEarned = 0 },
+		carXp = {},
+		carStage = {},
+		carLook = {},
 	}
 end
 
@@ -90,6 +96,24 @@ local function sanitize(raw: any): SavedData
 			(data.stats :: any)[name] = number(raw.stats[name], value :: number)
 		end
 	end
+	-- Evolution progress (added in version 2; older saves simply start from zero).
+	local maxStage = GameConfig.Evolution.Stages
+	for _, field in { "carXp", "carStage", "carLook" } do
+		if type(raw[field]) ~= "table" then
+			continue
+		end
+		for id, value in raw[field] do
+			if CarCatalog.isValidId(id) then
+				(data :: any)[field][id] = number(value, 0)
+			end
+		end
+	end
+	for id, stage in data.carStage do
+		data.carStage[id] = math.clamp(stage, 1, maxStage)
+	end
+	for id, look in data.carLook do
+		data.carLook[id] = math.clamp(look, 1, data.carStage[id] or 1)
+	end
 	return data
 end
 
@@ -100,6 +124,9 @@ local function serialize(data: SavedData, withSession: boolean): { [string]: any
 		owned = table.clone(data.owned),
 		equipped = data.equipped,
 		stats = table.clone(data.stats),
+		carXp = table.clone(data.carXp),
+		carStage = table.clone(data.carStage),
+		carLook = table.clone(data.carLook),
 	}
 	if withSession then
 		copy.session = { jobId = game.JobId, time = os.time() }
@@ -135,6 +162,9 @@ local function clientView(data: SavedData): { [string]: any }
 		owned = table.clone(data.owned),
 		equipped = data.equipped,
 		stats = table.clone(data.stats),
+		carXp = table.clone(data.carXp),
+		carStage = table.clone(data.carStage),
+		carLook = table.clone(data.carLook),
 	}
 end
 

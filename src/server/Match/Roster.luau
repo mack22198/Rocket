@@ -18,6 +18,7 @@ export type Participant = {
 	team: Team,
 	slot: number, -- kickoff position index within the team
 	def: CarCatalog.CarDef,
+	stage: number, -- which evolution look the car shows
 	car: Model?,
 	chassis: BasePart?,
 	driver: CarDriver.CarDriver?, -- server-side driver (bots only)
@@ -104,6 +105,7 @@ function Roster.newParticipant(fields: {
 	team: Team,
 	slot: number,
 	def: CarCatalog.CarDef,
+	stage: number,
 }): Participant
 	return {
 		key = fields.key,
@@ -113,6 +115,7 @@ function Roster.newParticipant(fields: {
 		team = fields.team,
 		slot = fields.slot,
 		def = fields.def,
+		stage = fields.stage,
 		car = nil,
 		chassis = nil,
 		driver = nil,

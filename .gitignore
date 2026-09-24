@@ -13,6 +13,14 @@ globalTypes.d.luau
 roblox.yml
 /build/
 
+# Preview tools: downloaded packages and generated files
+tools/preview/node_modules/
+tools/preview/package-lock.json
+tools/preview/scene.json
+tools/preview/ui-*.json
+tools/preview/bg-*.png
+tools/preview/shots/
+
 # Editors and OS files
 .vscode/*
 !.vscode/settings.json

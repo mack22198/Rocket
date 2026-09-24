@@ -38,6 +38,10 @@ export type Ramp = {
 	from: number, -- extent along `along`, measured from wallPoint
 	to: number,
 	radius: number,
+	-- Where this ramp meets the next wall's ramp in a 45 degree corner (nil = a free end, beside a goal).
+	-- Only used to draw the ramps; the maths above is all the ball needs.
+	cornerFrom: number?,
+	cornerTo: number?,
 }
 
 export type Arena = typeof(setmetatable(
@@ -122,6 +126,8 @@ function ArenaShape.new(config: Config): Arena
 			from = -straightHalf - overlap,
 			to = straightHalf + overlap,
 			radius = radius,
+			cornerFrom = -straightHalf,
+			cornerTo = straightHalf,
 		})
 	end
 	local diagonalLength = cut * math.sqrt(2)
@@ -136,6 +142,8 @@ function ArenaShape.new(config: Config): Arena
 				from = -overlap,
 				to = diagonalLength + overlap,
 				radius = radius,
+				cornerFrom = 0,
+				cornerTo = diagonalLength,
 			})
 		end
 	end
@@ -150,6 +158,7 @@ function ArenaShape.new(config: Config): Arena
 			from = goalHalfWidth,
 			to = endStraightHalf + overlap,
 			radius = radius,
+			cornerTo = endStraightHalf,
 		})
 		table.insert(ramps, {
 			wallPoint = wallPoint,
@@ -158,6 +167,7 @@ function ArenaShape.new(config: Config): Arena
 			from = -endStraightHalf - overlap,
 			to = -goalHalfWidth,
 			radius = radius,
+			cornerFrom = -endStraightHalf,
 		})
 	end
 

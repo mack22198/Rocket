@@ -194,9 +194,19 @@ GameConfig.Teams = {
 	},
 }
 
+-- Cars power up as you play with them. Evolving changes how a car looks, never how it drives.
+GameConfig.Evolution = {
+	Stages = 4,
+	-- Car XP needed to reach each stage. A car earns as much XP as the Scrap you win while driving it.
+	Xp = { 0, 500, 1500, 3500 },
+	-- How often bots show up in each stage (so players see what their cars can become).
+	BotStageWeights = { 5, 3, 2, 1 },
+}
+
+-- The lobby is a VIP deck built into the stands on the +X side, looking out over the pitch.
 GameConfig.Lobby = {
-	Center = Vector3.new(185, 36, 0), -- top of the viewing deck beside the arena
-	Size = Vector3.new(80, 2, 180),
+	Center = Vector3.new(194, 52, 0), -- middle of the deck's floor, on its top surface
+	Size = Vector3.new(92, 2, 192),
 }
 
 GameConfig.Data = {

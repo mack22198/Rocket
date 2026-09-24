@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.Config.CarCatalog)
+local Evolution = require(Shared.Config.Evolution)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 local MathUtil = require(Shared.Util.MathUtil)
@@ -149,10 +150,14 @@ local function safeSpawnCFrame(p: Participant): CFrame
 	return MathUtil.lookAlong(position, Vector3.new(0, 0, -side))
 end
 
-local function equippedCar(player: Player): CarCatalog.CarDef
+-- The car a player drives, and which evolution look it shows.
+local function equippedCar(player: Player): (CarCatalog.CarDef, number)
 	local data = DataService.get(player)
 	local def = if data then CarCatalog.get(data.equipped) else nil
-	return def or (CarCatalog.get(CarCatalog.StarterId) :: CarCatalog.CarDef)
+	if data and def then
+		return def, data.carLook[def.Id] or 1
+	end
+	return CarCatalog.get(CarCatalog.StarterId) :: CarCatalog.CarDef, 1
 end
 
 local function makeBot(team: Team, slot: number): Participant
@@ -168,17 +173,20 @@ local function makeBot(team: Team, slot: number): Participant
 		team = team,
 		slot = slot,
 		def = def,
+		stage = Evolution.botStage(rng:NextNumber()),
 	})
 end
 
 local function makePlayerParticipant(player: Player, team: Team, slot: number): Participant
+	local def, stage = equippedCar(player)
 	return Roster.newParticipant({
 		key = `player:{player.UserId}`,
 		player = player,
 		name = player.DisplayName,
 		team = team,
 		slot = slot,
-		def = equippedCar(player),
+		def = def,
+		stage = stage,
 	})
 end
 
@@ -454,7 +462,12 @@ local function finishMatch(aborted: boolean)
 			local summary = Rewards.compute(p.stats, outcome, mvp == p)
 			local scrap: number? = nil
 			local owned: { [string]: boolean } = {}
+			local carXp, carStage = 0, 1
 			DataService.update(player, function(data)
+				-- The car they drove earns as much XP as the Scrap they won.
+				carXp = (data.carXp[p.def.Id] or 0) + summary.total
+				data.carXp[p.def.Id] = carXp
+				carStage = data.carStage[p.def.Id] or 1
 				data.scrap += summary.total
 				data.stats.matches += 1
 				if outcome == "Win" then
@@ -482,6 +495,13 @@ local function finishMatch(aborted: boolean)
 				nextGoal = if scrap then Rewards.nextGoal(owned, scrap) else nil,
 				scoreboard = board,
 				stats = p.stats,
+				car = {
+					id = p.def.Id,
+					name = CarCatalog.stageName(p.def, p.stage),
+					emoji = p.def.Emoji,
+					xpGained = summary.total,
+					progress = Evolution.progress(p.def, carXp, carStage),
+				},
 			})
 		end
 		setPhase(Phases.Results, M.ResultsLength)

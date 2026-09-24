@@ -9,6 +9,9 @@ local roblox = require("@lune/roblox")
 local harness = {}
 
 local moduleCache: { [string]: any } = {}
+
+-- Optional per-module source rewrites (used by the preview tools to stub Roblox-only methods).
+harness.sourceTransforms = {} :: { [string]: (string) -> string }
 local loading: { [string]: boolean } = {}
 
 local makeProxy: (string) -> any
@@ -53,7 +56,12 @@ local function loadModule(path: string): any
 	assert(not loading[path], `harness: require cycle at {path}`)
 	loading[path] = true
 	local env = harness.makeEnvironment(makeProxy(path))
-	local chunk = luau.load(fs.readFile(file), { debugName = file, environment = env })
+	local source = fs.readFile(file)
+	local transform = harness.sourceTransforms[path]
+	if transform then
+		source = transform(source)
+	end
+	local chunk = luau.load(source, { debugName = file, environment = env })
 	local result = chunk()
 	loading[path] = nil
 	moduleCache[path] = result
@@ -115,9 +123,15 @@ function harness.loadFile(path: string): any
 	return luau.load(fs.readFile(path), { debugName = path, environment = env })()
 end
 
--- The shared and server folders, as seen from a test: require(Shared.Physics.BallSim)
+-- Use `value` whenever the module at `path` (e.g. "src/client/Controllers/CarController") is required.
+function harness.preload(path: string, value: any)
+	moduleCache[path] = value
+end
+
+-- The shared, server and client folders, as seen from a test: require(Shared.Physics.BallSim)
 harness.Shared = makeProxy("src/shared")
 harness.Server = makeProxy("src/server")
+harness.Client = makeProxy("src/client")
 harness.require = fakeRequire
 
 return harness

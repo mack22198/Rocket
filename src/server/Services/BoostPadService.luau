@@ -24,8 +24,9 @@ local BoostPadService = {}
 local pads: { Pad } = {}
 local cfg = GameConfig.BoostPads
 
-local ACTIVE_COLOR = Color3.fromRGB(255, 190, 40)
-local USED_COLOR = Color3.fromRGB(90, 80, 60)
+local ACTIVE_COLOR = Color3.fromRGB(255, 180, 40)
+local USED_COLOR = Color3.fromRGB(74, 66, 54)
+local RING_COLOR = Color3.fromRGB(52, 58, 76)
 
 local function mirrored(points: { Vector3 }): { Vector3 }
 	local list: { Vector3 } = {}
@@ -54,26 +55,34 @@ local function setActive(pad: Pad, active: boolean)
 	end
 end
 
+local function disc(folder: Instance, name: string, position: Vector3, radius: number, height: number): Part
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Shape = Enum.PartType.Cylinder
+	part.Size = Vector3.new(height, radius * 2, radius * 2)
+	part.CFrame = CFrame.new(position + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Parent = folder
+	return part
+end
+
 local function build(folder: Instance, position: Vector3, big: boolean): Pad
 	local radius = if big then cfg.BigRadius else cfg.SmallRadius
-	local base = Instance.new("Part")
-	base.Name = if big then "BigBoostPad" else "BoostPad"
-	base.Shape = Enum.PartType.Cylinder
-	base.Size = Vector3.new(0.2, radius * 2, radius * 2)
-	base.CFrame = CFrame.new(position + Vector3.new(0, 0.08, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	base.Anchored = true
-	base.CanCollide = false
-	base.CanQuery = false
-	base.CanTouch = false
-	base.CastShadow = false
-	base.Parent = folder
+	local ring = disc(folder, "BoostPadRing", position, radius + 0.9, 0.28)
+	ring.Color = RING_COLOR
+	ring.Material = Enum.Material.Metal
+	local base = disc(folder, if big then "BigBoostPad" else "BoostPad", position, radius, 0.34)
 	local orb: Part? = nil
 	if big then
 		local ball = Instance.new("Part")
 		ball.Name = "BoostOrb"
 		ball.Shape = Enum.PartType.Ball
-		ball.Size = Vector3.new(2.5, 2.5, 2.5)
-		ball.CFrame = CFrame.new(position + Vector3.new(0, 3, 0))
+		ball.Size = Vector3.new(2.8, 2.8, 2.8)
+		ball.CFrame = CFrame.new(position + Vector3.new(0, 3.4, 0))
 		ball.Color = ACTIVE_COLOR
 		ball.Material = Enum.Material.Neon
 		ball.Anchored = true

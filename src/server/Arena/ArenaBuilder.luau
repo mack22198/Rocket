@@ -1,11 +1,13 @@
 --!strict
--- Builds the stadium out of parts when the server starts, using the same numbers as ArenaShape
+-- Builds the arena out of parts when the server starts, using the same numbers as ArenaShape
 -- (so what you see matches what the ball bounces off).
 --
 -- Workspace.Arena      = everything cars drive on or bump into (wheel rays only look at this folder)
--- Workspace.ArenaDecor = lines, goal frames, signs and stands (no collisions)
+-- Workspace.ArenaDecor = field lines, trim, glass, goal nets and signs (no collisions, invisible to rays)
+--
+-- Each wall, from the floor up: the curved ramp, solid boards with adverts, then glass up to the invisible
+-- ceiling. StadiumBuilder builds the stands around the arena.
 
-local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -13,402 +15,548 @@ local ArenaShape = require(Shared.Arena.ArenaShape)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 
+local Palette = require(script.Parent.Palette)
+local PartKit = require(script.Parent.PartKit)
+
 local ArenaBuilder = {}
+
+type Team = typeof(GameConfig.Teams.Blue)
+
+-- One straight stretch of wall, described by its inner face at floor level.
+type Piece = {
+	a: Vector3,
+	b: Vector3,
+	inward: Vector3, -- horizontal, pointing into the field
+	cornerA: boolean, -- ends in a 45 degree corner at a (parts reach past it to close the joint)
+	cornerB: boolean,
+}
 
 local rgb = Color3.fromRGB
 local cfg = GameConfig.Arena
+local UP = Vector3.yAxis
+local NEON = Enum.Material.Neon
 
-local FIELD_LIGHT = rgb(88, 190, 90)
-local FIELD_DARK = rgb(72, 170, 76)
-local WALL_COLOR = rgb(190, 225, 255)
-local RIM_COLOR = rgb(235, 245, 255)
+local BOARD_BOTTOM = cfg.CurveRadius -- the ramp covers the wall below this
+local BOARD_TOP = cfg.CurveRadius + 10
+local HEADER_TOP = BOARD_TOP + 6 -- top of the team sign above each goal
+local MITER = math.tan(math.rad(22.5)) -- how far a wall part reaches past a 45 degree corner, per stud of depth
+local LINE_WIDTH = 1.2
+local LINE_Y = 0.02 -- field markings sit just above the grass
+local NET_COLOR = rgb(240, 244, 250)
 
-type PartProps = {
-	Size: Vector3,
-	CFrame: CFrame,
-	Color: Color3,
-	Material: Enum.Material?,
-	Transparency: number?,
-	CanCollide: boolean?,
-	CanQuery: boolean?,
-	Name: string?,
-	CastShadow: boolean?,
+-- Pretend sponsors on the boards, one for every car.
+local ADS: { PartKit.BannerItem } = {
+	{ text = "🍕 PIZZA CAR PIZZERIA", color = rgb(255, 196, 84) },
+	{ text = "⚡ TURBO BALL ⚡", color = rgb(255, 255, 255) },
+	{ text = "🍌 BANANA BOOST JUICE", color = rgb(255, 232, 96) },
+	{ text = "🦈 SHARK BITE SNACKS", color = rgb(120, 214, 255) },
+	{ text = "🛸 UFO SPACE TOURS", color = rgb(150, 255, 120) },
+	{ text = "🏁 KART KINGDOM", color = rgb(120, 255, 170) },
+	{ text = "👹 MONSTER MUNCH", color = rgb(255, 128, 128) },
 }
+local nextAd = 0
 
-local function makePart(parent: Instance, props: PartProps): Part
-	local part = Instance.new("Part")
-	part.Name = props.Name or "Part"
-	part.Anchored = true
-	part.Size = props.Size
-	part.CFrame = props.CFrame
-	part.Color = props.Color
-	part.Material = props.Material or Enum.Material.SmoothPlastic
-	part.Transparency = props.Transparency or 0
-	part.CanCollide = if props.CanCollide == nil then true else props.CanCollide
-	part.CanQuery = if props.CanQuery == nil then true else props.CanQuery
-	part.CanTouch = false
-	part.CastShadow = if props.CastShadow == nil then true else props.CastShadow
-	part.TopSurface = Enum.SurfaceType.Smooth
-	part.BottomSurface = Enum.SurfaceType.Smooth
-	part.Parent = parent
-	return part
+local function takeAds(count: number): { PartKit.BannerItem }
+	local list = {}
+	for _ = 1, count do
+		nextAd = nextAd % #ADS + 1
+		table.insert(list, ADS[nextAd])
+	end
+	return list
 end
 
-local function decor(parent: Instance, props: PartProps): Part
-	props.CanCollide = false
-	props.CanQuery = false
-	props.CastShadow = false
-	return makePart(parent, props)
-end
-
-local function teamForSide(side: number): typeof(GameConfig.Teams.Blue)
+local function teamForSide(side: number): Team
 	return if GameConfig.Teams.Blue.DefendsSide == side then GameConfig.Teams.Blue else GameConfig.Teams.Orange
 end
 
-local function addLabel(part: BasePart, face: Enum.NormalId, text: string, color: Color3)
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = face
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 12
-	gui.LightInfluence = 0
-	gui.Parent = part
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Text = text
-	label.TextColor3 = color
-	label.TextScaled = true
-	label.Font = Enum.Font.FredokaOne
-	label.TextStrokeTransparency = 0.2
-	label.Parent = gui
+-- A painted line on the floor from a to b. By default it reaches half its width past each end so corners close.
+local function stripe(
+	decor: Instance,
+	name: string,
+	a: Vector3,
+	b: Vector3,
+	color: Color3,
+	material: Enum.Material?,
+	exact: boolean?
+): Part
+	local flat = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
+	local centre = Vector3.new((a.X + b.X) / 2, LINE_Y, (a.Z + b.Z) / 2)
+	return PartKit.decor(decor, {
+		Name = name,
+		Size = Vector3.new(LINE_WIDTH, 0.2, flat.Magnitude + (if exact then 0 else LINE_WIDTH)),
+		CFrame = CFrame.fromMatrix(centre, UP:Cross(flat.Unit), UP),
+		Color = color,
+		Material = material or Enum.Material.SmoothPlastic,
+		Shadow = false,
+	})
 end
 
--- One curved ramp, approximated with flat strips.
-local function buildRamp(parent: Instance, ramp: ArenaShape.Ramp, segments: number)
-	local R = ramp.radius
-	local thickness = 2
-	local length = ramp.to - ramp.from
-	local middle = (ramp.from + ramp.to) / 2
-	local function crossSection(angle: number): Vector2
-		return Vector2.new(R - R * math.sin(angle), R - R * math.cos(angle))
-	end
-	for i = 0, segments - 1 do
-		local a0 = (i / segments) * math.pi / 2
-		local a1 = ((i + 1) / segments) * math.pi / 2
-		local p0, p1 = crossSection(a0), crossSection(a1)
-		local mid = (p0 + p1) / 2
-		local chord = (p1 - p0).Magnitude
-		local outward = (mid - Vector2.new(R, R)).Unit -- away from the curve's centre, into the solid
-		local centre2D = mid + outward * (thickness / 2)
-		local centre = ramp.wallPoint + ramp.inward * centre2D.X + Vector3.yAxis * centre2D.Y + ramp.along * middle
-		local surfaceNormal = -(ramp.inward * outward.X + Vector3.yAxis * outward.Y)
-		local t = if segments > 1 then i / (segments - 1) else 0
-		makePart(parent, {
-			Name = "Ramp",
-			Size = Vector3.new(length, thickness, chord + 0.08),
-			CFrame = CFrame.fromMatrix(centre, ramp.along, surfaceNormal),
-			Color = FIELD_LIGHT:Lerp(WALL_COLOR, t),
-			Material = if t < 0.5 then Enum.Material.Grass else Enum.Material.SmoothPlastic,
-		})
-	end
-end
+local function buildField(arena: Instance, decor: Instance)
+	local W, L, R = cfg.Width, cfg.Length, cfg.CurveRadius
+	local GW, GD, T = cfg.GoalWidth, cfg.GoalDepth, cfg.WallThickness
 
-local function buildField(arena: Instance, decorFolder: Instance)
-	local W, L = cfg.Width, cfg.Length
-	-- Striped grass floor.
+	-- Mowed stripes, each half tinted a touch toward its team's colour.
 	local stripes = 10
 	local stripeLength = L / stripes
 	for i = 0, stripes - 1 do
 		local z = -L / 2 + stripeLength * (i + 0.5)
-		makePart(arena, {
+		local team = teamForSide(if z < 0 then -1 else 1)
+		local base = if i % 2 == 0 then Palette.GrassLight else Palette.GrassDark
+		PartKit.part(arena, {
 			Name = "Floor",
 			Size = Vector3.new(W, 2, stripeLength),
 			CFrame = CFrame.new(0, -1, z),
-			Color = if i % 2 == 0 then FIELD_LIGHT else FIELD_DARK,
+			Color = base:Lerp(team.Color, 0.07),
 			Material = Enum.Material.Grass,
 		})
 	end
-	-- Floors inside the goals.
+	for _, side in { 1, -1 } do
+		PartKit.part(arena, {
+			Name = "GoalFloor",
+			Size = Vector3.new(GW + 2 * T, 2, GD + T),
+			CFrame = CFrame.new(0, -1, side * (L / 2 + (GD + T) / 2)),
+			Color = Palette.GoalFloor,
+		})
+	end
+
+	-- The boundary where the flat pitch meets the ramps: the wall outline pulled in by the ramp radius.
+	local halfW, halfL = W / 2, L / 2
+	local inset = R + LINE_WIDTH / 2
+	local sideX = halfW - inset
+	local endZ = halfL - inset
+	local diagonalSum = halfW + halfL - cfg.CornerCut - inset * math.sqrt(2) -- x + z along the corner boundary
+	local mouth = GW / 2 - LINE_WIDTH / 2
+	for _, sx in { 1, -1 } do
+		for _, sz in { 1, -1 } do
+			local points = {
+				Vector3.new(sx * mouth, 0, sz * (halfL - LINE_WIDTH / 2)),
+				Vector3.new(sx * mouth, 0, sz * endZ),
+				Vector3.new(sx * (diagonalSum - endZ), 0, sz * endZ),
+				Vector3.new(sx * sideX, 0, sz * (diagonalSum - sideX)),
+				Vector3.new(sx * sideX, 0, 0),
+			}
+			for i = 1, #points - 1 do
+				stripe(decor, "Touchline", points[i], points[i + 1], Palette.Line)
+			end
+		end
+	end
+
+	stripe(decor, "HalfwayLine", Vector3.new(-sideX, 0, 0), Vector3.new(sideX, 0, 0), Palette.Line)
+	local circleRadius = 30
+	local circleSegments = 48
+	for i = 0, circleSegments - 1 do
+		local a0 = i / circleSegments * math.pi * 2
+		local a1 = (i + 1) / circleSegments * math.pi * 2
+		stripe(
+			decor,
+			"CenterCircle",
+			Vector3.new(math.cos(a0), 0, math.sin(a0)) * circleRadius,
+			Vector3.new(math.cos(a1), 0, math.sin(a1)) * circleRadius,
+			Palette.Line
+		)
+	end
+	PartKit.disc(decor, Vector3.new(0, LINE_Y, 0), 1.8, 0.2, {
+		Name = "CenterSpot",
+		Color = Palette.Line,
+		Collide = false,
+		Query = false,
+		Shadow = false,
+	})
+
 	for _, side in { 1, -1 } do
 		local team = teamForSide(side)
-		makePart(arena, {
-			Name = "GoalFloor",
-			Size = Vector3.new(cfg.GoalWidth + 2 * cfg.WallThickness, 2, cfg.GoalDepth + cfg.WallThickness),
-			CFrame = CFrame.new(0, -1, side * (L / 2 + (cfg.GoalDepth + cfg.WallThickness) / 2)),
+		local boxHalf = GW / 2 + 14
+		local front = side * (halfL - 40)
+		stripe(decor, "BoxLine", Vector3.new(-boxHalf, 0, front), Vector3.new(boxHalf, 0, front), Palette.Line)
+		for _, sx in { 1, -1 } do
+			stripe(
+				decor,
+				"BoxLine",
+				Vector3.new(sx * boxHalf, 0, front),
+				Vector3.new(sx * boxHalf, 0, side * endZ),
+				Palette.Line
+			)
+		end
+		local goalZ = side * (halfL - LINE_WIDTH / 2)
+		stripe(
+			decor,
+			"GoalLine",
+			Vector3.new(-(mouth - LINE_WIDTH / 2), 0, goalZ),
+			Vector3.new(mouth - LINE_WIDTH / 2, 0, goalZ),
+			team.Color,
+			NEON,
+			true
+		)
+	end
+end
+
+-- One curved ramp, built from flat strips. Where two ramps meet in a 45 degree corner, each strip stops on the
+-- corner's bisector (reaching a hair past it, out of sight under the other ramp), so the seams are clean.
+local function buildRamp(arena: Instance, ramp: ArenaShape.Ramp, segments: number)
+	local R = ramp.radius
+	local thickness = 2
+	local function crossSection(angle: number): Vector2
+		return Vector2.new(R - R * math.sin(angle), R - R * math.cos(angle))
+	end
+	for i = 0, segments - 1 do
+		local p0 = crossSection(i / segments * math.pi / 2)
+		local p1 = crossSection((i + 1) / segments * math.pi / 2)
+		local mid = (p0 + p1) / 2
+		local outward = (mid - Vector2.new(R, R)).Unit -- away from the curve's centre, into the solid
+		local centre2D = mid + outward * (thickness / 2)
+		local near = math.min(p0.X, p1.X) -- distance from the wall to the strip's nearest edge
+		local cornerFrom, cornerTo = ramp.cornerFrom, ramp.cornerTo
+		local s0 = if cornerFrom then cornerFrom + MITER * near - 0.05 else ramp.from
+		local s1 = if cornerTo then cornerTo - MITER * near + 0.05 else ramp.to
+		local centre = ramp.wallPoint + ramp.inward * centre2D.X + UP * centre2D.Y + ramp.along * ((s0 + s1) / 2)
+		local surfaceNormal = -(ramp.inward * outward.X + UP * outward.Y)
+		PartKit.part(arena, {
+			Name = "Ramp",
+			Size = Vector3.new(s1 - s0, thickness, (p1 - p0).Magnitude + 0.08),
+			CFrame = CFrame.fromMatrix(centre, ramp.along, surfaceNormal),
+			Color = Palette.Ramp,
+			Material = Enum.Material.Grass,
+		})
+	end
+end
+
+-- A box against a wall piece: `depth` is measured back from the inner face (negative = in front of it), `s`
+-- along the piece from a. Unless s is given, pieces ending in a corner reach past it far enough to close the joint.
+local function wallBox(
+	piece: Piece,
+	depth0: number,
+	depth1: number,
+	y0: number,
+	y1: number,
+	s0: number?,
+	s1: number?
+): (CFrame, Vector3)
+	local offset = piece.b - piece.a
+	local length = offset.Magnitude
+	local reach = MITER * math.max(depth1, 0)
+	local from = s0 or (if piece.cornerA then -reach else 0)
+	local to = s1 or (if piece.cornerB then length + reach else length)
+	local centre = piece.a
+		+ offset.Unit * ((from + to) / 2)
+		- piece.inward * ((depth0 + depth1) / 2)
+		+ UP * ((y0 + y1) / 2)
+	-- The part's front face looks into the field.
+	return CFrame.fromMatrix(centre, piece.inward:Cross(UP), UP), Vector3.new(to - from, y1 - y0, depth1 - depth0)
+end
+
+local function buildBoards(arena: Instance, decor: Instance, piece: Piece, team: Team, adverts: number)
+	local T = cfg.WallThickness
+	local cf, size = wallBox(piece, 0, T, BOARD_BOTTOM, BOARD_TOP)
+	local board = PartKit.part(arena, { Name = "Boards", CFrame = cf, Size = size, Color = Palette.Board })
+	if adverts > 0 then
+		PartKit.banner(board, Enum.NormalId.Front, takeAds(adverts), { pixelsPerStud = 8 })
+	end
+	-- Concrete behind the ramp (only seen from outside).
+	cf, size = wallBox(piece, 0.4, T, 0, BOARD_BOTTOM)
+	PartKit.decor(decor, {
+		Name = "WallBase",
+		CFrame = cf,
+		Size = size,
+		Color = Palette.DarkConcrete,
+		Material = Enum.Material.Concrete,
+	})
+	-- A glowing strip in the team's colour along the top, and a white line where the ramp ends.
+	cf, size = wallBox(piece, -0.15, T + 0.15, BOARD_TOP - 0.45, BOARD_TOP + 0.45)
+	PartKit.decor(decor, {
+		Name = "BoardTrim",
+		CFrame = cf,
+		Size = size,
+		Color = team.Color,
+		Material = NEON,
+		Shadow = false,
+	})
+	cf, size = wallBox(piece, -0.1, 0.5, BOARD_BOTTOM - 0.1, BOARD_BOTTOM + 0.7)
+	PartKit.decor(decor, { Name = "RampLip", CFrame = cf, Size = size, Color = Palette.Line, Shadow = false })
+end
+
+local function buildGlass(arena: Instance, decor: Instance, piece: Piece, bottom: number, endPosts: boolean)
+	local T, H = cfg.WallThickness, cfg.Height
+	local cf, size = wallBox(piece, 0, T, bottom, H)
+	PartKit.part(arena, {
+		Name = "Wall",
+		CFrame = cf,
+		Size = size,
+		Color = Palette.Glass,
+		Transparency = 1,
+		Shadow = false,
+	})
+	cf, size = wallBox(piece, 0, 0.4, bottom, H)
+	PartKit.decor(decor, {
+		Name = "Glass",
+		CFrame = cf,
+		Size = size,
+		Color = Palette.Glass,
+		Material = Enum.Material.Glass,
+		Transparency = 0.72,
+		Shadow = false,
+	})
+	-- Steel frame: a rim along the top with a light strip under it, and posts behind the glass.
+	cf, size = wallBox(piece, -0.6, T + 0.6, H, H + 2.2)
+	PartKit.decor(decor, {
+		Name = "Rim",
+		CFrame = cf,
+		Size = size,
+		Color = Palette.Steel,
+		Material = Enum.Material.Metal,
+	})
+	cf, size = wallBox(piece, -0.45, -0.1, H - 0.5, H)
+	PartKit.decor(decor, {
+		Name = "RimLight",
+		CFrame = cf,
+		Size = size,
+		Color = Color3.new(1, 1, 1),
+		Material = NEON,
+		Shadow = false,
+	})
+	local length = (piece.b - piece.a).Magnitude
+	local count = math.max(1, math.floor(length / 30 + 0.5))
+	for k = if endPosts then 0 else 1, if endPosts then count else count - 1 do
+		local s = length * k / count
+		cf, size = wallBox(piece, T + 0.1, T + 1.3, bottom, H, s - 0.6, s + 0.6)
+		PartKit.decor(decor, {
+			Name = "Mullion",
+			CFrame = cf,
+			Size = size,
+			Color = Palette.Steel,
+			Material = Enum.Material.Metal,
+		})
+	end
+end
+
+-- A steel post covering the outside of a corner joint.
+local function buildCornerPost(decor: Instance, vertex: Vector3, inward1: Vector3, inward2: Vector3)
+	local outward = -(inward1 + inward2).Unit
+	local p = vertex + outward * (cfg.WallThickness / math.cos(math.rad(22.5)) + 0.4)
+	local height = cfg.Height + 2.2 - BOARD_TOP
+	PartKit.decor(decor, {
+		Name = "CornerPost",
+		Size = Vector3.new(1.8, height, 1.8),
+		CFrame = CFrame.fromMatrix(Vector3.new(p.X, BOARD_TOP + height / 2, p.Z), UP:Cross(outward), UP),
+		Color = Palette.Steel,
+		Material = Enum.Material.Metal,
+	})
+end
+
+local function buildWalls(arena: Instance, decor: Instance)
+	local halfW, halfL, cut = cfg.Width / 2, cfg.Length / 2, cfg.CornerCut
+	local mouth = cfg.GoalWidth / 2 + cfg.WallThickness -- the goal's side walls and header fill up to here
+
+	for _, sx in { 1, -1 } do
+		local inward = Vector3.new(-sx, 0, 0)
+		-- Side wall: boards in two halves (so each half's trim shows its team), one long run of glass.
+		for _, sz in { -1, 1 } do
+			buildBoards(arena, decor, {
+				a = Vector3.new(sx * halfW, 0, sz * (halfL - cut)),
+				b = Vector3.new(sx * halfW, 0, 0),
+				inward = inward,
+				cornerA = true,
+				cornerB = false,
+			}, teamForSide(sz), 2)
+		end
+		buildGlass(arena, decor, {
+			a = Vector3.new(sx * halfW, 0, -(halfL - cut)),
+			b = Vector3.new(sx * halfW, 0, halfL - cut),
+			inward = inward,
+			cornerA = true,
+			cornerB = true,
+		}, BOARD_TOP, false)
+
+		for _, sz in { 1, -1 } do
+			local team = teamForSide(sz)
+			local diagonal: Piece = {
+				a = Vector3.new(sx * halfW, 0, sz * (halfL - cut)),
+				b = Vector3.new(sx * (halfW - cut), 0, sz * halfL),
+				inward = -Vector3.new(sx, 0, sz).Unit,
+				cornerA = true,
+				cornerB = true,
+			}
+			buildBoards(arena, decor, diagonal, team, 1)
+			buildGlass(arena, decor, diagonal, BOARD_TOP, false)
+
+			-- End wall beside the goal.
+			local endWall: Piece = {
+				a = Vector3.new(sx * (halfW - cut), 0, sz * halfL),
+				b = Vector3.new(sx * mouth, 0, sz * halfL),
+				inward = Vector3.new(0, 0, -sz),
+				cornerA = true,
+				cornerB = false,
+			}
+			buildBoards(arena, decor, endWall, team, 1)
+			buildGlass(arena, decor, endWall, BOARD_TOP, false)
+
+			buildCornerPost(decor, diagonal.a, inward, diagonal.inward)
+			buildCornerPost(decor, diagonal.b, diagonal.inward, endWall.inward)
+		end
+	end
+
+	-- Glass above each goal's header.
+	for _, sz in { 1, -1 } do
+		buildGlass(arena, decor, {
+			a = Vector3.new(mouth, 0, sz * halfL),
+			b = Vector3.new(-mouth, 0, sz * halfL),
+			inward = Vector3.new(0, 0, -sz),
+			cornerA = false,
+			cornerB = false,
+		}, HEADER_TOP, true)
+	end
+
+	-- The invisible ceiling keeps the ball in.
+	local T = cfg.WallThickness
+	PartKit.part(arena, {
+		Name = "Ceiling",
+		Size = Vector3.new(cfg.Width + 2 * T, T, cfg.Length + 2 * (cfg.GoalDepth + T)),
+		CFrame = CFrame.new(0, cfg.Height + T / 2, 0),
+		Color = Palette.Glass,
+		Transparency = 1,
+		Shadow = false,
+	})
+end
+
+-- A grid of thin white bars in front of one inside face of a goal.
+local function net(decor: Instance, origin: Vector3, uAxis: Vector3, uLength: number, vAxis: Vector3, vLength: number)
+	local spacing = 4
+	local function props(): PartKit.Props
+		return { Name = "Net", Color = NET_COLOR, Collide = false, Query = false, Shadow = false }
+	end
+	for k = 1, math.floor(uLength / spacing - 0.01) do
+		local p = origin + uAxis * (k * spacing)
+		PartKit.between(decor, p, p + vAxis * vLength, 0.25, props())
+	end
+	for k = 1, math.floor(vLength / spacing - 0.01) do
+		local p = origin + vAxis * (k * spacing)
+		PartKit.between(decor, p, p + uAxis * uLength, 0.25, props())
+	end
+end
+
+local function buildGoal(arena: Instance, decor: Instance, side: number)
+	local team = teamForSide(side)
+	local L, GW, GH, GD, T = cfg.Length, cfg.GoalWidth, cfg.GoalHeight, cfg.GoalDepth, cfg.WallThickness
+	local R = cfg.CurveRadius
+	local half = GW / 2
+	local outer = half + T
+
+	-- World z of a point `depth` studs behind this goal's line.
+	local function z(depth: number): number
+		return side * (L / 2 + depth)
+	end
+	local function box(folder: Instance, name: string, low: Vector3, high: Vector3, props: PartKit.Props): Part
+		props.Name = name
+		return PartKit.box(folder, low:Min(high), low:Max(high), props)
+	end
+	local function glow(): PartKit.Props
+		return { Color = team.Color, Material = NEON, Collide = false, Query = false, Shadow = false }
+	end
+
+	-- The goal box: side walls, roof and back in the team's dark colour.
+	for _, sx in { 1, -1 } do
+		box(arena, "GoalWall", Vector3.new(sx * half, 0, z(0)), Vector3.new(sx * outer, GH, z(GD)), {
 			Color = team.DarkColor,
 		})
 	end
-	-- Stadium base under everything.
-	decor(decorFolder, {
-		Name = "StadiumBase",
-		Size = Vector3.new(W + 260, 2, L + 200),
-		CFrame = CFrame.new(40, -3, 0),
-		Color = rgb(55, 60, 75),
-		Material = Enum.Material.Concrete,
+	box(arena, "GoalRoof", Vector3.new(-outer, GH, z(T)), Vector3.new(outer, GH + T, z(GD)), {
+		Color = team.DarkColor,
 	})
-
-	-- Field markings (no collisions, invisible to wheel rays).
-	local lineColor = rgb(250, 250, 250)
-	decor(decorFolder, {
-		Name = "CenterLine",
-		Size = Vector3.new(W - 2 * cfg.CurveRadius, 0.06, 1.2),
-		CFrame = CFrame.new(0, 0.04, 0),
-		Color = lineColor,
-		Material = Enum.Material.Neon,
+	box(arena, "GoalBack", Vector3.new(-outer, 0, z(GD)), Vector3.new(outer, GH + T, z(GD + T)), {
+		Color = team.DarkColor,
 	})
-	local circleRadius = 30
-	local circleSegments = 36
-	for i = 0, circleSegments - 1 do
-		local angle = (i + 0.5) / circleSegments * math.pi * 2
-		local segmentLength = 2 * math.pi * circleRadius / circleSegments + 0.2
-		decor(decorFolder, {
-			Name = "CenterCircle",
-			Size = Vector3.new(1.2, 0.06, segmentLength),
-			CFrame = CFrame.new(math.cos(angle) * circleRadius, 0.04, math.sin(angle) * circleRadius)
-				* CFrame.Angles(0, -angle, 0),
-			Color = lineColor,
-			Material = Enum.Material.Neon,
-		})
-	end
-	for _, side in { 1, -1 } do
-		local team = teamForSide(side)
-		local boxDepth = 36
-		local boxWidth = cfg.GoalWidth + 30
-		local lineZ = side * (L / 2 - boxDepth)
-		decor(decorFolder, {
-			Name = "GoalBoxFront",
-			Size = Vector3.new(boxWidth, 0.06, 1.2),
-			CFrame = CFrame.new(0, 0.04, lineZ),
-			Color = team.Color,
-			Material = Enum.Material.Neon,
-		})
-		for _, sx in { 1, -1 } do
-			decor(decorFolder, {
-				Name = "GoalBoxSide",
-				Size = Vector3.new(1.2, 0.06, boxDepth - cfg.CurveRadius),
-				CFrame = CFrame.new(sx * boxWidth / 2, 0.04, lineZ + side * (boxDepth - cfg.CurveRadius) / 2),
-				Color = team.Color,
-				Material = Enum.Material.Neon,
-			})
-		end
-	end
-end
+	-- The header above the goal mouth, with the team's name on it.
+	local header = box(arena, "GoalHeader", Vector3.new(-outer, GH, z(0)), Vector3.new(outer, HEADER_TOP, z(T)), {
+		Color = Palette.Board,
+	})
+	PartKit.sign(header, if side > 0 then Enum.NormalId.Front else Enum.NormalId.Back, {
+		`{string.upper(team.Name)} GOAL`,
+	}, { color = team.Color, pixelsPerStud = 10 })
+	box(
+		decor,
+		"HeaderTrim",
+		Vector3.new(-outer, HEADER_TOP - 0.45, z(-0.15)),
+		Vector3.new(outer, HEADER_TOP + 0.45, z(T + 0.15)),
+		glow()
+	)
 
-local function buildWalls(arena: Instance, decorFolder: Instance)
-	local W, L, H, C, T = cfg.Width, cfg.Length, cfg.Height, cfg.CornerCut, cfg.WallThickness
-	local GW, GH, GD = cfg.GoalWidth, cfg.GoalHeight, cfg.GoalDepth
-
-	local function wall(size: Vector3, cframe: CFrame, color: Color3, transparency: number)
-		makePart(arena, {
-			Name = "Wall",
-			Size = size,
-			CFrame = cframe,
-			Color = color,
-			Material = Enum.Material.Glass,
-			Transparency = transparency,
-			CastShadow = false,
-		})
-	end
-
-	-- Side walls.
-	local sideLength = L - 2 * C
+	-- Glowing frame: posts and crossbar flush with the wall, and a strip following each ramp's rounded end.
+	box(
+		decor,
+		"Crossbar",
+		Vector3.new(-(half + 1.6), GH - 0.15, z(-0.15)),
+		Vector3.new(half + 1.6, GH + 1.4, z(1.6)),
+		glow()
+	)
 	for _, sx in { 1, -1 } do
-		wall(Vector3.new(T, H, sideLength), CFrame.new(sx * (W / 2 + T / 2), H / 2, 0), WALL_COLOR, 0.6)
-		decor(decorFolder, {
-			Name = "WallRim",
-			Size = Vector3.new(T + 0.4, 0.8, sideLength),
-			CFrame = CFrame.new(sx * (W / 2 + T / 2), H, 0),
-			Color = RIM_COLOR,
-			Material = Enum.Material.Neon,
-		})
-	end
-
-	-- 45 degree corner walls.
-	local diagonalLength = C * math.sqrt(2)
-	for _, sx in { 1, -1 } do
-		for _, sz in { 1, -1 } do
-			local a = Vector3.new(sx * W / 2, 0, sz * (L / 2 - C))
-			local b = Vector3.new(sx * (W / 2 - C), 0, sz * L / 2)
-			local outward = Vector3.new(sx, 0, sz).Unit
-			local centre = (a + b) / 2 + outward * (T / 2) + Vector3.new(0, H / 2, 0)
-			wall(
-				Vector3.new(T, H, diagonalLength + T),
-				CFrame.fromMatrix(centre, outward, Vector3.yAxis),
-				WALL_COLOR,
-				0.6
-			)
-		end
-	end
-
-	-- End walls with the goal holes, and the goals themselves.
-	local sideSegment = W / 2 - C - GW / 2
-	for _, side in { 1, -1 } do
-		local team = teamForSide(side)
-		local tint = WALL_COLOR:Lerp(team.Color, 0.35)
-		local wallZ = side * (L / 2 + T / 2)
-		for _, sx in { 1, -1 } do
-			wall(
-				Vector3.new(sideSegment + T, H, T),
-				CFrame.new(sx * (GW / 2 + sideSegment / 2 + T / 2), H / 2, wallZ),
-				tint,
-				0.45
-			)
-		end
-		local above = makePart(arena, {
-			Name = "Wall",
-			Size = Vector3.new(GW, H - GH, T),
-			CFrame = CFrame.new(0, GH + (H - GH) / 2, wallZ),
-			Color = tint,
-			Material = Enum.Material.Glass,
-			Transparency = 0.45,
-			CastShadow = false,
-		})
-		addLabel(
-			above,
-			if side > 0 then Enum.NormalId.Front else Enum.NormalId.Back,
-			`{string.upper(team.Name)} GOAL`,
-			team.Color
+		box(
+			decor,
+			"GoalPost",
+			Vector3.new(sx * (half - 0.15), BOARD_BOTTOM, z(-0.15)),
+			Vector3.new(sx * (half + 1.6), GH + 1.4, z(1.6)),
+			glow()
 		)
-
-		-- Goal box: side walls, roof and back, glowing in the team colour.
-		local goalMiddleZ = side * (L / 2 + GD / 2)
-		for _, sx in { 1, -1 } do
-			makePart(arena, {
-				Name = "GoalWall",
-				Size = Vector3.new(T, GH, GD),
-				CFrame = CFrame.new(sx * (GW / 2 + T / 2), GH / 2, goalMiddleZ),
-				Color = team.Color,
-				Material = Enum.Material.ForceField,
-			})
+		local segments = cfg.CurveSegments
+		local function point(angle: number): Vector3
+			local u, v = R - R * math.sin(angle), R - R * math.cos(angle)
+			return Vector3.new(sx * (half + 0.725), v, z(-u))
 		end
-		makePart(arena, {
-			Name = "GoalRoof",
-			Size = Vector3.new(GW + 2 * T, T, GD),
-			CFrame = CFrame.new(0, GH + T / 2, goalMiddleZ),
-			Color = team.Color,
-			Material = Enum.Material.ForceField,
-		})
-		makePart(arena, {
-			Name = "GoalBack",
-			Size = Vector3.new(GW + 2 * T, GH + T, T),
-			CFrame = CFrame.new(0, (GH + T) / 2, side * (L / 2 + GD + T / 2)),
-			Color = team.Color,
-			Material = Enum.Material.ForceField,
-		})
-
-		-- Glowing goal frame (flush with the wall face, so it never gets in the ball's way).
-		local frameZ = side * (L / 2 + 0.55)
-		for _, sx in { 1, -1 } do
-			decor(decorFolder, {
-				Name = "GoalPost",
-				Size = Vector3.new(1.2, GH + 1.2, 1.2),
-				CFrame = CFrame.new(sx * (GW / 2 + 0.6), (GH + 1.2) / 2, frameZ),
-				Color = team.Color,
-				Material = Enum.Material.Neon,
-			})
+		for i = 0, segments - 1 do
+			local p0 = point(i / segments * math.pi / 2)
+			local p1 = point((i + 1) / segments * math.pi / 2)
+			local tangent = (p1 - p0).Unit
+			local props = glow()
+			props.Name = "GoalEdge"
+			props.Size = Vector3.new(1.75, 0.8, (p1 - p0).Magnitude + 0.3)
+			props.CFrame = CFrame.fromMatrix((p0 + p1) / 2, Vector3.xAxis, tangent:Cross(Vector3.xAxis), tangent)
+			PartKit.part(decor, props)
 		end
-		decor(decorFolder, {
-			Name = "Crossbar",
-			Size = Vector3.new(GW + 2.4, 1.2, 1.2),
-			CFrame = CFrame.new(0, GH + 0.6, frameZ),
-			Color = team.Color,
-			Material = Enum.Material.Neon,
-		})
-		local light = Instance.new("PointLight")
-		light.Color = team.Color
-		light.Range = 40
-		light.Brightness = 2
-		light.Parent = makePart(decorFolder, {
-			Name = "GoalLight",
-			Size = Vector3.new(1, 1, 1),
-			CFrame = CFrame.new(0, GH / 2, side * (L / 2 + GD - 2)),
-			Color = team.Color,
-			Transparency = 1,
-			CanCollide = false,
-			CanQuery = false,
-		})
 	end
 
-	-- Invisible ceiling keeps the ball in.
-	makePart(arena, {
-		Name = "Ceiling",
-		Size = Vector3.new(W + 2 * T, T, L + 2 * (GD + T)),
-		CFrame = CFrame.new(0, H + T / 2, 0),
-		Color = WALL_COLOR,
+	-- Nets on the inside faces.
+	local inset = 0.2
+	net(decor, Vector3.new(-half, 0, z(GD - inset)), Vector3.xAxis, GW, UP, GH)
+	for _, sx in { 1, -1 } do
+		net(decor, Vector3.new(sx * (half - inset), 0, z(0)), Vector3.new(0, 0, side), GD, UP, GH)
+	end
+	net(decor, Vector3.new(-half, GH - inset, z(T)), Vector3.xAxis, GW, Vector3.new(0, 0, side), GD - T)
+
+	local lamp = PartKit.decor(decor, {
+		Name = "GoalLight",
+		Size = Vector3.one,
+		CFrame = CFrame.new(0, GH / 2, z(GD - 3)),
+		Color = team.Color,
 		Transparency = 1,
-		CastShadow = false,
+		Shadow = false,
 	})
-end
-
-local function buildStands(decorFolder: Instance)
-	-- A few rows of colourful seats on the far side and behind the goals, for atmosphere.
-	local W, L, T = cfg.Width, cfg.Length, cfg.WallThickness
-	local seatColors = { rgb(255, 90, 90), rgb(255, 210, 70), rgb(90, 200, 255), rgb(150, 110, 255), rgb(90, 220, 120) }
-	for row = 0, 5 do
-		local x = -(W / 2 + T + 6 + row * 7)
-		decor(decorFolder, {
-			Name = "Stand",
-			Size = Vector3.new(7, 4 + row * 4, L - 40),
-			CFrame = CFrame.new(x, (4 + row * 4) / 2, 0),
-			Color = seatColors[row % #seatColors + 1],
-			Material = Enum.Material.SmoothPlastic,
-		})
-	end
-	for _, side in { 1, -1 } do
-		for row = 0, 3 do
-			local z = side * (L / 2 + cfg.GoalDepth + T + 6 + row * 7)
-			decor(decorFolder, {
-				Name = "Stand",
-				Size = Vector3.new(W - 20, 4 + row * 4, 7),
-				CFrame = CFrame.new(0, (4 + row * 4) / 2, z),
-				Color = seatColors[(row + 2) % #seatColors + 1],
-				Material = Enum.Material.SmoothPlastic,
-			})
-		end
-	end
-end
-
-local function setupLighting()
-	if not Lighting:FindFirstChildOfClass("Sky") then
-		Instance.new("Sky").Parent = Lighting
-	end
-	if not Lighting:FindFirstChildOfClass("Atmosphere") then
-		local atmosphere = Instance.new("Atmosphere")
-		atmosphere.Density = 0.25
-		atmosphere.Haze = 1
-		atmosphere.Color = rgb(200, 225, 255)
-		atmosphere.Parent = Lighting
-	end
-	local bloom = Instance.new("BloomEffect")
-	bloom.Intensity = 0.5
-	bloom.Size = 24
-	bloom.Threshold = 1.5
-	bloom.Parent = Lighting
-	local color = Instance.new("ColorCorrectionEffect")
-	color.Saturation = 0.12
-	color.Contrast = 0.05
-	color.Parent = Lighting
+	local light = Instance.new("PointLight")
+	light.Color = team.Color
+	light.Range = 36
+	light.Brightness = 1.4
+	light.Shadows = false
+	light.Parent = lamp
 end
 
 -- Builds everything and returns the Arena folder (the one wheel rays should hit) and the math shape.
 function ArenaBuilder.build(): (Folder, ArenaShape.Arena)
 	local shape = ArenaShape.new(cfg)
+	nextAd = 0
 
 	local arena = Instance.new("Folder")
 	arena.Name = MatchState.Folders.Arena
-	local decorFolder = Instance.new("Folder")
-	decorFolder.Name = "ArenaDecor"
+	local decor = Instance.new("Folder")
+	decor.Name = "ArenaDecor"
 
-	buildField(arena, decorFolder)
-	buildWalls(arena, decorFolder)
+	buildField(arena, decor)
 	for _, ramp in shape.ramps do
 		buildRamp(arena, ramp, cfg.CurveSegments)
 	end
-	buildStands(decorFolder)
-	setupLighting()
+	buildWalls(arena, decor)
+	for _, side in { 1, -1 } do
+		buildGoal(arena, decor, side)
+	end
 
 	arena.Parent = workspace
-	decorFolder.Parent = workspace
+	decor.Parent = workspace
 	return arena, shape
 end
 
