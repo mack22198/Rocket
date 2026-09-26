@@ -1,6 +1,8 @@
 --!strict
--- Chase camera for driving. Ball cam (on by default) keeps the ball in view; press C / Y to switch to a
--- plain behind-the-car view. Outside a match the normal Roblox camera follows your avatar.
+-- The one place that moves the camera. While driving it's a chase camera: ball cam (on by default) keeps the
+-- ball in view; press C / Y for a plain behind-the-car view. It leans back and widens as you boost, for a
+-- feeling of speed. In the menus the showroom provides the shots (see setProvider), and if there's nothing to
+-- follow at all it slowly circles the stadium.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -8,6 +10,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ArenaShape = require(Shared.Arena.ArenaShape)
 local GameConfig = require(Shared.Config.GameConfig)
+local MatchState = require(Shared.Match.MatchState)
 local MathUtil = require(Shared.Util.MathUtil)
 local Signal = require(Shared.Util.Signal)
 
@@ -31,11 +34,41 @@ local shakeStrength = 0
 local DISTANCE = 17
 local HEIGHT = 6.5
 local FOV = 78
+local BOOST_FOV = 8 -- extra field of view at full boost speed
+local BOOST_PULL = 2.5 -- extra distance at full boost speed
+
+-- Something else that wants to place the camera (the menu showroom). Returns nil when it has nothing to show.
+type Provider = (dt: number) -> (CFrame?, number)
+local provider: Provider? = nil
+local speedFeel = 0
+
+-- Nothing to follow (e.g. between the menu and your car appearing): a slow flight around the stadium.
+local function overview(camera: Camera)
+	local t = os.clock() * 0.05
+	local position = Vector3.new(math.cos(t) * 250, 105, math.sin(t) * 250)
+	camera.CameraType = Enum.CameraType.Scriptable
+	camera.FieldOfView = 55
+	camera.CFrame = MathUtil.lookAlong(position, Vector3.new(0, 10, 0) - position, Vector3.yAxis)
+end
 
 local function update(dt: number)
 	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+	local p = provider
+	if p then
+		local cframe, fov = p(dt)
+		if cframe then
+			camera.CameraType = Enum.CameraType.Scriptable
+			camera.CFrame = cframe
+			camera.FieldOfView = fov
+			return
+		end
+	end
 	local chassis = CarController.getChassis()
-	if not camera or not chassis or not driving then
+	if not chassis or not driving then
+		overview(camera)
 		return
 	end
 	local carPos = chassis.Position
@@ -53,7 +86,16 @@ local function update(dt: number)
 	end
 	heading = MathUtil.safeUnit(heading:Lerp(wanted, MathUtil.expDecay(8, dt)), wanted)
 
-	local desiredPosition = carPos - heading * DISTANCE + Vector3.new(0, HEIGHT, 0)
+	-- The faster you go (boosting especially), the further back the camera sits and the wider it sees.
+	local car = CarController.getCar()
+	local boosting = car ~= nil and car:GetAttribute(MatchState.CarAttr.Boosting) == true
+	local wantedFeel = math.clamp((flatVelocity.Magnitude - GameConfig.Car.MaxSpeed * 0.8) / 60, 0, 1)
+	if boosting then
+		wantedFeel = math.max(wantedFeel, 0.6)
+	end
+	speedFeel = MathUtil.lerp(speedFeel, wantedFeel, MathUtil.expDecay(if wantedFeel > speedFeel then 4 else 2, dt))
+
+	local desiredPosition = carPos - heading * (DISTANCE + BOOST_PULL * speedFeel) + Vector3.new(0, HEIGHT, 0)
 	desiredPosition = arena:clampInside(desiredPosition, 2.5)
 	local focus: Vector3
 	if ballCam and BallView.isVisible() then
@@ -79,26 +121,19 @@ local function update(dt: number)
 		shake = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * s
 	end
 	camera.CameraType = Enum.CameraType.Scriptable
-	camera.FieldOfView = FOV
+	camera.FieldOfView = FOV + BOOST_FOV * speedFeel
 	camera.CFrame = MathUtil.lookAlong(position + shake, smoothFocus - position, Vector3.yAxis)
 end
 
 local function setDriving(on: boolean)
 	driving = on
-	local camera = workspace.CurrentCamera
-	if not camera then
-		return
-	end
 	if on then
 		smoothedPosition, smoothedFocus = nil, nil
+		speedFeel = 0
 		local chassis = CarController.getChassis()
 		if chassis then
 			heading = MathUtil.safeUnit(MathUtil.flat(chassis.CFrame.LookVector), heading)
 		end
-		camera.CameraType = Enum.CameraType.Scriptable
-	else
-		camera.CameraType = Enum.CameraType.Custom
-		camera.FieldOfView = 70
 	end
 end
 
@@ -112,6 +147,15 @@ function CameraController.start()
 	end)
 	RunService:BindToRenderStep("TurboBallCamera", Enum.RenderPriority.Camera.Value + 1, update)
 	setDriving(CarController.getCar() ~= nil)
+end
+
+-- Lets something else (the menu showroom) place the camera; nil hands it back.
+function CameraController.setProvider(newProvider: Provider?)
+	provider = newProvider
+	if not newProvider then
+		-- Snap straight to the car instead of gliding in from the showroom.
+		smoothedPosition, smoothedFocus = nil, nil
+	end
 end
 
 function CameraController.toggleBallCam()

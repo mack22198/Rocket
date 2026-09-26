@@ -1,9 +1,13 @@
 --!strict
 -- Builds each car's 3D model out of plain parts (no uploaded assets needed), at any of its evolution stages.
 -- Every car is an invisible physics box called "Chassis" (the hitbox) with decorative parts welded on.
--- The same builder makes the showroom cars in the lobby and the spinning previews in the garage.
+-- The same builder makes the cars in the menu showroom, the garage previews and the VIP lounge.
 --
 -- Car space: the car faces -Z, +Y is up, the chassis centre is the origin.
+--
+-- The cars are sporty "battle cars": chunky wheels with spoked rims under flared arches, a low glasshouse,
+-- light bars and spoilers - each dressed in its own theme (a pizza delivery hot hatch, a banana roadster, a
+-- go-kart, a shark supercar, a monster truck and a flying saucer).
 --
 -- Parts are coloured by role ("body", "accent", ...) so each evolution stage can repaint the whole car:
 -- stages 1 and 2 use the car's own colours, stage 3 turns every car into glowing lava and stage 4 into
@@ -15,7 +19,7 @@ local GameConfig = require(script.Parent.Parent.Config.GameConfig)
 type CarDef = CarCatalog.CarDef
 
 export type BuildOptions = {
-	teamColor: Color3?, -- underglow + antenna colour (nil = neutral, for previews)
+	teamColor: Color3?, -- underglow, antenna and team light colour (nil = neutral, for previews)
 	preview: boolean?, -- true = no physics setup (showroom and garage)
 	stage: number?, -- evolution stage, 1 (as unlocked) to GameConfig.Evolution.Stages
 }
@@ -32,15 +36,33 @@ type PartSpec = {
 	cframe: CFrame,
 	role: string,
 	name: string?,
+	text: string?, -- painted on the part (a badge on a door, a sign)
 }
 
 -- Adds one part to the car being built.
-type Add = (role: string, shape: Shape, size: Vector3, cframe: CFrame, name: string?) -> ()
+type Add = (role: string, shape: Shape, size: Vector3, cframe: CFrame, name: string?, text: string?) -> ()
 
 type Design = {
 	roles: { Roles }, -- the car's own colours at stage 1 and stage 2
 	antenna: Vector3, -- where the team antenna sticks out of the body
 	build: (h: Vector3, stage: number, add: Add) -> (),
+}
+
+-- The side profile of a car body, as heights (y) and positions along the car (z). See `coupe`.
+type Profile = {
+	width: number,
+	bottom: number, -- underside
+	nose: number, -- top of the front bumper (the bonnet rises from here)
+	belt: number, -- where the windows start
+	tail: number, -- top of the back edge
+	roof: number,
+	front: number, -- z of the front bumper
+	back: number, -- z of the rear bumper
+	screen: number, -- z where the windscreen starts
+	roofFront: number,
+	roofBack: number,
+	deck: number, -- z where the rear window meets the boot
+	cabin: number, -- width of the glasshouse
 }
 
 local CarModelBuilder = {}
@@ -68,45 +90,58 @@ local COMMON: Roles = {
 	eye = look(rgb(255, 255, 255)),
 	pupil = look(rgb(20, 20, 28)),
 	shine = look(rgb(255, 255, 255), NEON),
-	dark = look(rgb(34, 34, 42)),
+	dark = look(rgb(30, 31, 38)),
+	trim = look(rgb(58, 60, 72), METAL),
 	white = look(rgb(248, 248, 250)),
-	glass = look(rgb(170, 222, 255), GLASS, 0.35, 0.1),
+	glass = look(rgb(24, 32, 50), GLASS, 0.1, 0.3),
+	cabin = look(rgb(16, 17, 22)),
 	lamp = look(rgb(255, 250, 226), NEON),
-	tail = look(rgb(255, 56, 48), NEON),
-	tire = look(rgb(36, 36, 42)),
-	rim = look(rgb(226, 228, 236), METAL),
+	tail = look(rgb(255, 44, 40), NEON),
+	tire = look(rgb(34, 34, 40)),
+	sidewall = look(rgb(58, 58, 66)),
+	rim = look(rgb(222, 226, 236), METAL),
 	metal = look(rgb(186, 190, 202), METAL),
 }
 
--- Stage 3 and 4 repaint every car with the same theme (eyes stay as they are, so every car keeps its face).
+-- Stage 3 and 4 repaint every car with the same theme.
 local THEMES: { [number]: Roles } = {
 	[3] = { -- Lava: cooled black rock with molten orange glowing through
 		body = look(rgb(64, 42, 38), Enum.Material.Slate),
-		body2 = look(rgb(44, 30, 28), Enum.Material.Basalt),
+		body2 = look(rgb(40, 28, 26), Enum.Material.Basalt),
 		accent = look(rgb(255, 104, 26), NEON),
+		stripe = look(rgb(255, 140, 40), NEON),
 		light = look(rgb(255, 168, 56), NEON),
+		leaf = look(rgb(255, 120, 40), NEON),
 		skin = look(rgb(255, 150, 60), NEON),
+		mouth = look(rgb(44, 22, 16)),
 		dark = look(rgb(28, 20, 18)),
+		trim = look(rgb(80, 52, 42), METAL),
 		white = look(rgb(255, 196, 120)),
-		glass = look(rgb(255, 150, 90), GLASS, 0.3, 0.1),
+		glass = look(rgb(120, 50, 20), GLASS, 0.2, 0.2),
 		lamp = look(rgb(255, 214, 140), NEON),
 		tail = look(rgb(255, 60, 20), NEON),
 		tire = look(rgb(30, 22, 20)),
+		sidewall = look(rgb(56, 36, 30)),
 		rim = look(rgb(255, 118, 40), NEON),
 		metal = look(rgb(96, 64, 54), METAL),
 	},
 	[4] = { -- Galaxy: deep space purple with starlight trim
-		body = look(rgb(50, 32, 120), SMOOTH, 0, 0.12),
+		body = look(rgb(50, 32, 120), SMOOTH, 0, 0.14),
 		body2 = look(rgb(108, 60, 200), SMOOTH, 0, 0.12),
 		accent = look(rgb(90, 232, 255), NEON),
+		stripe = look(rgb(255, 128, 228), NEON),
 		light = look(rgb(255, 128, 228), NEON),
+		leaf = look(rgb(90, 232, 255), NEON),
 		skin = look(rgb(150, 255, 220), NEON),
+		mouth = look(rgb(24, 14, 56)),
 		dark = look(rgb(20, 14, 48)),
+		trim = look(rgb(80, 60, 160), METAL),
 		white = look(rgb(214, 236, 255)),
-		glass = look(rgb(170, 230, 255), GLASS, 0.25, 0.15),
+		glass = look(rgb(60, 90, 200), GLASS, 0.2, 0.25),
 		lamp = look(rgb(214, 250, 255), NEON),
 		tail = look(rgb(255, 110, 220), NEON),
 		tire = look(rgb(26, 18, 52)),
+		sidewall = look(rgb(50, 36, 100)),
 		rim = look(rgb(90, 232, 255), NEON),
 		metal = look(rgb(150, 132, 222), METAL),
 	},
@@ -118,397 +153,1110 @@ local function groundY(hitbox: Vector3): number
 	return -hitbox.Y / 2 - (GameConfig.Car.RideHeight - sag)
 end
 
--- A frame at `position` whose front (-Z) faces `facing`.
-local function facingFrame(position: Vector3, facing: Vector3): CFrame
-	local up = if math.abs(facing.Y) > 0.95 then Vector3.zAxis else Vector3.yAxis
-	local right = facing:Cross(up).Unit
-	return CFrame.fromMatrix(position, right, right:Cross(facing))
+---------------------------------------------------------------------------------------------------------------
+-- Building blocks
+---------------------------------------------------------------------------------------------------------------
+
+-- The size and centre of the box between two corners (given in any order).
+local function span(a: Vector3, b: Vector3): (Vector3, CFrame)
+	local low = Vector3.new(math.min(a.X, b.X), math.min(a.Y, b.Y), math.min(a.Z, b.Z))
+	local high = Vector3.new(math.max(a.X, b.X), math.max(a.Y, b.Y), math.max(a.Z, b.Z))
+	return high - low, CFrame.new((low + high) / 2)
 end
 
--- One cartoon eye on a surface that faces `facing`. `glance` nudges the pupil (in the eye's own left/right,
--- up/down), which is what gives each car its expression.
-local function eye(add: Add, position: Vector3, facing: Vector3, size: number, glance: Vector2?)
-	local frame = facingFrame(position, facing.Unit)
-	local g = glance or Vector2.new(0, -0.12)
-	add("eye", "Ellipsoid", Vector3.new(size, size * 1.2, size * 0.5), frame, "Eye")
-	local pupil = frame * CFrame.new(g.X * size, g.Y * size, -size * 0.2)
-	add("pupil", "Ellipsoid", Vector3.new(size * 0.52, size * 0.64, size * 0.32), pupil, "Pupil")
-	add("shine", "Ball", Vector3.one * size * 0.18, pupil * CFrame.new(size * 0.1, size * 0.14, -size * 0.14), "Shine")
+local function box(add: Add, role: string, a: Vector3, b: Vector3, name: string?)
+	local size, cframe = span(a, b)
+	add(role, "Block", size, cframe, name)
 end
 
--- A pair of eyes side by side on a surface facing `facing`, looking a little inward (it's cuter).
-local function eyes(add: Add, centre: Vector3, facing: Vector3, spacing: number, size: number)
-	local frame = facingFrame(centre, facing.Unit)
-	for _, side in { -1, 1 } do
-		local position = frame * Vector3.new(side * spacing / 2, 0, 0)
-		eye(add, position, facing, size, Vector2.new(-side * 0.1, -0.12))
+-- A wedge filling the box from a to b, its slope rising towards the back (+Z) - like a bonnet.
+local function rampUp(add: Add, role: string, a: Vector3, b: Vector3, name: string?)
+	local size, cframe = span(a, b)
+	add(role, "Wedge", size, cframe, name)
+end
+
+-- A wedge whose slope rises towards the front (-Z) - like a boot lid or a rear window.
+local function rampDown(add: Add, role: string, a: Vector3, b: Vector3, name: string?)
+	local size, cframe = span(a, b)
+	add(role, "Wedge", size, cframe * CFrame.Angles(0, math.pi, 0), name)
+end
+
+-- A thin strip lying on a slope that runs from (y0, z0) to (y1, z1), raised `lift` studs off it. Used for
+-- racing stripes and window pillars.
+local function strip(
+	add: Add,
+	role: string,
+	x: number,
+	width: number,
+	y0: number,
+	z0: number,
+	y1: number,
+	z1: number,
+	lift: number,
+	name: string?
+)
+	local run, rise = z1 - z0, y1 - y0
+	local angle = math.atan2(rise, run)
+	local centre = Vector3.new(x, (y0 + y1) / 2 + math.cos(angle) * lift, (z0 + z1) / 2 - math.sin(angle) * lift)
+	add(
+		role,
+		"Block",
+		Vector3.new(width, 0.06, math.sqrt(run * run + rise * rise)),
+		CFrame.new(centre) * CFrame.Angles(-angle, 0, 0),
+		name
+	)
+end
+
+-- A flared wheel arch over the top of a wheel: a curved band of short blocks, seen from the side.
+local function arch(add: Add, role: string, centre: Vector3, radius: number, thickness: number, x0: number, x1: number)
+	local segments = 7
+	local from, to = math.rad(-80), math.rad(80)
+	local step = (to - from) / segments
+	local length = 2 * (radius + thickness / 2) * math.tan(step / 2) + 0.05
+	for i = 0, segments - 1 do
+		local a = from + (i + 0.5) * step
+		local position = Vector3.new((x0 + x1) / 2, centre.Y + math.cos(a) * radius, centre.Z + math.sin(a) * radius)
+		add(
+			role,
+			"Block",
+			Vector3.new(math.abs(x1 - x0), thickness, length),
+			CFrame.new(position) * CFrame.Angles(a, 0, 0),
+			"Arch"
+		)
 	end
 end
 
-type WheelOptions = {
-	inset: number?,
-	frontInset: number?,
+-- A wheel: tyre, sidewall, a rim with a dark dish, spokes and a hub cap (and chunky treads if asked).
+local function wheel(
+	add: Add,
+	centre: Vector3,
+	side: number,
+	radius: number,
+	width: number,
+	spokes: number,
+	treads: boolean?
+)
+	local c = CFrame.new(centre)
+	local face = side * width / 2
+	add("tire", "Cylinder", Vector3.new(width, radius * 2, radius * 2), c, "Wheel")
+	add(
+		"sidewall",
+		"Cylinder",
+		Vector3.new(0.05, radius * 1.7, radius * 1.7),
+		c * CFrame.new(face + side * 0.02, 0, 0),
+		"Sidewall"
+	)
+	add(
+		"rim",
+		"Cylinder",
+		Vector3.new(0.1, radius * 1.32, radius * 1.32),
+		c * CFrame.new(face + side * 0.05, 0, 0),
+		"Rim"
+	)
+	add(
+		"dark",
+		"Cylinder",
+		Vector3.new(0.1, radius * 1.1, radius * 1.1),
+		c * CFrame.new(face + side * 0.08, 0, 0),
+		"RimDish"
+	)
+	for k = 0, spokes - 1 do
+		local angle = k / spokes * math.pi * 2
+		add(
+			"rim",
+			"Block",
+			Vector3.new(0.1, radius * 0.2, radius * 0.5),
+			c * CFrame.new(face + side * 0.12, 0, 0) * CFrame.Angles(angle, 0, 0) * CFrame.new(0, 0, radius * 0.3),
+			"Spoke"
+		)
+	end
+	add(
+		"metal",
+		"Cylinder",
+		Vector3.new(0.16, radius * 0.36, radius * 0.36),
+		c * CFrame.new(face + side * 0.15, 0, 0),
+		"HubCap"
+	)
+	if treads then
+		for k = 0, 11 do
+			add(
+				"tire",
+				"Block",
+				Vector3.new(width + 0.08, radius * 0.22, radius * 0.3),
+				c * CFrame.Angles(k * math.pi / 6, 0, 0) * CFrame.new(0, radius - 0.02, 0),
+				"Tread"
+			)
+		end
+	end
+end
+
+-- A dark wheel well painted on the body behind a wheel, so the arch looks hollow.
+local function wheelWell(add: Add, centre: Vector3, radius: number, x: number)
+	add("dark", "Cylinder", Vector3.new(0.04, radius * 2, radius * 2), CFrame.new(x, centre.Y, centre.Z), "WheelWell")
+end
+
+-- Four wheels at the given axles, each under a flared arch (unless `open`, like a go-kart).
+type WheelSet = {
+	g: number, -- ground height
+	x: number, -- body half-width (the tyres start just inside it)
+	front: number,
+	rear: number,
+	radius: number,
 	rearRadius: number?,
+	width: number,
+	rearWidth: number?,
+	spokes: number,
+	archRole: string?,
+	open: boolean?,
 	treads: boolean?,
+	inset: number?, -- how far the tyre's inner face sits inside the body
 }
 
-local function wheels(add: Add, hitbox: Vector3, radius: number, width: number, options: WheelOptions?)
-	local o: WheelOptions = options or ({} :: WheelOptions)
-	local inset = o.inset or 0.8
-	local frontZ = -hitbox.Z / 2 + (o.frontInset or 1.6)
-	local rearZ = hitbox.Z / 2 - 1.6
-	local floor = groundY(hitbox)
-	for _, side in { -1, 1 } do
-		for _, z in { frontZ, rearZ } do
-			local r = if z == rearZ then (o.rearRadius or radius) else radius
-			local x = side * (hitbox.X / 2 - inset + width / 2 - 0.2)
-			local centre = at(x, floor + r, z)
-			add("tire", "Cylinder", Vector3.new(width, r * 2, r * 2), centre, "Wheel")
-			add("rim", "Cylinder", Vector3.new(width + 0.1, r * 1.2, r * 1.2), centre, "Rim")
-			add("dark", "Cylinder", Vector3.new(width + 0.16, r * 0.45, r * 0.45), centre, "HubCap")
-			if o.treads then
-				for k = 0, 5 do
-					local angle = k * math.pi / 3
-					add(
-						"tire",
-						"Block",
-						Vector3.new(width + 0.1, r * 0.34, r * 0.3),
-						centre * CFrame.Angles(angle, 0, 0) * CFrame.new(0, r - 0.05, 0),
-						"Tread"
-					)
-				end
+local function wheelSet(add: Add, w: WheelSet)
+	for _, z in { w.front, w.rear } do
+		local rear = z == w.rear
+		local r = if rear then (w.rearRadius or w.radius) else w.radius
+		local width = if rear then (w.rearWidth or w.width) else w.width
+		local inner = w.x - (w.inset or 0.25)
+		for _, side in { -1, 1 } do
+			local centre = Vector3.new(side * (inner + width / 2), w.g + r, z)
+			wheel(add, centre, side, r, width, w.spokes, w.treads)
+			if not w.open then
+				arch(
+					add,
+					w.archRole or "body",
+					centre,
+					r + 0.24,
+					0.44,
+					side * (inner - 0.1),
+					side * (inner + width + 0.12)
+				)
+				wheelWell(add, centre, r + 0.12, side * (w.x + 0.02))
 			end
 		end
 	end
 end
+
+-- The main shell of a car: a lower body (in body2), a bonnet rising to the windscreen, the doors, a boot (or a
+-- ducktail, if the tail sits higher than the windows), and a tinted glasshouse with a painted roof and pillars.
+local function coupe(add: Add, p: Profile)
+	local hw = p.width / 2
+	box(add, "body2", Vector3.new(-hw, p.bottom, p.front), Vector3.new(hw, p.nose, p.back), "LowerBody")
+	rampUp(add, "body", Vector3.new(-hw, p.nose, p.front), Vector3.new(hw, p.belt, p.screen), "Bonnet")
+	box(add, "body", Vector3.new(-hw, p.nose, p.screen), Vector3.new(hw, p.belt, p.deck), "Doors")
+	if p.tail < p.belt - 0.01 then
+		box(add, "body", Vector3.new(-hw, p.nose, p.deck), Vector3.new(hw, p.tail, p.back), "RearBody")
+		rampDown(add, "body", Vector3.new(-hw, p.tail, p.deck), Vector3.new(hw, p.belt, p.back), "Boot")
+	else
+		box(add, "body", Vector3.new(-hw, p.nose, p.deck), Vector3.new(hw, p.belt, p.back), "RearBody")
+		if p.tail > p.belt + 0.01 then
+			rampUp(add, "body", Vector3.new(-hw, p.belt, p.deck), Vector3.new(hw, p.tail, p.back), "Ducktail")
+		end
+	end
+
+	local cw = p.cabin / 2
+	-- A dark interior behind the tinted glass (seats and all, as far as anyone can tell).
+	box(
+		add,
+		"cabin",
+		Vector3.new(-cw + 0.25, p.belt - 0.05, p.roofFront - 0.3),
+		Vector3.new(cw - 0.25, p.roof - 0.35, p.roofBack + 0.2),
+		"Interior"
+	)
+	rampUp(add, "glass", Vector3.new(-cw, p.belt, p.screen), Vector3.new(cw, p.roof, p.roofFront), "Windscreen")
+	box(
+		add,
+		"glass",
+		Vector3.new(-cw + 0.02, p.belt, p.roofFront),
+		Vector3.new(cw - 0.02, p.roof - 0.1, p.roofBack),
+		"Windows"
+	)
+	rampDown(add, "glass", Vector3.new(-cw, p.belt, p.roofBack), Vector3.new(cw, p.roof, p.deck), "RearWindow")
+	box(
+		add,
+		"body",
+		Vector3.new(-cw - 0.05, p.roof - 0.14, p.roofFront - 0.08),
+		Vector3.new(cw + 0.05, p.roof + 0.04, p.roofBack + 0.08),
+		"Roof"
+	)
+	for _, side in { -1, 1 } do
+		local x = side * (cw + 0.02)
+		strip(add, "body", x, 0.14, p.belt, p.screen, p.roof, p.roofFront, 0.02, "APillar")
+		strip(add, "body", x, 0.14, p.roof, p.roofBack, p.belt, p.deck, 0.02, "CPillar")
+		box(
+			add,
+			"body",
+			Vector3.new(x - 0.07, p.belt, p.roofBack - 0.35),
+			Vector3.new(x + 0.07, p.roof, p.roofBack - 0.05),
+			"BPillar"
+		)
+		-- Chrome along the bottom of the side windows, and the door shut lines.
+		box(
+			add,
+			"trim",
+			Vector3.new(x - side * 0.04, p.belt - 0.02, p.roofFront - 0.2),
+			Vector3.new(x + side * 0.08, p.belt + 0.06, p.roofBack + 0.1),
+			"WindowTrim"
+		)
+		for _, z in { p.screen + 0.25, p.roofBack - 0.2 } do
+			box(
+				add,
+				"dark",
+				Vector3.new(side * (hw - 0.02), p.nose + 0.1, z - 0.03),
+				Vector3.new(side * (hw + 0.02), p.belt - 0.05, z + 0.03),
+				"DoorLine"
+			)
+		end
+		-- A dark sill along the bottom of each side, between the arches.
+		box(
+			add,
+			"dark",
+			Vector3.new(side * (hw - 0.05), p.bottom, p.front + 2.4),
+			Vector3.new(side * (hw + 0.12), p.bottom + 0.32, p.back - 2.4),
+			"SideSkirt"
+		)
+	end
+end
+
+-- Racing stripes along the top of a coupe (over the bonnet, roof and boot).
+local function stripes(add: Add, p: Profile, role: string, offset: number, width: number)
+	local xs: { number } = if offset > 0 then { -offset, offset } else { 0 }
+	for _, x in xs do
+		strip(add, role, x, width, p.nose, p.front, p.belt, p.screen, 0.035, "Stripe")
+		box(
+			add,
+			role,
+			Vector3.new(x - width / 2, p.roof + 0.04, p.roofFront - 0.06),
+			Vector3.new(x + width / 2, p.roof + 0.08, p.roofBack + 0.06),
+			"Stripe"
+		)
+		if p.tail < p.belt - 0.01 then
+			strip(add, role, x, width, p.belt, p.deck, p.tail, p.back, 0.035, "Stripe")
+		end
+	end
+end
+
+-- Headlights in chrome bezels on the front face, at height y, their centres `x` from the middle.
+local function headlights(add: Add, x: number, y: number, z: number, width: number, height: number)
+	for _, side in { -1, 1 } do
+		box(
+			add,
+			"trim",
+			Vector3.new(side * x - width / 2 - 0.08, y - height / 2 - 0.08, z + 0.02),
+			Vector3.new(side * x + width / 2 + 0.08, y + height / 2 + 0.08, z + 0.14),
+			"LightBezel"
+		)
+		box(
+			add,
+			"lamp",
+			Vector3.new(side * x - width / 2, y - height / 2, z - 0.04),
+			Vector3.new(side * x + width / 2, y + height / 2, z + 0.06),
+			"Headlight"
+		)
+	end
+end
+
+-- Red tail lights on the back face, joined by a thin light bar.
+local function taillights(add: Add, x: number, y: number, z: number, width: number, height: number)
+	for _, side in { -1, 1 } do
+		box(
+			add,
+			"tail",
+			Vector3.new(side * x - width / 2, y - height / 2, z - 0.06),
+			Vector3.new(side * x + width / 2, y + height / 2, z + 0.06),
+			"TailLight"
+		)
+	end
+	box(
+		add,
+		"tail",
+		Vector3.new(-x + width / 2, y - 0.05, z - 0.03),
+		Vector3.new(x - width / 2, y + 0.05, z + 0.04),
+		"LightBar"
+	)
+end
+
+-- A rear wing on two struts, with endplates and a team-coloured light along its edge.
+local function wing(add: Add, role: string, width: number, depth: number, y: number, z: number, strutFrom: number)
+	for _, side in { -1, 1 } do
+		box(
+			add,
+			"dark",
+			Vector3.new(side * width * 0.3 - 0.09, strutFrom, z - 0.15),
+			Vector3.new(side * width * 0.3 + 0.09, y, z + 0.15),
+			"WingStrut"
+		)
+		box(
+			add,
+			role,
+			Vector3.new(side * width / 2 - 0.08, y - 0.35, z - depth / 2 - 0.05),
+			Vector3.new(side * width / 2 + 0.02, y + 0.25, z + depth / 2 + 0.05),
+			"Endplate"
+		)
+	end
+	add(role, "Block", Vector3.new(width, 0.14, depth), at(0, y + 0.05, z) * CFrame.Angles(math.rad(-7), 0, 0), "Wing")
+	box(
+		add,
+		"team",
+		Vector3.new(-width / 2 + 0.1, y + 0.1, z + depth / 2 - 0.02),
+		Vector3.new(width / 2 - 0.1, y + 0.2, z + depth / 2 + 0.06),
+		"TeamLight"
+	)
+end
+
+local function exhausts(add: Add, x: number, y: number, z: number, size: number)
+	for _, side in { -1, 1 } do
+		add("metal", "Cylinder", Vector3.new(0.7, size, size), at(side * x, y, z) * CYL_ALONG_Z, "ExhaustPipe")
+		add(
+			"dark",
+			"Cylinder",
+			Vector3.new(0.72, size * 0.62, size * 0.62),
+			at(side * x, y, z) * CYL_ALONG_Z,
+			"ExhaustHole"
+		)
+	end
+end
+
+local function mirrors(add: Add, x: number, y: number, z: number)
+	for _, side in { -1, 1 } do
+		box(
+			add,
+			"dark",
+			Vector3.new(side * x, y - 0.06, z - 0.05),
+			Vector3.new(side * (x + 0.3), y + 0.02, z + 0.05),
+			"MirrorArm"
+		)
+		box(
+			add,
+			"body",
+			Vector3.new(side * (x + 0.22), y - 0.14, z - 0.2),
+			Vector3.new(side * (x + 0.55), y + 0.14, z + 0.2),
+			"Mirror"
+		)
+	end
+end
+
+-- Round badges on both doors, with the car's emoji painted on.
+local function badges(add: Add, x: number, y: number, z: number, size: number, text: string)
+	for _, side in { -1, 1 } do
+		add("white", "Cylinder", Vector3.new(0.06, size, size), at(side * x, y, z), "Badge", text)
+	end
+end
+
+---------------------------------------------------------------------------------------------------------------
+-- The cars
+---------------------------------------------------------------------------------------------------------------
 
 local designs: { [string]: Design } = {}
 
+-- A pizza delivery hot hatch: tomato red over a golden crust, melted-cheese stripes and a pizza box on the roof.
 designs.pizza = {
 	roles = {
 		{
-			body = look(rgb(228, 162, 86)), -- crust
-			body2 = look(rgb(180, 110, 52)), -- darker crust
-			accent = look(rgb(204, 48, 38)), -- pepperoni
-			light = look(rgb(255, 208, 72)), -- cheese
+			body = look(rgb(214, 44, 36)),
+			body2 = look(rgb(240, 176, 64)),
+			accent = look(rgb(255, 218, 92)),
+			stripe = look(rgb(255, 218, 92)),
+			light = look(rgb(250, 246, 236)),
 		},
 		{ -- Burnt: a little too long in the oven
-			body = look(rgb(150, 88, 42)),
-			body2 = look(rgb(76, 46, 28)),
-			accent = look(rgb(140, 26, 20)),
-			light = look(rgb(236, 164, 48)),
-			rim = look(rgb(255, 196, 64), METAL),
+			body = look(rgb(74, 40, 30)),
+			body2 = look(rgb(44, 30, 26)),
+			accent = look(rgb(255, 118, 36), NEON),
+			stripe = look(rgb(255, 118, 36), NEON),
+			light = look(rgb(214, 180, 130)),
+			rim = look(rgb(255, 176, 60), METAL),
 		},
 	},
-	antenna = Vector3.new(1.75, 0.3, 2.9),
+	antenna = Vector3.new(1.55, 1.5, 2.05),
 	build = function(h, stage, add)
-		add("body2", "Block", Vector3.new(5.0, 0.8, 7.9), at(0, -0.75, 0))
-		add("body", "Ellipsoid", Vector3.new(5.5, 2.3, 8.5), at(0, -0.15, 0))
-		add("body", "Ellipsoid", Vector3.new(4.8, 0.9, 1.3), at(0, -0.62, -3.8))
-		add("body2", "Cylinder", Vector3.new(5.3, 1.1, 1.1), at(0, -0.45, 3.85))
-		-- Melted cheese over the hood, dripping down the sides, with pepperoni on top.
-		add("light", "Ellipsoid", Vector3.new(4.7, 1.0, 4.4), at(0, 0.62, -1.7))
-		for _, side in { -1, 1 } do
-			add("light", "Ellipsoid", Vector3.new(0.55, 1.0, 0.8), at(side * 2.05, 0.25, -2.5))
-			add("light", "Ellipsoid", Vector3.new(0.5, 0.8, 0.7), at(side * 2.15, 0.3, -1.2))
+		local g = groundY(h)
+		local p: Profile = {
+			width = 4.6,
+			bottom = g + 0.55,
+			nose = -0.3,
+			belt = 0.35,
+			tail = 0.15,
+			roof = 1.5,
+			front = -4.3,
+			back = 4.25,
+			screen = -1.2,
+			roofFront = 0.15,
+			roofBack = 2.35,
+			deck = 3.35,
+			cabin = 3.8,
+		}
+		coupe(add, p)
+		stripes(add, p, "stripe", 0.55, 0.5)
+		wheelSet(add, { g = g, x = 2.3, front = -2.65, rear = 2.65, radius = 1.05, width = 0.95, spokes = 5 })
+		-- Face: grille, headlights and a chin splitter.
+		box(
+			add,
+			"dark",
+			Vector3.new(-1.1, p.bottom + 0.3, p.front - 0.05),
+			Vector3.new(1.1, p.nose - 0.12, p.front + 0.1),
+			"Grille"
+		)
+		for k = 0, 2 do
+			local y = p.bottom + 0.42 + k * 0.2
+			box(
+				add,
+				"trim",
+				Vector3.new(-1.05, y - 0.03, p.front - 0.09),
+				Vector3.new(1.05, y + 0.03, p.front - 0.03),
+				"GrilleBar"
+			)
 		end
-		for _, spot in { Vector3.new(-1.0, 1.07, -2.4), Vector3.new(0.95, 1.06, -2.5), Vector3.new(0.1, 1.13, -1.3) } do
-			add("accent", "Cylinder", Vector3.new(0.16, 1.05, 1.05), CFrame.new(spot) * CYL_ALONG_Y, "Pepperoni")
-		end
-		-- Bubble cabin with a face, and a delivery sign on the roof.
-		add("glass", "Ellipsoid", Vector3.new(4.3, 2.2, 3.8), at(0, 0.85, 1.1))
-		eyes(add, Vector3.new(0, 1.3, -0.5), Vector3.new(0, 0.3, -1), 1.7, 1.2)
-		add("white", "Block", Vector3.new(2.4, 0.8, 1.0), at(0, 2.25, 1.5), "RoofSign")
-		add("accent", "Block", Vector3.new(2.5, 0.28, 1.06), at(0, 2.32, 1.5))
-		for _, side in { -1, 1 } do
-			add("lamp", "Ball", Vector3.one * 0.75, at(side * 1.65, -0.05, -3.45), "Headlight")
-			add("tail", "Block", Vector3.new(0.8, 0.4, 0.2), at(side * 1.7, -0.05, 3.45), "TailLight")
-		end
-		if stage == 2 then
-			-- Burnt bits.
-			for _, spot in { Vector3.new(2.4, 0.1, 1.2), Vector3.new(-2.35, 0.2, 0.4), Vector3.new(1.2, 0.72, 2.9) } do
-				add("dark", "Ball", Vector3.one * 0.9, CFrame.new(spot), "Char")
-			end
-		end
+		headlights(add, 1.6, p.nose - 0.27, p.front, 0.85, 0.3)
+		box(
+			add,
+			"dark",
+			Vector3.new(-2.4, p.bottom - 0.05, p.front - 0.3),
+			Vector3.new(2.4, p.bottom + 0.12, p.front + 0.6),
+			"Splitter"
+		)
+		-- Back: tail lights, a diffuser and twin exhausts.
+		taillights(add, 1.65, p.tail - 0.25, p.back, 0.8, 0.3)
+		box(
+			add,
+			"dark",
+			Vector3.new(-1.6, p.bottom - 0.02, p.back - 0.5),
+			Vector3.new(1.6, p.bottom + 0.35, p.back + 0.12),
+			"Diffuser"
+		)
+		exhausts(add, 0.6, p.bottom + 0.2, p.back + 0.2, 0.42)
+		mirrors(add, 1.9, p.belt + 0.15, p.screen + 0.45)
+		badges(add, 2.33, (p.nose + p.belt) / 2 + 0.05, -0.2, 1.35, "🍕")
+		-- The pizza box and its sign on the roof.
+		box(add, "light", Vector3.new(-1.05, p.roof + 0.04, 0.55), Vector3.new(1.05, p.roof + 0.44, 2.05), "PizzaBox")
+		box(add, "body", Vector3.new(-1.07, p.roof + 0.3, 0.53), Vector3.new(1.07, p.roof + 0.36, 2.07), "BoxStripe")
+		add("light", "Block", Vector3.new(2.3, 0.75, 0.16), at(0, p.roof + 0.82, 0.62), "RoofSign", "🍕 PIZZA")
+		-- A roof spoiler once it's been in the oven a while.
 		if stage >= 2 then
-			-- A cheesy spoiler.
-			for _, side in { -1, 1 } do
-				add("dark", "Block", Vector3.new(0.25, 1.0, 0.35), at(side * 1.6, 1.1, 3.35))
-				add("accent", "Cylinder", Vector3.new(0.1, 0.8, 0.8), at(side * 1.3, 1.83, 3.45) * CYL_ALONG_Y)
-			end
-			add("light", "Block", Vector3.new(5.0, 0.25, 1.4), at(0, 1.7, 3.45), "Spoiler")
+			add(
+				"body",
+				"Block",
+				Vector3.new(3.9, 0.12, 0.8),
+				at(0, p.roof - 0.02, p.roofBack + 0.4) * CFrame.Angles(math.rad(8), 0, 0),
+				"RoofSpoiler"
+			)
 		end
-		wheels(add, h, 1.05, 0.9)
+		box(
+			add,
+			"team",
+			Vector3.new(-1.7, p.roof - 0.1, p.roofBack + 0.02),
+			Vector3.new(1.7, p.roof - 0.02, p.roofBack + 0.12),
+			"TeamLight"
+		)
 	end,
 }
 
+-- A banana roadster: long and low, curving up at the back like a banana, a brown tip at the front and a leafy
+-- stem holding up the wing.
 designs.banana = {
 	roles = {
 		{
-			body = look(rgb(255, 222, 64)),
-			body2 = look(rgb(124, 146, 52)), -- stem
-			accent = look(rgb(112, 74, 36)), -- spots
-			light = look(rgb(255, 246, 214)), -- the fruit inside
+			body = look(rgb(255, 216, 56)),
+			body2 = look(rgb(226, 186, 36)),
+			accent = look(rgb(104, 70, 34)),
+			stripe = look(rgb(255, 244, 206)),
+			light = look(rgb(255, 244, 206)),
+			leaf = look(rgb(118, 168, 54)),
 		},
 		{ -- Ripe: sweeter and spottier
-			body = look(rgb(250, 198, 42)),
-			body2 = look(rgb(98, 72, 30)),
-			accent = look(rgb(86, 54, 24)),
-			light = look(rgb(255, 238, 190)),
+			body = look(rgb(250, 196, 36)),
+			body2 = look(rgb(214, 158, 28)),
+			accent = look(rgb(82, 50, 22)),
+			stripe = look(rgb(255, 236, 180)),
+			light = look(rgb(255, 236, 180)),
+			leaf = look(rgb(96, 142, 44)),
 			rim = look(rgb(255, 214, 90), METAL),
 		},
 	},
-	antenna = Vector3.new(1.0, 0.75, 2.3),
+	antenna = Vector3.new(1.35, 1.05, 1.9),
 	build = function(h, stage, add)
-		-- The banana: three segments along a curve, both ends tipped up, a dark tip in front and the stem behind.
-		add("body", "Ellipsoid", Vector3.new(3.9, 2.3, 4.8), at(0, -0.3, 0))
-		add("body", "Ellipsoid", Vector3.new(3.4, 2.0, 4.2), at(0, 0.1, -2.6) * CFrame.Angles(math.rad(20), 0, 0))
-		add("body", "Ellipsoid", Vector3.new(3.4, 2.0, 4.2), at(0, 0.1, 2.6) * CFrame.Angles(math.rad(-20), 0, 0))
-		add("accent", "Ellipsoid", Vector3.new(0.6, 0.6, 0.9), at(0, 0.88, -4.52), "Tip")
-		local stem = at(0, 1.35, 4.95) * CFrame.Angles(math.rad(-45), 0, 0)
-		add("body2", "Cylinder", Vector3.new(1.7, 0.62, 0.62), stem * CYL_ALONG_Z, "Stem")
-		add("accent", "Cylinder", Vector3.new(0.2, 0.66, 0.66), stem * CFrame.new(0, 0, 0.85) * CYL_ALONG_Z, "StemEnd")
-		-- Peeled open on top, showing the fruit.
-		add("light", "Ellipsoid", Vector3.new(2.6, 0.9, 3.0), at(0, 0.72, 0.35), "Fruit")
-		eyes(add, Vector3.new(0, 1.18, -3.05), Vector3.new(0, 0.7, -1), 1.3, 0.95)
-		-- Brown spots.
-		local spots = { Vector3.new(1.85, -0.2, -0.8), Vector3.new(-1.9, 0.0, 0.7), Vector3.new(1.45, 0.45, 2.2) }
+		local g = groundY(h)
+		local p: Profile = {
+			width = 4.3,
+			bottom = g + 0.5,
+			nose = -0.6,
+			belt = 0.1,
+			tail = 0.4,
+			roof = 1.15,
+			front = -4.45,
+			back = 4.45,
+			screen = -0.55,
+			roofFront = 0.55,
+			roofBack = 1.55,
+			deck = 3.1,
+			cabin = 3.4,
+		}
+		coupe(add, p)
+		stripes(add, p, "stripe", 0, 0.8)
+		wheelSet(add, { g = g, x = 2.15, front = -2.85, rear = 2.85, radius = 1.0, width = 0.9, spokes = 6 })
+		-- The dark tip of the banana, as a nose cone.
+		add("accent", "Ellipsoid", Vector3.new(1.3, 0.75, 1.2), at(0, p.nose + 0.05, p.front - 0.25), "Tip")
+		box(
+			add,
+			"dark",
+			Vector3.new(-1.3, p.bottom + 0.25, p.front - 0.05),
+			Vector3.new(1.3, p.nose - 0.18, p.front + 0.08),
+			"Grille"
+		)
+		headlights(add, 1.45, p.nose - 0.22, p.front, 0.9, 0.22)
+		box(
+			add,
+			"dark",
+			Vector3.new(-2.2, p.bottom - 0.05, p.front - 0.25),
+			Vector3.new(2.2, p.bottom + 0.1, p.front + 0.5),
+			"Splitter"
+		)
+		taillights(add, 1.5, p.belt - 0.1, p.back, 0.9, 0.24)
+		exhausts(add, 0.5, p.bottom + 0.2, p.back + 0.2, 0.36)
+		mirrors(add, 1.72, p.belt + 0.14, p.screen + 0.4)
+		badges(add, 2.18, (p.nose + p.belt) / 2, -0.4, 1.2, "🍌")
+		-- Brown spots (more of them once it's ripe).
+		local spots = { Vector2.new(0.05, -2.0), Vector2.new(-0.3, 1.2), Vector2.new(-0.05, 2.6) }
 		if stage == 2 then
-			table.insert(spots, Vector3.new(-1.45, 0.5, -2.1))
-			table.insert(spots, Vector3.new(1.75, -0.6, 1.2))
-			table.insert(spots, Vector3.new(-1.8, -0.55, -0.6))
+			table.insert(spots, Vector2.new(-0.35, -1.1))
+			table.insert(spots, Vector2.new(0.0, 0.6))
+			table.insert(spots, Vector2.new(-0.25, 3.5))
 		end
 		for _, spot in spots do
-			add("accent", "Ball", Vector3.one * 0.5, CFrame.new(spot), "Spot")
-		end
-		for _, side in { -1, 1 } do
-			add("lamp", "Ball", Vector3.one * 0.45, at(side * 0.8, -0.15, -4.1), "Headlight")
-			add("tail", "Ball", Vector3.one * 0.42, at(side * 0.8, -0.05, 4.1), "TailLight")
-		end
-		if stage >= 2 then
-			-- A leafy wing.
 			for _, side in { -1, 1 } do
-				add("dark", "Block", Vector3.new(0.22, 0.9, 0.3), at(side * 1.3, 1.3, 2.9))
+				add("accent", "Cylinder", Vector3.new(0.05, 0.42, 0.42), at(side * 2.16, spot.X, spot.Y), "Spot")
 			end
-			add("body2", "Ellipsoid", Vector3.new(4.4, 0.3, 1.5), at(0, 1.8, 2.95), "Spoiler")
 		end
-		wheels(add, h, 0.95, 0.8, { inset = 0.6 })
+		-- The stem at the back holds up a leaf-shaped wing.
+		local stem = at(0, p.tail + 0.45, p.back - 0.55) * CFrame.Angles(math.rad(-35), 0, 0)
+		add("leaf", "Cylinder", Vector3.new(1.3, 0.45, 0.45), stem * CYL_ALONG_Z, "Stem")
+		add(
+			"leaf",
+			"Ellipsoid",
+			Vector3.new(4.2, 0.22, 1.25),
+			at(0, p.tail + 0.95, p.back - 0.35) * CFrame.Angles(math.rad(-6), 0, 0),
+			"LeafWing"
+		)
+		box(
+			add,
+			"team",
+			Vector3.new(-1.6, p.tail + 1.0, p.back + 0.15),
+			Vector3.new(1.6, p.tail + 1.08, p.back + 0.25),
+			"TeamLight"
+		)
+		if stage >= 2 then
+			for _, side in { -1, 1 } do
+				add(
+					"leaf",
+					"Ellipsoid",
+					Vector3.new(0.2, 0.9, 1.4),
+					at(side * 1.95, p.tail + 0.75, p.back - 0.4),
+					"LeafFin"
+				)
+			end
+		end
 	end,
 }
 
+-- An open-wheel go-kart: a low tub, side pods, the driver in a helmet, and a big rear wing.
 designs.kart = {
 	roles = {
 		{
-			body = look(rgb(64, 208, 96)),
-			body2 = look(rgb(34, 136, 66)),
-			accent = look(rgb(236, 64, 64)), -- racing suit
+			body = look(rgb(52, 204, 96)),
+			body2 = look(rgb(28, 128, 62)),
+			accent = look(rgb(236, 60, 56)), -- racing suit
 			light = look(rgb(248, 248, 250)),
-			glass = look(rgb(40, 64, 96), GLASS, 0.1, 0.3),
+			glass = look(rgb(20, 30, 50), GLASS, 0.05, 0.4),
 		},
-		{ -- Turbo: gold and racing stripes
-			body = look(rgb(36, 220, 128)),
-			body2 = look(rgb(20, 120, 80)),
-			accent = look(rgb(255, 200, 48)),
+		{ -- Turbo: gold trim and racing stripes
+			body = look(rgb(30, 214, 124)),
+			body2 = look(rgb(18, 110, 72)),
+			accent = look(rgb(255, 196, 40)),
 			light = look(rgb(255, 255, 255)),
-			glass = look(rgb(40, 64, 96), GLASS, 0.1, 0.3),
+			glass = look(rgb(20, 30, 50), GLASS, 0.05, 0.4),
 			rim = look(rgb(255, 200, 48), METAL),
 		},
 	},
-	antenna = Vector3.new(1.55, -0.55, 3.2),
+	antenna = Vector3.new(0.9, 0.5, 2.3),
 	build = function(h, stage, add)
-		add("dark", "Block", Vector3.new(3.8, 0.35, 6.6), at(0, -1.15, 0.1), "Floor")
-		add("body", "Ellipsoid", Vector3.new(3.4, 1.1, 3.2), at(0, -0.75, -2.2), "Nose")
-		add("body2", "Block", Vector3.new(4.6, 0.2, 0.9), at(0, -1.0, -3.4), "FrontWing")
-		add("light", "Cylinder", Vector3.new(0.12, 1.1, 1.1), at(0, -0.21, -2.3) * CYL_ALONG_Y, "Number")
+		local g = groundY(h)
+		local floor = g + 0.3
+		wheelSet(add, {
+			g = g,
+			x = 1.75,
+			front = -2.45,
+			rear = 2.35,
+			radius = 0.82,
+			rearRadius = 1.05,
+			width = 0.85,
+			rearWidth = 1.2,
+			spokes = 4,
+			open = true,
+			inset = 0,
+		})
+		box(add, "dark", Vector3.new(-1.45, floor, -3.3), Vector3.new(1.45, floor + 0.28, 3.3), "Floor")
+		-- Nose cone with a number disc, and a front wing.
+		box(add, "body", Vector3.new(-0.85, floor + 0.28, -3.35), Vector3.new(0.85, floor + 0.75, -0.9), "Nose")
+		rampUp(add, "body", Vector3.new(-0.85, floor + 0.75, -3.35), Vector3.new(0.85, floor + 1.25, -0.9), "NoseTop")
+		add("body", "Ellipsoid", Vector3.new(1.7, 0.55, 0.9), at(0, floor + 0.52, -3.4), "NoseTip")
+		box(add, "body2", Vector3.new(-2.35, floor + 0.05, -3.95), Vector3.new(2.35, floor + 0.18, -3.4), "FrontWing")
 		for _, side in { -1, 1 } do
-			add("body", "Ellipsoid", Vector3.new(1.2, 0.95, 3.2), at(side * 1.95, -0.85, 0.5), "SidePod")
-			if stage >= 2 then
-				add("light", "Block", Vector3.new(0.1, 0.25, 2.4), at(side * 2.52, -0.7, 0.5), "Stripe")
-			end
+			box(
+				add,
+				"body2",
+				Vector3.new(side * 2.35 - 0.06, floor + 0.05, -4.0),
+				Vector3.new(side * 2.35 + 0.06, floor + 0.55, -3.35),
+				"WingEnd"
+			)
 		end
-		add("metal", "Cylinder", Vector3.new(4.8, 0.45, 0.45), at(0, -1.0, 3.55), "Bumper")
-		-- Seat and driver.
-		add("dark", "Block", Vector3.new(1.8, 0.4, 1.5), at(0, -0.85, 0.7), "Seat")
-		add("dark", "Block", Vector3.new(1.8, 1.4, 0.35), at(0, -0.25, 1.45) * CFrame.Angles(math.rad(-12), 0, 0))
-		add("accent", "Ellipsoid", Vector3.new(1.5, 1.6, 1.1), at(0, -0.05, 0.75), "Driver")
-		add("body", "Ball", Vector3.one * 1.6, at(0, 1.2, 0.55), "Helmet")
-		add("light", "Cylinder", Vector3.new(0.3, 1.66, 1.66), at(0, 1.2, 0.55), "HelmetStripe")
-		add("glass", "Ellipsoid", Vector3.new(1.2, 0.6, 0.6), at(0, 1.22, 0.02), "Visor")
-		eyes(add, Vector3.new(0, 1.24, -0.2), Vector3.new(0, 0.1, -1), 0.5, 0.36)
-		-- Engine, exhausts and wing.
-		add("metal", "Block", Vector3.new(2.0, 0.9, 1.2), at(0, -0.6, 2.6), "Engine")
+		add("metal", "Cylinder", Vector3.new(3.6, 0.32, 0.32), at(0, floor + 0.2, 3.75), "Bumper")
+		-- Side pods with stripes and number badges.
 		for _, side in { -1, 1 } do
-			add("metal", "Cylinder", Vector3.new(1.3, 0.4, 0.4), at(side * 0.55, -0.3, 3.4) * CYL_ALONG_Z)
-			add("dark", "Block", Vector3.new(0.2, 1.3, 0.3), at(side * 1.3, 0.2, 3.25))
-			add("tail", "Block", Vector3.new(0.5, 0.3, 0.15), at(side * 1.5, -0.7, 3.8), "TailLight")
+			box(
+				add,
+				"body",
+				Vector3.new(side * 0.95, floor + 0.28, -0.75),
+				Vector3.new(side * 1.55, floor + 1.05, 1.55),
+				"SidePod"
+			)
+			rampDown(
+				add,
+				"body",
+				Vector3.new(side * 0.95, floor + 0.28, -1.45),
+				Vector3.new(side * 1.55, floor + 1.05, -0.75),
+				"PodIntake"
+			)
+			box(
+				add,
+				"light",
+				Vector3.new(side * 1.56, floor + 0.55, -0.6),
+				Vector3.new(side * 1.6, floor + 0.75, 1.45),
+				"PodStripe"
+			)
 		end
-		add("body", "Block", Vector3.new(4.4, 0.22, 1.1), at(0, 0.9, 3.3), "Wing")
+		badges(add, 1.59, floor + 0.65, 0.75, 0.62, "7")
+		-- Seat, driver and steering wheel.
+		box(add, "dark", Vector3.new(-0.75, floor + 0.28, 0.1), Vector3.new(0.75, floor + 0.6, 1.3), "Seat")
+		add(
+			"dark",
+			"Block",
+			Vector3.new(1.5, 1.3, 0.3),
+			at(0, floor + 1.0, 1.35) * CFrame.Angles(math.rad(-12), 0, 0),
+			"SeatBack"
+		)
+		add("accent", "Ellipsoid", Vector3.new(1.35, 1.45, 1.0), at(0, floor + 1.15, 0.75), "Driver")
+		add("body", "Ball", Vector3.one * 1.45, at(0, floor + 2.3, 0.6), "Helmet")
+		add("light", "Cylinder", Vector3.new(0.26, 1.5, 1.5), at(0, floor + 2.3, 0.6), "HelmetStripe")
+		add("glass", "Ellipsoid", Vector3.new(1.15, 0.5, 0.6), at(0, floor + 2.32, 0.02), "Visor")
+		add(
+			"dark",
+			"Cylinder",
+			Vector3.new(0.12, 0.8, 0.8),
+			at(0, floor + 1.35, -0.3) * CFrame.Angles(0, math.rad(90), math.rad(-60)),
+			"SteeringWheel"
+		)
+		-- Engine, exhausts and the big wing.
+		box(add, "metal", Vector3.new(-0.9, floor + 0.28, 1.6), Vector3.new(0.9, floor + 1.1, 2.9), "Engine")
+		for _, side in { -1, 1 } do
+			add(
+				"metal",
+				"Cylinder",
+				Vector3.new(1.2, 0.34, 0.34),
+				at(side * 0.45, floor + 1.0, 3.3) * CFrame.Angles(0, math.rad(90), math.rad(25)),
+				"ExhaustPipe"
+			)
+			box(
+				add,
+				"tail",
+				Vector3.new(side * 1.3 - 0.25, floor + 0.35, 3.62),
+				Vector3.new(side * 1.3 + 0.25, floor + 0.6, 3.72),
+				"TailLight"
+			)
+		end
+		wing(add, "body", 4.2, 1.1, floor + 2.1, 3.25, floor + 1.1)
 		if stage >= 2 then
+			-- Turbo: a stripe down the nose and tall fins on the wing.
+			box(
+				add,
+				"accent",
+				Vector3.new(-0.2, floor + 1.1, -3.3),
+				Vector3.new(0.2, floor + 1.14, -0.95),
+				"NoseStripe"
+			)
 			for _, side in { -1, 1 } do
-				add("body2", "Block", Vector3.new(0.2, 0.9, 1.3), at(side * 2.25, 1.05, 3.3), "WingEnd")
+				box(
+					add,
+					"accent",
+					Vector3.new(side * 2.1 - 0.05, floor + 1.7, 2.6),
+					Vector3.new(side * 2.1 + 0.05, floor + 2.45, 3.9),
+					"WingFin"
+				)
 			end
 		end
-		wheels(add, h, 0.85, 0.9, { rearRadius = 1.15, inset = 0.55, frontInset = 1.3 })
 	end,
 }
 
+-- A shark supercar: low and pointy, a white belly, glowing gills, teeth in the grille and a fin on the roof.
 designs.shark = {
 	roles = {
 		{
-			body = look(rgb(98, 126, 162)),
-			body2 = look(rgb(72, 94, 128)),
+			body = look(rgb(96, 124, 160)),
+			body2 = look(rgb(232, 238, 246)),
 			accent = look(rgb(40, 255, 236), NEON),
-			light = look(rgb(236, 240, 246)), -- belly
-			dark = look(rgb(120, 24, 38)), -- mouth
+			stripe = look(rgb(70, 94, 128)),
+			mouth = look(rgb(120, 24, 38)),
 		},
-		{ -- Tiger: stripes!
-			body = look(rgb(214, 140, 74)),
-			body2 = look(rgb(64, 46, 36)),
+		{ -- Tiger: orange with dark stripes
+			body = look(rgb(222, 132, 58)),
+			body2 = look(rgb(250, 238, 216)),
 			accent = look(rgb(255, 214, 64), NEON),
-			light = look(rgb(250, 238, 216)),
-			dark = look(rgb(120, 24, 38)),
+			stripe = look(rgb(52, 38, 30)),
+			mouth = look(rgb(120, 24, 38)),
 			rim = look(rgb(255, 214, 64), METAL),
 		},
 	},
-	antenna = Vector3.new(1.2, 0.8, 2.7),
+	antenna = Vector3.new(1.3, 1.0, 2.2),
 	build = function(h, stage, add)
-		add("body", "Ellipsoid", Vector3.new(5.1, 2.5, 9.0), at(0, 0.05, 0))
-		add("light", "Ellipsoid", Vector3.new(4.7, 1.5, 8.2), at(0, -0.5, -0.25), "Belly")
-		-- A big grin full of teeth.
-		add("dark", "Ellipsoid", Vector3.new(3.4, 0.8, 1.6), at(0, -0.3, -3.75), "Mouth")
-		for i = -2, 2 do
-			local z = if i == 0 then -4.3 elseif math.abs(i) == 1 then -4.2 else -3.9
-			add(
-				"white",
-				"Wedge",
-				Vector3.new(0.4, 0.5, 0.3),
-				at(i * 0.6, 0.02, z) * CFrame.Angles(math.pi, 0, 0),
-				"Tooth"
-			)
-		end
-		for _, side in { -1, 1 } do
-			eye(
-				add,
-				Vector3.new(side * 1.95, 0.55, -2.55),
-				Vector3.new(side, 0.2, -0.45),
-				1.0,
-				Vector2.new(side * 0.12, -0.1)
-			)
-			-- Fins and glowing gills.
-			add(
-				"body2",
-				"Wedge",
-				Vector3.new(0.3, 1.2, 2.0),
-				at(side * 2.55, -0.55, -0.3) * CFrame.Angles(0, 0, math.rad(-side * 120)),
-				"SideFin"
-			)
-			for k = 0, 2 do
-				local z = -1.4 + k * 0.45
-				local x = 2.55 * math.sqrt(1 - (0.15 / 1.25) ^ 2 - (z / 4.5) ^ 2) + 0.02
-				add("accent", "Block", Vector3.new(0.12, 0.9, 0.16), at(side * x, 0.2, z), "Gill")
-			end
-			add("lamp", "Ball", Vector3.one * 0.4, at(side * 1.4, -0.35, -3.85), "Headlight")
-			add("tail", "Ball", Vector3.one * 0.4, at(side * 1.2, 0.0, 4.2), "TailLight")
-		end
-		add("body", "Wedge", Vector3.new(0.5, 2.3, 2.8), at(0, 2.15, 0.6), "DorsalFin")
-		add(
-			"body",
-			"Wedge",
-			Vector3.new(0.45, 2.0, 1.8),
-			at(0, 1.3, 4.45) * CFrame.Angles(math.rad(-20), 0, 0),
-			"TailFin"
+		local g = groundY(h)
+		local p: Profile = {
+			width = 4.6,
+			bottom = g + 0.45,
+			nose = -0.8,
+			belt = 0.05,
+			tail = 0.05,
+			roof = 1.0,
+			front = -4.5,
+			back = 4.5,
+			screen = -1.4,
+			roofFront = 0.05,
+			roofBack = 0.95,
+			deck = 2.7,
+			cabin = 3.2,
+		}
+		coupe(add, p)
+		wheelSet(add, {
+			g = g,
+			x = 2.3,
+			front = -2.95,
+			rear = 2.8,
+			radius = 1.02,
+			rearRadius = 1.1,
+			width = 0.95,
+			rearWidth = 1.1,
+			spokes = 5,
+		})
+		-- The mouth: a dark red grille with rows of teeth.
+		box(
+			add,
+			"mouth",
+			Vector3.new(-1.35, p.bottom + 0.2, p.front - 0.06),
+			Vector3.new(1.35, p.nose - 0.1, p.front + 0.1),
+			"Mouth"
 		)
-		if stage == 2 then
-			for _, z in { -1.6, -0.3, 1.0, 2.3 } do
-				local top = 0.05 + 1.25 * math.sqrt(1 - (z / 4.5) ^ 2)
-				add("body2", "Ellipsoid", Vector3.new(3.6, 0.5, 0.5), at(0, top - 0.12, z), "Stripe")
-			end
-		end
-		wheels(add, h, 1.05, 0.85, { inset = 0.7 })
-	end,
-}
-
-designs.monster = {
-	roles = {
-		{
-			body = look(rgb(224, 50, 46)),
-			body2 = look(rgb(148, 28, 32)),
-			accent = look(rgb(255, 200, 40)),
-			rim = look(rgb(255, 200, 40), METAL),
-		},
-		{ -- Mega: black paint, chrome and flames
-			body = look(rgb(42, 42, 52)),
-			body2 = look(rgb(24, 24, 30)),
-			accent = look(rgb(255, 132, 30), NEON),
-			metal = look(rgb(226, 228, 236), METAL, 0, 0.3),
-			rim = look(rgb(226, 228, 236), METAL, 0, 0.3),
-		},
-	},
-	antenna = Vector3.new(2.4, 1.45, 4.0),
-	build = function(h, stage, add)
-		add("dark", "Block", Vector3.new(1.4, 0.8, 7.6), at(0, -1.0, 0), "Frame")
-		for _, z in { -3.0, 3.0 } do
-			add("metal", "Cylinder", Vector3.new(6.2, 0.5, 0.5), at(0, -0.63, z), "Axle")
-		end
-		add("body", "Block", Vector3.new(5.6, 1.3, 8.8), at(0, 0.0, 0))
-		add("body", "Wedge", Vector3.new(5.6, 0.6, 2.6), at(0, 0.95, -2.9), "Hood")
-		add("body", "Block", Vector3.new(5.2, 1.7, 3.2), at(0, 1.5, 0.3), "Cab")
-		add("glass", "Wedge", Vector3.new(5.0, 1.5, 1.2), at(0, 1.5, -1.85), "Windshield")
-		add("glass", "Block", Vector3.new(5.3, 0.9, 2.2), at(0, 1.75, 0.45), "Windows")
-		add("body2", "Block", Vector3.new(5.4, 0.25, 3.4), at(0, 2.45, 0.3), "Roof")
-		add("body2", "Block", Vector3.new(5.4, 0.8, 2.6), at(0, 1.05, 3.2), "Bed")
-		add("dark", "Block", Vector3.new(4.6, 0.3, 2.2), at(0, 1.35, 3.2))
-		-- The face: a toothy grille, headlight eyes and angry eyebrows.
-		add("dark", "Block", Vector3.new(4.0, 1.0, 0.3), at(0, 0.05, -4.45), "Grille")
 		for i = -3, 3 do
 			add(
 				"white",
 				"Wedge",
-				Vector3.new(0.45, 0.4, 0.2),
-				at(i * 0.55, 0.35, -4.62) * CFrame.Angles(math.pi, 0, 0),
+				Vector3.new(0.3, 0.32, 0.14),
+				at(i * 0.36, p.nose - 0.28, p.front - 0.1) * CFrame.Angles(math.pi, 0, 0),
 				"Tooth"
 			)
-			add("white", "Wedge", Vector3.new(0.45, 0.35, 0.2), at(i * 0.55 + 0.27, -0.27, -4.62), "Tooth")
+			add(
+				"white",
+				"Wedge",
+				Vector3.new(0.3, 0.26, 0.14),
+				at(i * 0.36 + 0.18, p.bottom + 0.33, p.front - 0.1),
+				"Tooth"
+			)
+		end
+		headlights(add, 1.7, p.nose - 0.18, p.front, 0.75, 0.16)
+		box(
+			add,
+			"dark",
+			Vector3.new(-2.4, p.bottom - 0.05, p.front - 0.3),
+			Vector3.new(2.4, p.bottom + 0.1, p.front + 0.6),
+			"Splitter"
+		)
+		-- Glowing gills behind the front wheels, and engine vents on the deck.
+		for _, side in { -1, 1 } do
+			for k = 0, 2 do
+				local z = -1.55 + k * 0.38
+				box(
+					add,
+					"accent",
+					Vector3.new(side * 2.3 - 0.02, p.nose + 0.05, z - 0.06),
+					Vector3.new(side * 2.3 + 0.03, p.belt - 0.12, z + 0.06),
+					"Gill"
+				)
+			end
+			rampDown(
+				add,
+				"dark",
+				Vector3.new(side * 2.32, p.nose + 0.1, 0.6),
+				Vector3.new(side * 2.36, p.belt - 0.1, 1.9),
+				"SideIntake"
+			)
+		end
+		for k = 0, 3 do
+			box(
+				add,
+				"dark",
+				Vector3.new(-0.9, p.belt + 0.01, 2.95 + k * 0.35),
+				Vector3.new(0.9, p.belt + 0.05, 3.1 + k * 0.35),
+				"Vent"
+			)
+		end
+		taillights(add, 1.9, p.tail - 0.22, p.back, 0.5, 0.16)
+		box(
+			add,
+			"dark",
+			Vector3.new(-1.7, p.bottom - 0.02, p.back - 0.5),
+			Vector3.new(1.7, p.bottom + 0.35, p.back + 0.12),
+			"Diffuser"
+		)
+		exhausts(add, 0.35, p.bottom + 0.25, p.back + 0.2, 0.46)
+		mirrors(add, 1.62, p.belt + 0.12, p.screen + 0.7)
+		-- The dorsal fin, and a tail fin holding up the wing.
+		rampUp(
+			add,
+			"body",
+			Vector3.new(-0.16, p.roof, p.roofFront + 0.2),
+			Vector3.new(0.16, p.roof + 1.7, p.roofBack + 0.9),
+			"DorsalFin"
+		)
+		box(
+			add,
+			"team",
+			Vector3.new(-0.18, p.roof + 1.55, p.roofBack + 0.5),
+			Vector3.new(0.18, p.roof + 1.72, p.roofBack + 0.92),
+			"TeamLight"
+		)
+		rampUp(
+			add,
+			"body",
+			Vector3.new(-0.14, p.belt, p.back - 1.3),
+			Vector3.new(0.14, p.belt + 1.05, p.back - 0.2),
+			"TailFin"
+		)
+		wing(add, "body", 4.0, 0.9, p.belt + 1.05, p.back - 0.6, p.belt)
+		if stage == 2 then
+			-- Tiger stripes over the bonnet and down the sides.
+			for k = 0, 3 do
+				strip(
+					add,
+					"stripe",
+					0,
+					3.6 - k * 0.8,
+					p.nose,
+					p.front,
+					p.belt,
+					p.screen,
+					0.03 + k * 0.004,
+					"TigerStripe"
+				)
+				local z = -0.4 + k * 0.7
+				box(
+					add,
+					"stripe",
+					Vector3.new(-2.33, p.nose + 0.05, z),
+					Vector3.new(2.33, p.belt - 0.2, z + 0.22),
+					"TigerStripe"
+				)
+			end
+		end
+	end,
+}
+
+-- A monster truck: a lifted pickup on huge treaded tyres, with chrome bumpers, a roof light bar, a roll bar
+-- and exhaust stacks.
+designs.monster = {
+	roles = {
+		{
+			body = look(rgb(222, 48, 44)),
+			body2 = look(rgb(150, 26, 30)),
+			accent = look(rgb(255, 200, 40)),
+			rim = look(rgb(255, 200, 40), METAL),
+			metal = look(rgb(226, 228, 236), METAL, 0, 0.25),
+		},
+		{ -- Mega: black paint, chrome and flames
+			body = look(rgb(38, 38, 48)),
+			body2 = look(rgb(22, 22, 28)),
+			accent = look(rgb(255, 132, 30), NEON),
+			metal = look(rgb(232, 234, 242), METAL, 0, 0.35),
+			rim = look(rgb(232, 234, 242), METAL, 0, 0.3),
+		},
+	},
+	antenna = Vector3.new(2.3, 2.9, 1.1),
+	build = function(h, stage, add)
+		local g = groundY(h)
+		local r = 1.75
+		local axleY = g + r
+		wheelSet(add, {
+			g = g,
+			x = 2.7,
+			front = -2.95,
+			rear = 2.95,
+			radius = r,
+			width = 1.45,
+			spokes = 6,
+			archRole = "trim",
+			treads = true,
+			inset = 0.05,
+		})
+		-- Frame, axles and big coil-over shocks.
+		for _, side in { -1, 1 } do
+			box(
+				add,
+				"dark",
+				Vector3.new(side * 1.0, axleY - 0.25, -4.2),
+				Vector3.new(side * 1.4, axleY + 0.2, 4.2),
+				"FrameRail"
+			)
+		end
+		for _, z in { -2.95, 2.95 } do
+			add("metal", "Cylinder", Vector3.new(6.0, 0.5, 0.5), at(0, axleY, z), "Axle")
+			box(
+				add,
+				"dark",
+				Vector3.new(-0.6, axleY - 0.45, z - 0.45),
+				Vector3.new(0.6, axleY + 0.4, z + 0.45),
+				"Differential"
+			)
+			for _, side in { -1, 1 } do
+				add(
+					"accent",
+					"Cylinder",
+					Vector3.new(1.6, 0.42, 0.42),
+					at(side * 1.85, axleY + 0.75, z) * CFrame.Angles(0, 0, math.rad(90 + side * 18)),
+					"Shock"
+				)
+			end
+		end
+		-- The pickup body.
+		local base, hood, belt, roof = 0.1, 1.15, 1.55, 2.95
+		box(add, "body2", Vector3.new(-2.6, base, -4.6), Vector3.new(2.6, base + 0.55, 4.6), "LowerBody")
+		box(add, "body", Vector3.new(-2.6, base + 0.55, -4.6), Vector3.new(2.6, hood, -1.4), "Hood")
+		box(add, "body", Vector3.new(-1.0, hood, -4.2), Vector3.new(1.0, hood + 0.25, -1.8), "HoodBulge")
+		box(add, "dark", Vector3.new(-0.7, hood + 0.25, -3.9), Vector3.new(0.7, hood + 0.55, -3.2), "Scoop")
+		box(add, "body", Vector3.new(-2.6, base + 0.55, -1.4), Vector3.new(2.6, belt, 1.3), "Cab")
+		rampUp(add, "glass", Vector3.new(-2.35, belt, -1.4), Vector3.new(2.35, roof, -0.6), "Windscreen")
+		box(add, "glass", Vector3.new(-2.33, belt, -0.6), Vector3.new(2.33, roof - 0.1, 1.2), "Windows")
+		box(add, "body", Vector3.new(-2.45, roof - 0.14, -0.7), Vector3.new(2.45, roof + 0.04, 1.3), "Roof")
+		for _, side in { -1, 1 } do
+			strip(add, "body", side * 2.37, 0.14, belt, -1.4, roof, -0.6, 0.02, "APillar")
+			box(
+				add,
+				"body",
+				Vector3.new(side * 2.37 - 0.08, belt, 1.0),
+				Vector3.new(side * 2.37 + 0.08, roof, 1.3),
+				"CPillar"
+			)
+		end
+		-- The open bed, with a roll bar.
+		box(add, "dark", Vector3.new(-2.4, base + 0.55, 1.3), Vector3.new(2.4, base + 0.75, 4.5), "BedFloor")
+		for _, side in { -1, 1 } do
+			box(
+				add,
+				"body",
+				Vector3.new(side * 2.35, base + 0.55, 1.3),
+				Vector3.new(side * 2.6, belt + 0.15, 4.6),
+				"BedSide"
+			)
+			add(
+				"metal",
+				"Cylinder",
+				Vector3.new(1.6, 0.26, 0.26),
+				at(side * 2.1, belt + 0.95, 1.7) * CYL_ALONG_Y,
+				"RollBarLeg"
+			)
+		end
+		box(add, "body", Vector3.new(-2.35, base + 0.55, 4.35), Vector3.new(2.35, belt + 0.15, 4.6), "Tailgate")
+		add("metal", "Cylinder", Vector3.new(4.5, 0.26, 0.26), at(0, belt + 1.75, 1.7), "RollBar")
+		-- Chrome bumpers, grille and round headlights.
+		box(add, "metal", Vector3.new(-2.9, base - 0.1, -4.95), Vector3.new(2.9, base + 0.45, -4.55), "FrontBumper")
+		box(add, "metal", Vector3.new(-2.9, base - 0.1, 4.55), Vector3.new(2.9, base + 0.45, 4.95), "RearBumper")
+		box(add, "dark", Vector3.new(-1.5, base + 0.55, -4.66), Vector3.new(1.5, hood - 0.1, -4.55), "Grille")
+		for k = 0, 3 do
+			local y = base + 0.65 + k * 0.1
+			box(add, "metal", Vector3.new(-1.45, y - 0.02, -4.7), Vector3.new(1.45, y + 0.02, -4.64), "GrilleBar")
 		end
 		for _, side in { -1, 1 } do
-			eye(
+			add(
+				"trim",
+				"Cylinder",
+				Vector3.new(0.14, 0.72, 0.72),
+				at(side * 2.05, hood - 0.3, -4.62) * CYL_ALONG_Z,
+				"LightBezel"
+			)
+			add(
+				"lamp",
+				"Cylinder",
+				Vector3.new(0.12, 0.56, 0.56),
+				at(side * 2.05, hood - 0.3, -4.68) * CYL_ALONG_Z,
+				"Headlight"
+			)
+			box(
 				add,
-				Vector3.new(side * 1.95, 0.95, -4.35),
-				Vector3.new(0, 0.25, -1),
-				1.05,
-				Vector2.new(-side * 0.1, -0.05)
+				"tail",
+				Vector3.new(side * 2.45 - 0.15, base + 0.7, 4.6),
+				Vector3.new(side * 2.45 + 0.15, belt, 4.68),
+				"TailLight"
+			)
+			-- Exhaust stacks behind the cab.
+			add(
+				"metal",
+				"Cylinder",
+				Vector3.new(2.4, 0.42, 0.42),
+				at(side * 2.1, belt + 0.9, 1.45) * CYL_ALONG_Y,
+				"Stack"
 			)
 			add(
 				"dark",
-				"Block",
-				Vector3.new(1.3, 0.28, 0.3),
-				at(side * 1.95, 1.62, -4.3) * CFrame.Angles(0, 0, math.rad(side * 18)),
-				"Brow"
+				"Cylinder",
+				Vector3.new(0.3, 0.46, 0.46),
+				at(side * 2.1, belt + 2.05, 1.45) * CYL_ALONG_Y,
+				"StackTip"
 			)
-			add("metal", "Cylinder", Vector3.new(1.6, 0.45, 0.45), at(side * 2.3, 2.3, 2.0) * CYL_ALONG_Y, "Exhaust")
-			add("tail", "Block", Vector3.new(0.8, 0.4, 0.15), at(side * 2.2, 0.3, 4.45), "TailLight")
-			if stage >= 2 then
-				-- Flames licking along the sides.
+			box(
+				add,
+				"dark",
+				Vector3.new(side * 2.7, axleY - 0.3, 3.95),
+				Vector3.new(side * 3.9, axleY + 0.9, 4.05),
+				"MudFlap"
+			)
+		end
+		badges(add, 2.63, base + 0.95, 0.0, 1.3, "🛻")
+		-- A light bar on the roof.
+		box(add, "dark", Vector3.new(-2.3, roof + 0.04, -0.55), Vector3.new(2.3, roof + 0.32, -0.25), "LightBar")
+		box(add, "team", Vector3.new(-2.3, roof + 0.32, -0.55), Vector3.new(2.3, roof + 0.38, -0.25), "TeamLight")
+		for k = 0, 4 do
+			add(
+				"lamp",
+				"Cylinder",
+				Vector3.new(0.12, 0.34, 0.34),
+				at(-1.8 + k * 0.9, roof + 0.18, -0.58) * CYL_ALONG_Z,
+				"RoofLight"
+			)
+		end
+		if stage >= 2 then
+			-- Flames licking along the sides.
+			for _, side in { -1, 1 } do
 				for k = 0, 2 do
 					add(
 						"accent",
 						"Ellipsoid",
-						Vector3.new(0.14, 0.55 - k * 0.1, 2.0 - k * 0.3),
-						at(side * 2.81, 0.05 + k * 0.28, -2.6 + k * 0.5),
+						Vector3.new(0.1, 0.46 - k * 0.08, 2.4 - k * 0.4),
+						at(side * 2.61, base + 0.7 + k * 0.22, -3.2 + k * 0.6),
 						"Flame"
 					)
 				end
 			end
 		end
-		add("metal", "Block", Vector3.new(6.0, 0.6, 0.6), at(0, -0.5, -4.55), "Bumper")
-		add("dark", "Block", Vector3.new(5.4, 0.25, 0.35), at(0, 2.8, -0.9), "LightBar")
-		for i = 0, 3 do
-			add("lamp", "Ball", Vector3.one * 0.5, at(-1.8 + i * 1.2, 3.05, -0.9), "RoofLight")
-		end
-		wheels(add, h, 1.75, 1.4, { inset = 0.2, treads = true })
 	end,
 }
 
+-- A flying saucer: a two-part hull with a glowing rim of lights, a glass dome with a little alien pilot, and
+-- hover pads instead of wheels.
 designs.ufo = {
 	roles = {
 		{
@@ -532,26 +1280,29 @@ designs.ufo = {
 	build = function(h, stage, add)
 		local floor = groundY(h)
 		add("body", "Ellipsoid", Vector3.new(7.4, 1.3, 7.4), at(0, -0.35, 0), "Saucer")
-		add("body2", "Ellipsoid", Vector3.new(4.6, 1.5, 4.6), at(0, -0.75, 0))
+		add("body2", "Ellipsoid", Vector3.new(4.8, 1.6, 4.8), at(0, -0.8, 0), "Belly")
+		add("trim", "Cylinder", Vector3.new(0.1, 5.6, 5.6), at(0, 0.18, 0) * CYL_ALONG_Y, "PanelRing")
 		add("accent", "Cylinder", Vector3.new(0.22, 7.6, 7.6), at(0, -0.35, 0) * CYL_ALONG_Y, "Rim")
-		local lights = if stage >= 2 then 14 else 10
+		add("team", "Cylinder", Vector3.new(0.14, 3.4, 3.4), at(0, -1.55, 0) * CYL_ALONG_Y, "TeamLight")
+		local lights = if stage >= 2 then 16 else 12
 		for i = 0, lights - 1 do
 			local angle = i / lights * math.pi * 2
 			local role = if i % 2 == 0 then "light" else "lamp"
-			add(role, "Ball", Vector3.one * 0.55, at(math.sin(angle) * 3.35, -0.12, math.cos(angle) * 3.35), "RimLight")
+			add(role, "Ball", Vector3.one * 0.55, at(math.sin(angle) * 3.4, -0.1, math.cos(angle) * 3.4), "RimLight")
 		end
 		-- The pilot, under a glass dome.
 		add("glass", "Ellipsoid", Vector3.new(3.6, 3.0, 3.6), at(0, 0.45, 0.3), "Dome")
+		add("trim", "Cylinder", Vector3.new(0.2, 3.7, 3.7), at(0, 0.3, 0.3) * CYL_ALONG_Y, "DomeRing")
 		add("skin", "Ellipsoid", Vector3.new(1.3, 1.1, 1.2), at(0, 0.35, 0.35), "Alien")
 		add("skin", "Ellipsoid", Vector3.new(1.6, 1.4, 1.4), at(0, 1.15, 0.3), "AlienHead")
 		for _, side in { -1, 1 } do
 			local socket = at(side * 0.36, 1.2, -0.28) * CFrame.Angles(0, 0, math.rad(-side * 25))
 			add("pupil", "Ellipsoid", Vector3.new(0.5, 0.78, 0.3), socket, "AlienEye")
-			add("shine", "Ball", Vector3.one * 0.14, socket * CFrame.new(0.08, 0.18, -0.13))
+			add("shine", "Ball", Vector3.one * 0.14, socket * CFrame.new(0.08, 0.18, -0.13), "EyeShine")
 			local tip = Vector3.new(side * 0.55, 2.3, 0.3)
 			local base = Vector3.new(side * 0.3, 1.75, 0.3)
 			local stalk = CFrame.new((tip + base) / 2) * CFrame.Angles(0, 0, math.rad(90 - side * 25))
-			add("skin", "Cylinder", Vector3.new((tip - base).Magnitude, 0.1, 0.1), stalk, "Antenna")
+			add("skin", "Cylinder", Vector3.new((tip - base).Magnitude, 0.1, 0.1), stalk, "AlienAntenna")
 			add("accent", "Ball", Vector3.one * 0.3, CFrame.new(tip), "AntennaTip")
 		end
 		-- Glowing hover pads instead of wheels.
@@ -561,19 +1312,17 @@ designs.ufo = {
 				add("lamp", "Cylinder", Vector3.new(0.3, 1.3, 1.3), at(x, floor + 0.55, z) * CYL_ALONG_Y, "HoverPad")
 			end
 		end
-		if stage >= 2 then
-			for _, side in { -1, 1 } do
-				add(
-					"body2",
-					"Wedge",
-					Vector3.new(0.3, 1.0, 1.8),
-					at(side * 2.6, 0.2, 2.4) * CFrame.Angles(0, 0, math.rad(-side * 20)),
-					"Fin"
-				)
-			end
+		-- Little fins at the back (bigger once it's golden).
+		for _, side in { -1, 1 } do
+			local size = if stage >= 2 then Vector3.new(0.3, 1.2, 2.0) else Vector3.new(0.25, 0.8, 1.4)
+			add("body2", "Wedge", size, at(side * 2.5, 0.2, 2.5) * CFrame.Angles(0, 0, math.rad(-side * 20)), "Fin")
 		end
 	end,
 }
+
+---------------------------------------------------------------------------------------------------------------
+-- Putting a car together
+---------------------------------------------------------------------------------------------------------------
 
 local function makePart(spec: PartSpec, style: Look): BasePart
 	local part: BasePart
@@ -598,7 +1347,8 @@ local function makePart(spec: PartSpec, style: Look): BasePart
 	part.Color = style.color
 	part.Material = style.material or SMOOTH
 	part.Transparency = style.transparency or 0
-	part.Reflectance = style.reflectance or 0
+	-- Painted plastic gets a hint of shine, like a toy car's glossy paint.
+	part.Reflectance = style.reflectance or (if part.Material == SMOOTH then 0.05 else 0)
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
 	part.CanCollide = false
@@ -609,12 +1359,46 @@ local function makePart(spec: PartSpec, style: Look): BasePart
 	return part
 end
 
+-- Paints `text` on a part: on a badge (a flat cylinder) its outward face, on a sign both big faces.
+local function paint(part: BasePart, spec: PartSpec, text: string)
+	local faces: { Enum.NormalId }
+	if spec.shape == "Cylinder" then
+		local outward = spec.cframe.XVector:Dot(spec.cframe.Position) >= 0
+		faces = { if outward then Enum.NormalId.Right else Enum.NormalId.Left }
+	else
+		faces = { Enum.NormalId.Front, Enum.NormalId.Back }
+	end
+	for _, face in faces do
+		local gui = Instance.new("SurfaceGui")
+		gui.Name = "Paint"
+		gui.Face = face
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 40
+		gui.LightInfluence = 1
+		local label = Instance.new("TextLabel")
+		label.Name = "Text"
+		label.Size = UDim2.fromScale(0.9, 0.8)
+		label.Position = UDim2.fromScale(0.05, 0.1)
+		label.BackgroundTransparency = 1
+		label.Text = text
+		label.TextScaled = true
+		label.Font = Enum.Font.FredokaOne
+		label.TextColor3 = rgb(200, 36, 30)
+		label.Parent = gui
+		gui.Parent = part
+	end
+end
+
 -- The colours for a car at a stage: its own colours (or the stage's theme), then the shared defaults.
-local function rolesFor(design: Design, stage: number): (string) -> Look
+local function rolesFor(design: Design, stage: number, teamColor: Color3): (string) -> Look
 	local own = design.roles[math.min(stage, #design.roles)]
 	local theme = THEMES[stage]
 	local base = design.roles[1]
+	local team = look(teamColor, NEON)
 	return function(role: string): Look
+		if role == "team" then
+			return team
+		end
 		if theme and theme[role] then
 			return theme[role]
 		end
@@ -644,11 +1428,27 @@ local function particles(
 	return emitter
 end
 
+-- Parts that belong to a wheel (and turn with it).
+local WHEEL_PARTS: { [string]: boolean } = {
+	Wheel = true,
+	Sidewall = true,
+	Rim = true,
+	RimDish = true,
+	Spoke = true,
+	HubCap = true,
+	Tread = true,
+}
+
 -- The boost flame colours for each stage.
 local FLAMES = {
 	[3] = ColorSequence.new(rgb(255, 214, 90), rgb(210, 30, 10)),
 	[4] = ColorSequence.new(rgb(196, 140, 255), rgb(60, 220, 255)),
 }
+
+-- How high the chassis centre sits above the ground when the car rests on its wheels.
+function CarModelBuilder.restHeight(def: CarDef): number
+	return -groundY(def.Hitbox)
+end
 
 -- Builds a car model positioned at the origin. Move it with model:PivotTo(cframe).
 function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
@@ -682,14 +1482,14 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 	model.PrimaryPart = chassis
 
 	local design = designs[def.Id] or designs.pizza
-	local styleOf = rolesFor(design, stage)
+	local teamColor = opts.teamColor or rgb(236, 236, 240)
+	local styleOf = rolesFor(design, stage, teamColor)
 	local specs: { PartSpec } = {}
-	design.build(hitbox, stage, function(role, shape, size, cframe, name)
-		table.insert(specs, { role = role, shape = shape, size = size, cframe = cframe, name = name })
+	design.build(hitbox, stage, function(role, shape, size, cframe, name, text)
+		table.insert(specs, { role = role, shape = shape, size = size, cframe = cframe, name = name, text = text })
 	end)
 
 	-- A team-coloured ball on an antenna, so teams are easy to tell apart from anywhere on the field.
-	local teamColor = opts.teamColor or rgb(236, 236, 240)
 	local antennaHeight = hitbox.Y + 1.1 - design.antenna.Y
 	table.insert(specs, {
 		role = "dark",
@@ -698,35 +1498,73 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 		cframe = CFrame.new(design.antenna + Vector3.new(0, antennaHeight / 2, 0)) * CYL_ALONG_Y,
 		name = "Antenna",
 	})
-
-	for _, spec in specs do
-		local part = makePart(spec, styleOf(spec.role))
-		if opts.preview then
-			part.Anchored = true
-		else
-			local weld = Instance.new("WeldConstraint")
-			weld.Part0 = chassis
-			weld.Part1 = part
-			weld.Parent = part
-		end
-		part.Parent = model
-	end
-	local flag = makePart({
+	table.insert(specs, {
 		role = "team",
 		shape = "Ball",
 		size = Vector3.one * 0.85,
 		cframe = CFrame.new(design.antenna + Vector3.new(0, antennaHeight + 0.25, 0)),
 		name = "TeamFlag",
-	}, look(teamColor, NEON))
-	if opts.preview then
-		flag.Anchored = true
-	else
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = chassis
-		weld.Part1 = flag
-		weld.Parent = flag
+	})
+
+	-- In a match the wheels turn: each wheel's parts hang off an invisible hub on a Motor6D, which CarVisuals
+	-- spins (and steers, for the front wheels) on every player's screen.
+	local hubs: { { centre: Vector3, part: BasePart } } = {}
+	if not opts.preview then
+		for _, spec in specs do
+			if spec.name == "Wheel" then
+				local centre = spec.cframe.Position
+				local hub: BasePart = Instance.new("Part")
+				hub.Name = "WheelHub"
+				hub.Size = Vector3.one * 0.4
+				hub.CFrame = CFrame.new(centre)
+				hub.Transparency = 1
+				hub.CanCollide = false
+				hub.CanQuery = false
+				hub.CanTouch = false
+				hub.CastShadow = false
+				hub.Massless = true
+				hub:SetAttribute("Front", centre.Z < 0)
+				hub:SetAttribute("Radius", spec.size.Y / 2)
+				local motor = Instance.new("Motor6D")
+				motor.Name = "WheelMotor"
+				motor.Part0 = chassis
+				motor.Part1 = hub
+				motor.C0 = CFrame.new(centre)
+				motor.Parent = hub
+				hub.Parent = model
+				table.insert(hubs, { centre = centre, part = hub })
+			end
+		end
 	end
-	flag.Parent = model
+	local function anchorFor(spec: PartSpec): BasePart
+		local best: BasePart = chassis
+		if WHEEL_PARTS[spec.name or ""] then
+			local bestDistance = math.huge
+			for _, hub in hubs do
+				local distance = (hub.centre - spec.cframe.Position).Magnitude
+				if distance < bestDistance then
+					best, bestDistance = hub.part, distance
+				end
+			end
+		end
+		return best
+	end
+
+	for _, spec in specs do
+		local part = makePart(spec, styleOf(spec.role))
+		if spec.text then
+			paint(part, spec, spec.text)
+		end
+		if opts.preview then
+			part.Anchored = true
+		else
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = anchorFor(spec)
+			weld.Part1 = part
+			weld.Parent = part
+		end
+		part.Parent = model
+	end
 
 	-- Team-coloured light on the ground under the car.
 	if opts.teamColor then

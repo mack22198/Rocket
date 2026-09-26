@@ -5,7 +5,9 @@
 --   BallHit(id, time, carCFrame, carVelocity, ballPosition, ballVelocity)   "my car just touched the ball"
 --   SetBoosting(isBoosting)                                                  boost button held / released
 --   ActivateMega()                                                           arm a full Mega Shot
---   Garage(action, carId) -> result                                          unlock / equip cars
+--   Garage(action, carId, extra) -> result                                   unlock / equip / evolve cars
+--   Play()                                                                   join the next match (or a free seat now)
+--   LeaveMatch()                                                             back to the menu (a bot takes your seat)
 --   GetPlayerData() -> data                                                  initial profile snapshot
 -- Server -> Client
 --   BallState(time, position, velocity, flags, lastTouchTeam)  (unreliable, ~30/s)
@@ -69,6 +71,8 @@ local Remotes = {
 	SetBoosting = event("SetBoosting"),
 	ActivateMega = event("ActivateMega"),
 	Garage = func("Garage"),
+	Play = event("Play"),
+	LeaveMatch = event("LeaveMatch"),
 	GetPlayerData = func("GetPlayerData"),
 
 	BallState = unreliable("BallState"),

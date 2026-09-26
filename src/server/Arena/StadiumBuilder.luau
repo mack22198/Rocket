@@ -10,8 +10,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
 
-local Palette = require(script.Parent.Palette)
-local PartKit = require(script.Parent.PartKit)
+local Palette = require(Shared.Build.Palette)
+local PartKit = require(Shared.Build.PartKit)
 
 local StadiumBuilder = {}
 

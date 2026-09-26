@@ -1,7 +1,7 @@
 -- Builds the game's real screens (HUD, garage, results...) in Lune with pretend services, then writes the
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
---   scenarios: lobby, match, touch, goal, garage, evolve, results
+--   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -11,7 +11,7 @@ local task = require("@lune/task")
 
 local harness = require("../../tests/harness")
 
-local scenario = process.args[1] or "lobby"
+local scenario = process.args[1] or "menu"
 local outPath = process.args[2] or "tools/preview/ui.json"
 
 local Vector2 = roblox.Vector2
@@ -47,7 +47,13 @@ local attrs: { [string]: any } = {
 	Overtime = false,
 	Banner = "",
 }
-if scenario ~= "lobby" and scenario ~= "garage" and scenario ~= "evolve" then
+local MENU_SCENARIOS = { menu = true, queued = true, garage = true, evolve = true, howto = true }
+if scenario == "menu" or scenario == "garage" or scenario == "evolve" or scenario == "howto" then
+	attrs.Phase = "Waiting"
+elseif scenario == "queued" then
+	attrs.PhaseEndsAt = NOW + 3
+end
+if not MENU_SCENARIOS[scenario] then
 	attrs.Phase = "Playing"
 	attrs.BlueScore = 2
 	attrs.OrangeScore = 1
@@ -107,9 +113,12 @@ local localPlayer = {
 
 local renderStepped, heartbeat = signal(), signal()
 local services = {
-	Players = { LocalPlayer = localPlayer, GetPlayers = function()
-		return { localPlayer }
-	end },
+	Players = {
+		LocalPlayer = localPlayer,
+		GetPlayers = function()
+			return { localPlayer }
+		end,
+	},
 	ReplicatedStorage = {
 		WaitForChild = function(_, name)
 			if name == "Shared" then
@@ -165,6 +174,7 @@ local services = {
 	StarterGui = { SetCore = function() end },
 	SoundService = Instance.new("Folder"),
 	GuiService = {
+		SelectedObject = nil,
 		GetGuiInset = function()
 			return Vector2.new(0, 58), Vector2.zero
 		end,
@@ -187,9 +197,11 @@ harness.globals.workspace = {
 	end,
 }
 harness.globals.task = task
-harness.globals.TweenInfo = { new = function(...)
-	return { ... }
-end }
+harness.globals.TweenInfo = {
+	new = function(...)
+		return { ... }
+	end,
+}
 
 -- Pretend player data and car.
 local data = {
@@ -202,7 +214,7 @@ local data = {
 	carLook = { banana = 2 },
 }
 local carAttrs = { Boost = 67, Mega = 100, MegaArmed = false, Team = "Blue", Stage = 2 }
-local driving = attrs.Phase == "Playing"
+local driving = attrs.Phase == "Playing" and scenario ~= "live"
 local car = {
 	Name = "Car",
 	GetAttribute = function(_, name)
@@ -260,6 +272,16 @@ harness.preload(controllers .. "EffectsController", {
 	play = function() end,
 	start = function() end,
 })
+harness.preload(controllers .. "ShowroomController", {
+	showCar = function() end,
+	celebrate = function() end,
+	setActive = function() end,
+	setMode = function() end,
+	isActive = function()
+		return true
+	end,
+	start = function() end,
+})
 
 -- Lune's instances have no events, so button clicks and the like get pretend signals in the preview.
 local events: { [any]: { [string]: any } } = {}
@@ -282,11 +304,34 @@ harness.globals.__pivotTo = function(model, target)
 		end
 	end
 end
-local UI_EVENTS = { "Activated", "InputBegan", "InputEnded", "InputChanged", "MouseEnter", "MouseLeave" }
-for _, name in { "HUD", "Announcer", "ResultsScreen", "Garage", "TouchControls", "Theme" } do
+local UI_EVENTS = {
+	"Activated",
+	"InputBegan",
+	"InputEnded",
+	"InputChanged",
+	"MouseEnter",
+	"MouseLeave",
+	"MouseButton1Down",
+	"MouseButton1Up",
+	"SelectionGained",
+	"SelectionLost",
+}
+for _, name in
+	{
+		"HUD",
+		"Announcer",
+		"ResultsScreen",
+		"Garage",
+		"TouchControls",
+		"Theme",
+		"MainMenu",
+		"PauseMenu",
+		"HowToPlay",
+	}
+do
 	harness.sourceTransforms["src/client/UI/" .. name] = function(source)
 		for _, event in UI_EVENTS do
-			source = string.gsub(source, "([%w_%.]+)%." .. event .. ":", "__event(%1, \"" .. event .. "\"):")
+			source = string.gsub(source, "([%w_%.]+)%." .. event .. ":", '__event(%1, "' .. event .. '"):')
 		end
 		source = string.gsub(source, "([%w_%.]+):PivotTo%(", "__pivotTo(%1, ")
 		return (string.gsub(source, "([%w_%.]+):GetPropertyChangedSignal%(([^)]*)%)", "__event(%1, %2)"))
@@ -299,12 +344,26 @@ local Announcer = harness.require(UI.Announcer)
 local ResultsScreen = harness.require(UI.ResultsScreen)
 local Garage = harness.require(UI.Garage)
 local TouchControls = harness.require(UI.TouchControls)
+local MainMenu = harness.require(UI.MainMenu)
+local PauseMenu = harness.require(UI.PauseMenu)
+local HowToPlay = harness.require(UI.HowToPlay)
 HUD.start()
 Announcer.start()
 ResultsScreen.start()
 Garage.start()
+MainMenu.start()
+PauseMenu.start()
+HowToPlay.start()
 if touch then
 	TouchControls.start()
+end
+-- What GameFlow would show for each scenario.
+local inMatch = not MENU_SCENARIOS[scenario] and scenario ~= "live"
+HUD.setVisible(inMatch)
+Announcer.setVisible(inMatch)
+if not inMatch and scenario ~= "garage" and scenario ~= "evolve" then
+	MainMenu.setQueued(scenario == "queued")
+	MainMenu.show()
 end
 
 local function frame()
@@ -319,6 +378,10 @@ if scenario == "goal" then
 	remotes.Announce.OnClientEvent:Fire("save", "EPIC SAVE!", "Orange", "Bolt (bot)")
 elseif scenario == "garage" then
 	Garage.open()
+elseif scenario == "howto" then
+	HowToPlay.open()
+elseif scenario == "pause" then
+	PauseMenu.open()
 elseif scenario == "evolve" then
 	data.carXp.pizza = 520
 	Garage.open("pizza")
@@ -505,3 +568,5 @@ table.sort(screens, function(a, b)
 end)
 fs.writeFile(outPath, serde.encode("json", { scenario = scenario, touch = touch, screens = screens }))
 print(`wrote {#screens} screens for '{scenario}' to {outPath}`)
+-- Some screens run little animation loops forever; the picture is taken, so stop here.
+process.exit(0)

@@ -1,7 +1,6 @@
 --!strict
--- The in-game HUD. While driving: the scoreboard and clock, a boost dial, the Mega Shot meter and big centre
--- text (countdown, GO!, GOAL!). In the lobby: your Scrap, the next car you're saving for, the match timer and a
--- big Garage button (with a badge when one of your cars is ready to evolve).
+-- The in-game HUD: the scoreboard and clock, a boost dial, the Mega Shot meter, big centre text (countdown,
+-- GO!, GOAL!) and the ☰ MENU button. It's only shown during matches - the menus have their own screens.
 --
 -- Everything stays clear of Roblox's own buttons in the top corners.
 
@@ -12,22 +11,19 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local CarCatalog = require(Shared.Config.CarCatalog)
-local Evolution = require(Shared.Config.Evolution)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 local Remotes = require(Shared.Net.Remotes)
-local Rewards = require(Shared.Config.Rewards)
 local Signal = require(Shared.Util.Signal)
 
 local CameraController = require(script.Parent.Parent.Controllers.CameraController)
 local CarController = require(script.Parent.Parent.Controllers.CarController)
-local PlayerDataClient = require(script.Parent.Parent.Controllers.PlayerDataClient)
 local Theme = require(script.Parent.Theme)
 
 local HUD = {}
 
-HUD.GarageRequested = Signal.new() :: Signal.Signal<>
+-- The ☰ MENU button was pressed.
+HUD.MenuRequested = Signal.new() :: Signal.Signal<>
 
 local C = Theme.Colors
 local Phases = MatchState.Phases
@@ -58,19 +54,10 @@ local megaPanel: Frame
 local megaBar: Theme.Bar
 local megaLabel: TextLabel
 local camPill: TextLabel
--- Lobby
-local lobbyInfo: Frame
-local scrapPill: TextLabel
-local nextName: TextLabel
-local nextAmount: TextLabel
-local nextBar: Theme.Bar
-local garageArea: Frame
-local evolveBadge: TextLabel
-local banner: TextLabel
+local menuButton: TextButton
 
 local messageUntil = 0
 local lastPhase = ""
-local evolveReady = false
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
@@ -244,80 +231,25 @@ local function buildMegaMeter()
 	})
 end
 
-local function buildLobby()
-	lobbyInfo = Instance.new("Frame")
-	lobbyInfo.Name = "LobbyInfo"
-	lobbyInfo.Size = UDim2.fromOffset(310, 150)
-	lobbyInfo.Position = UDim2.fromOffset(16, 68)
-	lobbyInfo.BackgroundTransparency = 1
-	lobbyInfo.Parent = gui
-	scrapPill = Theme.pill(lobbyInfo, {
-		name = "Scrap",
-		size = UDim2.fromOffset(210, 48),
-		text = "🔩 0",
-		color = C.Scrap,
-	})
-	local card = Theme.panel(lobbyInfo, "NextCar", UDim2.fromOffset(310, 86), UDim2.fromOffset(0, 58))
-	Theme.label(card, {
-		size = UDim2.fromOffset(200, 16),
-		position = UDim2.fromOffset(14, 10),
-		text = "SAVING UP FOR",
-		font = Enum.Font.GothamBlack,
-		color = C.Muted,
-		align = Enum.TextXAlignment.Left,
-		stroke = false,
-	})
-	nextName = Theme.label(card, {
-		size = UDim2.new(1, -28, 0, 26),
-		position = UDim2.fromOffset(14, 28),
-		text = "",
-		align = Enum.TextXAlignment.Left,
-	})
-	nextBar = Theme.bar(card, UDim2.new(1, -118, 0, 14), UDim2.fromOffset(14, 62), C.Good)
-	nextAmount = Theme.label(card, {
-		size = UDim2.fromOffset(92, 18),
-		position = UDim2.new(1, -100, 0, 60),
-		text = "",
-		font = Theme.Body,
-		color = C.Muted,
-		align = Enum.TextXAlignment.Right,
-		stroke = false,
-	})
-
-	garageArea = Instance.new("Frame")
-	garageArea.Name = "GarageArea"
-	garageArea.Size = UDim2.fromOffset(300, 72)
-	garageArea.Position = UDim2.new(0.5, 0, 1, -24)
-	garageArea.AnchorPoint = Vector2.new(0.5, 1)
-	garageArea.BackgroundTransparency = 1
-	garageArea.Parent = gui
-	local garageButton = Theme.button(garageArea, {
-		name = "GarageButton",
+local function buildMenuButton()
+	local holder = Instance.new("Frame")
+	holder.Name = "Menu"
+	holder.Size = UDim2.fromOffset(118, 42)
+	holder.Position = UDim2.fromOffset(16, 66)
+	holder.BackgroundTransparency = 1
+	holder.Parent = gui
+	Theme.scaled(holder)
+	menuButton = Theme.button(holder, {
+		name = "MenuButton",
 		size = UDim2.fromScale(1, 1),
-		text = "🚗  GARAGE",
+		text = "☰  MENU",
+		color = C.Panel,
+		textColor = C.Text,
 	})
-	garageButton.Activated:Connect(function()
-		HUD.GarageRequested:Fire()
+	menuButton.BackgroundTransparency = 0.15
+	menuButton.Activated:Connect(function()
+		HUD.MenuRequested:Fire()
 	end)
-	evolveBadge = Theme.pill(garageArea, {
-		name = "EvolveBadge",
-		size = UDim2.fromOffset(200, 32),
-		position = UDim2.new(0.5, 0, 0, -8),
-		anchor = Vector2.new(0.5, 1),
-		text = "✨ READY TO EVOLVE!",
-		background = C.Evolve,
-		transparency = 0,
-	})
-	evolveBadge.Rotation = -3
-
-	banner = Theme.pill(gui, {
-		name = "Banner",
-		size = UDim2.fromOffset(580, 42),
-		position = UDim2.new(0.5, 0, 0, 12),
-		anchor = Vector2.new(0.5, 0),
-		text = "",
-		color = C.Gold,
-	})
 end
 
 local function build()
@@ -325,7 +257,7 @@ local function build()
 	buildScoreboard()
 	buildBoostDial()
 	buildMegaMeter()
-	buildLobby()
+	buildMenuButton()
 
 	-- Centre messages.
 	bigText = Theme.label(gui, {
@@ -348,39 +280,11 @@ local function build()
 	})
 	subText.Visible = false
 
-	local scaledObjects: { GuiObject } =
-		{ scoreboard, bigText, subText, dial, camPill, megaPanel, lobbyInfo, garageArea, banner }
+	local scaledObjects: { GuiObject } = { scoreboard, bigText, subText, dial, camPill, megaPanel }
 	for _, object in scaledObjects do
 		Theme.scaled(object)
 	end
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
-end
-
-local function refreshData()
-	local data = PlayerDataClient.get()
-	scrapPill.Text = `🔩 {Theme.formatNumber(data.scrap)}`
-	local goal = Rewards.nextGoal(data.owned, data.scrap)
-	if goal then
-		nextName.Text = `{goal.emoji} {goal.displayName}`
-		nextAmount.Text = if goal.canAfford
-			then "UNLOCK IT!"
-			else `{Theme.formatNumber(goal.have)} / {Theme.formatNumber(goal.price)}`
-		nextAmount.TextColor3 = if goal.canAfford then C.Gold else C.Muted
-		nextBar.set(goal.have / math.max(goal.price, 1))
-		nextBar.fill.BackgroundColor3 = if goal.canAfford then C.Gold else C.Good
-	else
-		nextName.Text = "🏆 Every car unlocked!"
-		nextAmount.Text = ""
-		nextBar.set(1)
-	end
-	-- Is any car ready to evolve?
-	evolveReady = false
-	for id in data.owned do
-		local def = CarCatalog.get(id)
-		if def and Evolution.progress(def, data.carXp[id] or 0, data.carStage[id] or 1).ready then
-			evolveReady = true
-		end
-	end
 end
 
 local function numberAttr(name: string): number
@@ -479,31 +383,16 @@ local function update()
 			youTag.Position = UDim2.fromOffset(if team == "Blue" then 18 else 338, 70)
 		end
 	end
+end
 
-	-- Lobby.
-	lobbyInfo.Visible = not driving
-	garageArea.Visible = not driving
-	evolveBadge.Visible = evolveReady
-	if evolveReady then
-		evolveBadge.Rotation = -3 + math.sin(os.clock() * 5) * 2
-	end
-	local bannerText = ""
-	local status = stateObject:GetAttribute(Attr.Banner)
-	if not driving and phase == Phases.Intermission then
-		bannerText = `NEXT MATCH IN {math.ceil(MatchState.phaseSecondsLeft(stateObject, now))}`
-	elseif not driving and inMatchPhase then
-		bannerText = "MATCH IN PROGRESS - YOU'LL JOIN WHEN A SEAT OPENS"
-	elseif not driving and type(status) == "string" then
-		bannerText = string.upper(status)
-	end
-	banner.Text = bannerText
-	banner.Visible = not scoreboard.Visible and bannerText ~= ""
+-- The HUD only shows during matches.
+function HUD.setVisible(on: boolean)
+	gui.Enabled = on
 end
 
 function HUD.start()
 	build()
-	refreshData()
-	PlayerDataClient.Changed:Connect(refreshData)
+	gui.Enabled = false
 	RunService.RenderStepped:Connect(update)
 
 	Remotes.GoalScored.OnClientEvent:Connect(function(team: any, scorer: any, assist: any, _position: any, combo: any)

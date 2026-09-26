@@ -33,6 +33,25 @@ MatchState.Attr = {
 	Banner = "Banner", -- short status text shown in the lobby
 }
 
+-- Where each player is: in the menu, waiting for a match (pressed PLAY), or driving in the match.
+MatchState.Status = {
+	Menu = "Menu",
+	Queued = "Queued",
+	Playing = "Playing",
+}
+
+-- Attributes on each Player.
+MatchState.PlayerAttr = {
+	Status = "Status", -- one of MatchState.Status
+	Team = "Team", -- "Blue" / "Orange" while playing
+}
+
+-- A player's status (players who just joined are in the menu).
+function MatchState.statusOf(player: Instance): string
+	local value = player:GetAttribute(MatchState.PlayerAttr.Status)
+	return if type(value) == "string" then value else MatchState.Status.Menu
+end
+
 -- Attributes on every car model.
 MatchState.CarAttr = {
 	OwnerUserId = "OwnerUserId", -- 0 for bots

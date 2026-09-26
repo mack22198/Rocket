@@ -1,7 +1,10 @@
 --!strict
 -- Colours, fonts and small helpers that give every screen the same bright, chunky look.
 
+local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared").Config.GameConfig)
 
@@ -11,6 +14,8 @@ local Theme = {}
 
 Theme.Title = Enum.Font.FredokaOne
 Theme.Body = Enum.Font.GothamBold
+Theme.Caps = Enum.Font.GothamBlack -- small labels in capitals
+Theme.Logo = Enum.Font.LuckiestGuy
 
 Theme.Colors = {
 	Panel = rgb(22, 26, 48),
@@ -138,7 +143,47 @@ export type ButtonOptions = {
 	textColor: Color3?,
 }
 
--- A chunky button: bright colour, a darker rim and a little shine on top.
+-- A chunky, glossy button: bright on top, a darker "lip" along the bottom so it looks like you can press it
+-- in, and it grows a little under the mouse and squashes when pressed.
+local LIP = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, rgb(255, 255, 255)),
+	ColorSequenceKeypoint.new(0.45, rgb(236, 236, 236)),
+	ColorSequenceKeypoint.new(0.83, rgb(214, 214, 214)),
+	ColorSequenceKeypoint.new(0.84, rgb(150, 150, 150)),
+	ColorSequenceKeypoint.new(1, rgb(135, 135, 135)),
+})
+
+local function pop(button: GuiButton): UIScale
+	local scale = Instance.new("UIScale")
+	scale.Name = "Pop"
+	scale.Parent = button
+	local function to(size: number)
+		TweenService:Create(scale, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Scale = size,
+		}):Play()
+	end
+	button.MouseEnter:Connect(function()
+		to(1.04)
+	end)
+	button.MouseLeave:Connect(function()
+		to(1)
+	end)
+	button.MouseButton1Down:Connect(function()
+		to(0.95)
+	end)
+	button.MouseButton1Up:Connect(function()
+		to(1.04)
+	end)
+	button.SelectionGained:Connect(function()
+		to(1.06)
+	end)
+	button.SelectionLost:Connect(function()
+		to(1)
+	end)
+	return scale
+end
+Theme.pop = pop
+
 function Theme.button(parent: Instance, options: ButtonOptions): TextButton
 	local color = options.color or Theme.Colors.Gold
 	local button = Instance.new("TextButton")
@@ -155,18 +200,53 @@ function Theme.button(parent: Instance, options: ButtonOptions): TextButton
 	button.TextColor3 = options.textColor or Theme.Colors.Ink
 	button.Parent = parent
 	Theme.corner(button, 14)
-	Theme.stroke(button, color:Lerp(rgb(0, 0, 0), 0.5), 3)
+	Theme.stroke(button, color:Lerp(rgb(0, 0, 0), 0.55), 2.5)
 	local shine = Instance.new("UIGradient")
-	shine.Color = ColorSequence.new(rgb(255, 255, 255), rgb(205, 205, 205))
+	shine.Name = "Gloss"
+	shine.Color = LIP
 	shine.Rotation = 90
 	shine.Parent = button
 	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0.18, 0)
-	padding.PaddingBottom = UDim.new(0.18, 0)
-	padding.PaddingLeft = UDim.new(0, 10)
-	padding.PaddingRight = UDim.new(0, 10)
+	padding.PaddingTop = UDim.new(0.16, 0)
+	padding.PaddingBottom = UDim.new(0.27, 0)
+	padding.PaddingLeft = UDim.new(0, 12)
+	padding.PaddingRight = UDim.new(0, 12)
 	padding.Parent = button
+	pop(button)
 	return button
+end
+
+-- A band of light that sweeps across a button every few seconds, to draw the eye (the PLAY button).
+function Theme.sweep(button: GuiObject, every: number)
+	local band = Instance.new("Frame")
+	band.Name = "Sweep"
+	band.Size = UDim2.fromScale(1, 1)
+	band.BackgroundColor3 = rgb(255, 255, 255)
+	band.BackgroundTransparency = 0
+	band.BorderSizePixel = 0
+	band.ZIndex = button.ZIndex + 1
+	band.Parent = button
+	Theme.corner(band, 14)
+	local gradient = Instance.new("UIGradient")
+	gradient.Rotation = 25
+	gradient.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.42, 1),
+		NumberSequenceKeypoint.new(0.5, 0.55),
+		NumberSequenceKeypoint.new(0.58, 1),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	gradient.Offset = Vector2.new(-1, 0)
+	gradient.Parent = band
+	task.spawn(function()
+		while band.Parent do
+			gradient.Offset = Vector2.new(-1, 0)
+			TweenService:Create(gradient, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+				Offset = Vector2.new(1, 0),
+			}):Play()
+			task.wait(every)
+		end
+	end)
 end
 
 -- Sets a Theme.button's colour (keeping its rim in step).
@@ -175,8 +255,38 @@ function Theme.setButtonColor(button: TextButton, color: Color3, textColor: Colo
 	button.TextColor3 = textColor or Theme.Colors.Ink
 	local stroke = button:FindFirstChildOfClass("UIStroke")
 	if stroke then
-		stroke.Color = color:Lerp(rgb(0, 0, 0), 0.5)
+		stroke.Color = color:Lerp(rgb(0, 0, 0), 0.55)
 	end
+end
+
+-- Puts the gamepad's selection on a button (when a gamepad is being used), so menus work from the sofa.
+function Theme.focus(button: GuiObject?)
+	if UserInputService.GamepadEnabled then
+		pcall(function()
+			GuiService.SelectedObject = button
+		end)
+	end
+end
+
+-- A full-screen shade that fades from dark on one side to clear, so text stays readable over the 3D scene.
+function Theme.shade(parent: Instance, name: string, fromLeft: boolean, width: number, darkness: number): Frame
+	local frame = Instance.new("Frame")
+	frame.Name = name
+	frame.Size = UDim2.fromScale(width, 1)
+	frame.Position = if fromLeft then UDim2.new() else UDim2.fromScale(1 - width, 0)
+	frame.BackgroundColor3 = rgb(4, 6, 14)
+	frame.BackgroundTransparency = 0
+	frame.BorderSizePixel = 0
+	frame.Parent = parent
+	local gradient = Instance.new("UIGradient")
+	gradient.Rotation = if fromLeft then 0 else 180
+	gradient.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1 - darkness),
+		NumberSequenceKeypoint.new(0.55, 1 - darkness * 0.6),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	gradient.Parent = frame
+	return frame
 end
 
 export type PillOptions = {

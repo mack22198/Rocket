@@ -1,6 +1,8 @@
--- Builds the stadium, lobby, cars and ball with the game's real builder code (using Lune's Roblox
--- instances) and writes every part to a JSON file that the three.js previewer can draw.
--- Usage (from the repository root):  lune run tools/preview/export <out.json>
+-- Builds the stadium, lobby, cars and ball (or the menu showroom) with the game's real builder code, using Lune's
+-- Roblox instances, and writes every part to a JSON file that the three.js previewer can draw.
+-- Usage (from the repository root):
+--   lune run tools/preview/export <out.json>                                       the stadium
+--   lune run tools/preview/export <out.json> showroom [carId] [stage] [yawDegrees]   the garage showroom
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -10,6 +12,7 @@ local serde = require("@lune/serde")
 local harness = require("../../tests/harness")
 
 local outPath = process.args[1] or "tools/preview/scene.json"
+local which = process.args[2] or "stadium"
 
 local dataModel = roblox.Instance.new("DataModel")
 local workspaceInstance = dataModel:GetService("Workspace")
@@ -50,67 +53,102 @@ end
 
 local Shared = harness.Shared
 local Server = harness.Server
-local ArenaBuilder = harness.require(Server.Arena.ArenaBuilder)
-local StadiumBuilder = harness.require(Server.Arena.StadiumBuilder)
-local LobbyBuilder = harness.require(Server.Arena.LobbyBuilder)
-local EnvironmentBuilder = harness.require(Server.Arena.EnvironmentBuilder)
 local CarCatalog = harness.require(Shared.Config.CarCatalog)
 local CarModelBuilder = harness.require(Shared.Cars.CarModelBuilder)
 local GameConfig = harness.require(Shared.Config.GameConfig)
 local BallModelBuilder = harness.require(Shared.Ball.BallModelBuilder)
 
-local extras = {}
-ArenaBuilder.build()
-StadiumBuilder.build()
-LobbyBuilder.build()
-EnvironmentBuilder.build()
-extras.terrain = {}
-for _, piece in EnvironmentBuilder.terrainPlan() do
-	table.insert(extras.terrain, {
-		kind = piece.kind,
-		cf = { roblox.CFrame.new(piece.position):GetComponents() },
-		size = { piece.size.X, piece.size.Y, piece.size.Z },
-		radius = piece.size.X / 2,
-		material = piece.material,
-	})
+local extras: { [string]: any } = { env = which }
+
+local function buildStadium()
+	local ArenaBuilder = harness.require(Server.Arena.ArenaBuilder)
+	local StadiumBuilder = harness.require(Server.Arena.StadiumBuilder)
+	local LobbyBuilder = harness.require(Server.Arena.LobbyBuilder)
+	local EnvironmentBuilder = harness.require(Server.Arena.EnvironmentBuilder)
+	ArenaBuilder.build()
+	StadiumBuilder.build()
+	LobbyBuilder.build()
+	EnvironmentBuilder.build()
+	extras.terrain = {}
+	for _, piece in EnvironmentBuilder.terrainPlan() do
+		table.insert(extras.terrain, {
+			kind = piece.kind,
+			cf = { roblox.CFrame.new(piece.position):GetComponents() },
+			size = { piece.size.X, piece.size.Y, piece.size.Z },
+			radius = piece.size.X / 2,
+			material = piece.material,
+		})
+	end
+
+	-- A line-up of every car (each evolution stage if the builder supports it) for close-up shots.
+	local showcase = roblox.Instance.new("Folder")
+	showcase.Name = "Showcase"
+	showcase.Parent = workspaceInstance
+	-- Car i's evolution stages stand side by side, 14 studs apart, facing +Z, starting at x = (i - 1) * 100.
+	local stages = GameConfig.Evolution.Stages
+	for i, def in CarCatalog.ordered() do
+		for stage = 1, stages do
+			local model =
+				CarModelBuilder.build(def, { preview = true, stage = stage, teamColor = GameConfig.Teams.Blue.Color })
+			local x = (i - 1) * 100 + (stage - 1) * 14
+			local z = 600
+			pivotTo(model, roblox.CFrame.new(x, def.Hitbox.Y / 2 + 0.9, z) * roblox.CFrame.Angles(0, math.rad(205), 0))
+			model.Parent = showcase
+		end
+	end
+	-- Kickoff line-up in the arena: blue cars on their spots, orange cars on theirs.
+	local kick = { { -48, 70 }, { 48, 70 }, { 0, 125 } }
+	for t, team in { "Blue", "Orange" } do
+		local side = GameConfig.Teams[team].DefendsSide
+		for slot = 1, 3 do
+			local def = CarCatalog.ordered()[((t - 1) * 3 + slot - 1) % #CarCatalog.ordered() + 1]
+			local stage = ((t - 1) * 3 + slot - 1) % GameConfig.Evolution.Stages + 1
+			local model =
+				CarModelBuilder.build(def, { preview = true, stage = stage, teamColor = GameConfig.Teams[team].Color })
+			local pos = roblox.Vector3.new(kick[slot][1] * side, def.Hitbox.Y / 2 + 0.9, kick[slot][2] * side)
+			local look = (roblox.Vector3.new(0, pos.Y, 0) - pos).Unit
+			local right = look:Cross(roblox.Vector3.yAxis).Unit
+			local up = right:Cross(look)
+			pivotTo(model, roblox.CFrame.fromMatrix(pos, right, up))
+			model.Parent = showcase
+		end
+	end
+
+	-- The ball on the centre spot.
+	local ball = BallModelBuilder.build()
+	pivotTo(ball, roblox.CFrame.new(0, GameConfig.Ball.Radius, 0))
+	ball.Parent = showcase
 end
 
--- A line-up of every car (each evolution stage if the builder supports it) for close-up shots.
-local showcase = roblox.Instance.new("Folder")
-showcase.Name = "Showcase"
-showcase.Parent = workspaceInstance
--- Car i's evolution stages stand side by side, 14 studs apart, facing +Z, starting at x = (i - 1) * 100.
-local stages = GameConfig.Evolution.Stages
-for i, def in CarCatalog.ordered() do
-	for stage = 1, stages do
-		local model = CarModelBuilder.build(def, { preview = true, stage = stage, teamColor = GameConfig.Teams.Blue.Color })
-		local x = (i - 1) * 100 + (stage - 1) * 14
-		local z = 600
-		pivotTo(model, roblox.CFrame.new(x, def.Hitbox.Y / 2 + 0.9, z) * roblox.CFrame.Angles(0, math.rad(205), 0))
-		model.Parent = showcase
+-- The garage showroom from the menus, with one car on the turntable (as ShowroomController shows it).
+local function buildShowroom()
+	local ShowroomBuilder = harness.require(harness.Client.Showroom.ShowroomBuilder)
+	local showroom = ShowroomBuilder.build()
+	showroom.folder.Parent = workspaceInstance
+	local def = CarCatalog.get(process.args[3] or "banana") or CarCatalog.get(CarCatalog.StarterId)
+	local stage = tonumber(process.args[4]) or 2
+	local glow = CarCatalog.Rarities[def.Rarity].Color
+	for _, part in showroom.rings do
+		part.Color = glow
 	end
-end
--- Kickoff line-up in the arena: blue cars on their spots, orange cars on theirs.
-local kick = { { -48, 70 }, { 48, 70 }, { 0, 125 } }
-for t, team in { "Blue", "Orange" } do
-	local side = GameConfig.Teams[team].DefendsSide
-	for slot = 1, 3 do
-		local def = CarCatalog.ordered()[((t - 1) * 3 + slot - 1) % #CarCatalog.ordered() + 1]
-		local stage = ((t - 1) * 3 + slot - 1) % GameConfig.Evolution.Stages + 1
-		local model = CarModelBuilder.build(def, { preview = true, stage = stage, teamColor = GameConfig.Teams[team].Color })
-		local pos = roblox.Vector3.new(kick[slot][1] * side, def.Hitbox.Y / 2 + 0.9, kick[slot][2] * side)
-		local look = (roblox.Vector3.new(0, pos.Y, 0) - pos).Unit
-		local right = look:Cross(roblox.Vector3.yAxis).Unit
-		local up = right:Cross(look)
-		pivotTo(model, roblox.CFrame.fromMatrix(pos, right, up))
-		model.Parent = showcase
+	local display = ShowroomBuilder.display(showroom, def, stage, glow)
+	display.place(math.rad(tonumber(process.args[5]) or -30), 0)
+	extras.cameras = {}
+	for name, shot in ShowroomBuilder.Shots do
+		local position, aim = ShowroomBuilder.camera(shot, 16 / 9)
+		extras.cameras[name] = {
+			pos = { position.X, position.Y, position.Z },
+			at = { aim.X, aim.Y, aim.Z },
+			fov = shot.fov,
+		}
 	end
 end
 
--- The ball on the centre spot.
-local ball = BallModelBuilder.build()
-pivotTo(ball, roblox.CFrame.new(0, GameConfig.Ball.Radius, 0))
-ball.Parent = showcase
+if which == "showroom" then
+	buildShowroom()
+else
+	buildStadium()
+end
 
 local parts = {}
 local guis = {}
@@ -163,6 +201,12 @@ local function guiBackground(gui)
 	return nil
 end
 
+local beams = {}
+local function worldPoint(attachment)
+	local parent = attachment.Parent
+	return parent.CFrame * attachment.Position
+end
+
 for _, d in workspaceInstance:GetDescendants() do
 	if d:IsA("BasePart") then
 		local shape = "Block"
@@ -193,6 +237,7 @@ for _, d in workspaceInstance:GetDescendants() do
 			m = d.Material.Name,
 			t = d.Transparency,
 			r = d.Reflectance,
+			sh = d.CastShadow,
 		})
 		local index = #parts
 		for _, child in d:GetChildren() do
@@ -205,17 +250,46 @@ for _, d in workspaceInstance:GetDescendants() do
 					pps = child.PixelsPerStud,
 				})
 			elseif child:IsA("PointLight") or child:IsA("SpotLight") or child:IsA("SurfaceLight") then
-				table.insert(lights, { part = index, col = color(child.Color), range = child.Range, b = child.Brightness })
+				local light = {
+					part = index,
+					kind = child.ClassName,
+					col = color(child.Color),
+					range = child.Range,
+					b = child.Brightness,
+					shadows = child.Shadows,
+				}
+				if not child:IsA("PointLight") then
+					light.face = child.Face.Name
+					light.angle = child.Angle
+				end
+				table.insert(lights, light)
+			elseif child:IsA("Beam") and child.Attachment0 and child.Attachment1 then
+				local a, b = worldPoint(child.Attachment0), worldPoint(child.Attachment1)
+				local keys = child.Transparency.Keypoints
+				table.insert(beams, {
+					a = { a.X, a.Y, a.Z },
+					b = { b.X, b.Y, b.Z },
+					w0 = child.Width0,
+					w1 = child.Width1,
+					col = color(child.Color.Keypoints[1].Value),
+					t0 = keys[1].Value,
+					tm = keys[math.max(1, #keys - 1)].Value,
+					tmAt = keys[math.max(1, #keys - 1)].Time,
+					t1 = keys[#keys].Value,
+				})
 			end
 		end
 	end
 end
 
 local scene = {
+	env = extras.env,
 	parts = parts,
 	guis = guis,
 	lights = lights,
+	beams = beams,
 	terrain = extras.terrain or {},
+	cameras = extras.cameras,
 }
 fs.writeFile(outPath, serde.encode("json", scene))
 print(`wrote {#parts} parts, {#guis} signs, {#lights} lights to {outPath}`)

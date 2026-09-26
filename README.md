@@ -9,12 +9,21 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
 
 ## What's in it
 
-- **3v3 matches, 5 minutes long.** Bots fill any empty seats, so one kid alone still gets a full game. Players who
-  join mid-match take over a bot's seat right away.
+- **A main menu in a 3D garage showroom.** You start in the menu, not in a match: your car turns on a glowing
+  turntable in a dark studio with a polished, reflective floor, spotlights and a big screen. From there: **PLAY**,
+  **GARAGE** and **HOW TO PLAY**. After a match you pick **PLAY AGAIN**, **GARAGE** or **MENU**, and the ☰ MENU
+  button (or M) lets you leave a match at any time.
+- **3v3 matches, 5 minutes long.** Bots fill any empty seats, so one kid alone still gets a full game. Pressing
+  PLAY while a match is on takes over a bot's seat right away; otherwise the next match starts a few seconds
+  later (so friends who press PLAY together play together).
 - **Car soccer:** a curved-wall arena with glowing goals and nets, boost pads, kickoff countdowns, a scoreboard and
   clock, a play-on-at-0:00 rule, and golden-goal overtime.
-- **A real stadium:** team-coloured stands packed with fans (who jump when someone scores), advert boards, glass
-  walls, floodlights and giant screens showing the live score, all under a sunny sky with hills and trees around.
+- **A real stadium:** team-coloured stands packed with fans (who jump when someone scores and do Mexican waves),
+  scrolling LED advert boards that flash team colours after a goal, the game's name painted on the pitch, glass
+  walls, floodlights and giant screens showing the live score, under a late-afternoon sky with hills and trees.
+- **Big moments look big:** every goal sets off a shockwave, a fireball and smoke in the net, confetti over the
+  goal and fireworks above the stands. Hard hits flash, Mega Shots explode, boosting cars stream light trails
+  and the camera widens as you go faster.
 - **Arcade driving:** boost, jump, double jump, flips (dodges), air control and air roll, driving up the curved
   walls, and bumping other cars.
 - **Mega Shot:** touching the ball, making saves and doing style moves fills a meter. When it's full, press
@@ -23,15 +32,16 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   Saves, style moves and MVP are all announced.
 - **Rewards:** everyone earns **Scrap** every match (more for winning, goals, saves and style). Scrap is the
   only currency and there are no loot boxes.
-- **6 collectible cars with faces:** Pizza Car (starter), Banana Car, Tiny Kart, Neon Shark, Monster Truck and UFO.
-  Each has real strengths and weaknesses, and rarity never means "better".
+- **6 collectible cars:** a pizza delivery hot hatch (the starter), a banana roadster, a go-kart, a shark
+  supercar, a monster truck and a UFO. They're proper little battle-cars - flared arches, spoked wheels that
+  roll and steer, light bars and spoilers - each with real strengths and weaknesses. Rarity never means "better".
 - **Car evolutions:** every car earns XP while you drive it (as much as the Scrap you win) and evolves through
   four looks, e.g. Pizza Car → Burnt Pizza Car → Lava Pizza Car → Galaxy Pizza Car. Evolving is earned by playing,
   never bought, and only changes looks. You can switch back to any look you've unlocked, and bots sometimes
   drive evolved cars to show what's possible.
-- **Garage:** spinning 3D previews, stats, prices, unlock/equip, and each car's evolution track with an EVOLVE!
-  button. The lobby showroom, the "saving up for" panel and the results screen keep the next goal in sight.
-- **Lobby:** a VIP deck built into the stands, looking out over the pitch, with the car showroom on turntables.
+- **Garage:** your cars on the left, the chosen car big on the showroom turntable (drag to spin it), and its stats,
+  price and evolution track on the right, with an EVOLVE! button that sets off a light show. The menu's "saving
+  up for" card and the results screen keep the next goal in sight.
 - **Works on computer, gamepad and phone/tablet** (on-screen stick and buttons).
 - **Progress saves** with DataStores (once the game is published).
 
@@ -43,8 +53,8 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
      green run, and download **TurboBall-place** under *Artifacts* (it's a zip; unzip it).
    - Or build it yourself (see [Working on the code](#working-on-the-code)).
 3. Double-click `TurboBall.rbxlx` to open it in Studio (or **File → Open from File**).
-4. Press **Play** (F5). You spawn on the VIP deck overlooking the pitch. After a few seconds you're put
-   into a car and the countdown starts.
+4. Press **Play** (F5). The main menu opens in the garage showroom. Press **PLAY**: a match starts a few
+   seconds later (bots fill the other seats) and you're dropped into your car for the countdown.
 5. To try it with more than one player: **Test** tab → *Clients and Servers* → choose 2+ players → **Start**.
 
 When testing in Studio your progress isn't saved unless the place is published and API access is on (see below).
@@ -63,11 +73,12 @@ evolutions quickly, lower the numbers in `GameConfig.Evolution.Xp`.
 | Ball cam on/off | C | Y | CAM |
 | Air roll | Q / E | LB / RB | |
 | In the air: tip the nose | W / S | Left stick | Stick |
+| Match menu (leave the match) | M | View / Back | ☰ MENU |
 
 ## Publishing to Roblox
 
 1. In Studio: **File → Publish to Roblox**.
-2. **Game Settings → Places:** set *Max Players* to 6 for pure 3v3 (extra players watch from the deck and join
+2. **Game Settings → Places:** set *Max Players* to 6 for pure 3v3 (extra players wait in the menu and join
    when a seat opens).
 3. **Game Settings → Security:** turn on *Enable Studio Access to API Services* so saving also works when
    testing in Studio.
@@ -85,9 +96,11 @@ Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
 
 Car looks (and every evolution stage) are built from plain parts in
 [`CarModelBuilder.luau`](src/shared/Cars/CarModelBuilder.luau), so new cars need no uploaded models. The stadium,
-lobby and scenery are built the same way in [`src/server/Arena`](src/server/Arena); their colours are in
-[`Palette.luau`](src/server/Arena/Palette.luau), and the lighting (sun, haze, glow) is set in
-[`default.project.json`](default.project.json). Sounds use Roblox's built-in ones; to add a goal horn or crowd cheer, paste audio
+lobby and scenery are built the same way in [`src/server/Arena`](src/server/Arena), and the menu showroom in
+[`ShowroomBuilder.luau`](src/client/Showroom/ShowroomBuilder.luau); their colours are in
+[`Palette.luau`](src/shared/Build/Palette.luau). The stadium lighting (sun, haze, glow) is set in
+[`default.project.json`](default.project.json), and the showroom's studio lighting in
+[`ShowroomController.luau`](src/client/Controllers/ShowroomController.luau). Sounds use Roblox's built-in ones; to add a goal horn or crowd cheer, paste audio
 IDs from the Creator Store into `SOUNDS` in
 [`EffectsController.luau`](src/client/Controllers/EffectsController.luau).
 
@@ -138,16 +151,20 @@ src/
     Bots/         BotBrain (bot decisions)
     Cars/         CarModelBuilder (car looks at every evolution stage), CarDriver (connects CarPhysics to a car)
     Ball/         BallModelBuilder (the ball's look)
+    Build/        PartKit (part helpers), Palette (colours)
     Net/          Remotes
   server/   (ServerScriptService.Server)
     Arena/        ArenaBuilder (pitch, walls, goals), StadiumBuilder (stands, crowd, roof, screens),
-                  LobbyBuilder (VIP deck and showroom), EnvironmentBuilder (terrain, trees), PartKit, Palette
-    Services/     MatchService (the game loop), BallService, CarService, BotService, StatsService,
-                  BoostPadService, BumpService, DataService (saving), GarageService
+                  LobbyBuilder (VIP deck), EnvironmentBuilder (terrain, trees)
+    Services/     MatchService (menu -> queue -> match loop), BallService, CarService, BotService,
+                  StatsService, BoostPadService, BumpService, DataService (saving), GarageService
   client/   (StarterPlayerScripts.Client)
-    Controllers/  InputController, CarController, BallView, CameraController, EffectsController,
-                  StadiumController (live scoreboards, cheering crowd, spinning showroom)
-    UI/           HUD, Announcer, ResultsScreen, Garage, TouchControls, Theme
+    Showroom/     ShowroomBuilder (the menu's garage showroom and its mirror-floor reflection)
+    Controllers/  GameFlow (menu / garage / match), InputController, CarController, CarVisuals (wheels,
+                  trails), BallView, CameraController, EffectsController, ShowroomController,
+                  StadiumController (live scoreboards, LED boards, cheering crowd)
+    UI/           MainMenu, Garage, PauseMenu, HowToPlay, HUD, Announcer, ResultsScreen, TouchControls,
+                  Transition, Theme
 tests/      Lune unit tests (run outside Roblox)
 tools/      Offline previews of the 3D world and the UI
 ```
@@ -161,6 +178,11 @@ tools/      Offline previews of the 3D world and the UI
 - **Cars** use arcade raycast suspension (`CarPhysics`). Each player's client drives their own car. Bots run
   the same code on the server.
 - **Saving** uses a session lock so two servers can't overwrite each other.
+- **Menus and matches:** each player has a `Status` attribute (`Menu`, `Queued` or `Playing`) set by
+  `MatchService`; the client's `GameFlow` shows the menu, the garage or the match to match it, fading through
+  black when it switches between the showroom and the stadium.
+- **The showroom's shiny floor** is a mirror trick: everything in the room is built a second time, upside down,
+  under a see-through dark floor.
 
 ## What's next
 
@@ -180,3 +202,7 @@ Ideas from the design, roughly in order:
   (car feel, bot difficulty, UI sizes, lighting) after the first real session.
 - Other players' hits reach you after a short network delay (standard for online games). Your own hits are instant.
 - Sounds are Roblox's built-in placeholders.
+- Everything is built from Roblox's basic parts (no uploaded 3D models or textures), which is why the cars and
+  stadium have a clean "low-poly" look. The next big visual step would be custom meshes and textures made in
+  Blender and uploaded to Roblox. Also: Roblox shows its best lighting, shadows and glow only at high graphics
+  quality (Esc → Settings → Graphics Quality).

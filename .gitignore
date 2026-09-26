@@ -27,3 +27,4 @@ tools/preview/shots/
 !.vscode/extensions.json
 .DS_Store
 Thumbs.db
+tools/preview/showroom*.json

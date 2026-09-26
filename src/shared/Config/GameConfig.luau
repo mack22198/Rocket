@@ -10,7 +10,7 @@ GameConfig.Match = {
 	TeamSize = 3, -- 3v3; empty seats are filled with bots
 	Length = 300, -- 5:00 of regulation play
 	OvertimeLength = 120, -- golden-goal overtime; still tied after this = draw
-	Intermission = 20, -- time between matches (garage time)
+	Intermission = 5, -- after someone presses PLAY, wait this long so friends can hop into the same match
 	CountdownLength = 3, -- 3-2-1-GO before every kickoff
 	GoalCelebration = 4, -- pause between a goal and the next kickoff
 	ResultsLength = 12, -- how long the results screen stays up
@@ -217,7 +217,7 @@ GameConfig.Data = {
 
 GameConfig.Debug = {
 	-- Shorter waits while testing in Roblox Studio. Set to nil to use the normal values.
-	StudioIntermission = 6 :: number?,
+	StudioIntermission = 3 :: number?,
 	StudioMatchLength = nil :: number?,
 	-- Scrap given to every player when testing in Studio without saved data (handy for testing the garage).
 	StudioStartingScrap = 0,

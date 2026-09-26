@@ -1,5 +1,10 @@
-// Draws the exported scene roughly the way Roblox would (flat approximations of its materials).
+// Draws the exported scene roughly the way Roblox would (flat approximations of its materials, plus bloom).
 import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 const params = new URLSearchParams(location.search);
 const view = params.get("view") || "overview";
@@ -16,20 +21,29 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 document.body.appendChild(renderer.domElement);
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x8fc3ff);
-scene.fog = new THREE.Fog(0xb9d8ff, 700, 2400);
+const res = await fetch(sceneFile);
+const data = await res.json();
+const showroom = data.env === "showroom";
 
-scene.add(new THREE.HemisphereLight(0xdfefff, 0x4a5a40, 1.1));
-const sun = new THREE.DirectionalLight(0xfff4e0, 2.4);
-sun.position.set(260, 480, 200);
-sun.castShadow = true;
-sun.shadow.mapSize.set(4096, 4096);
-const sc = sun.shadow.camera;
-sc.left = -520; sc.right = 520; sc.top = 520; sc.bottom = -520; sc.near = 10; sc.far = 1600;
-sun.shadow.bias = -0.0004;
-scene.add(sun);
-scene.add(sun.target);
+const scene = new THREE.Scene();
+if (showroom) {
+  // An enclosed studio: no sky or sun, just a little ambient light and the room's own lamps.
+  scene.background = new THREE.Color(0x050608);
+  scene.add(new THREE.AmbientLight(0x1a1c26, 2.2));
+} else {
+  scene.background = new THREE.Color(0x8fc3ff);
+  scene.fog = new THREE.Fog(0xb9d8ff, 700, 2400);
+  scene.add(new THREE.HemisphereLight(0xdfefff, 0x4a5a40, 1.1));
+  const sun = new THREE.DirectionalLight(0xfff4e0, 2.4);
+  sun.position.set(260, 480, 200);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(4096, 4096);
+  const sc = sun.shadow.camera;
+  sc.left = -520; sc.right = 520; sc.top = 520; sc.bottom = -520; sc.near = 10; sc.far = 1600;
+  sun.shadow.bias = -0.0004;
+  scene.add(sun);
+  scene.add(sun.target);
+}
 
 function srgb(c) { return new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace); }
 
@@ -120,15 +134,13 @@ function signTexture(sign, wPx, hPx, pxPerStud) {
   return tex;
 }
 
-const res = await fetch(sceneFile);
-const data = await res.json();
 const meshes = [];
 for (const p of data.parts) {
   if (p.t >= 0.99) { meshes.push(null); continue; }
   const mesh = new THREE.Mesh(geometryFor(p), materialFor(p));
   mesh.matrixAutoUpdate = false;
   mesh.matrix.copy(matrixFor(p.cf));
-  mesh.castShadow = p.m !== "Neon" && p.t < 0.5;
+  mesh.castShadow = p.m !== "Neon" && p.t < 0.5 && p.sh !== false;
   mesh.receiveShadow = true;
   scene.add(mesh);
   meshes.push(mesh);
@@ -153,11 +165,32 @@ for (const sign of (Array.isArray(data.guis) ? data.guis : [])) {
   plane.matrix.copy(matrixFor(p.cf).multiply(local));
   scene.add(plane);
 }
+// Roblox lights: point lights shine all round; spot and surface lights shine out of one face of their part.
+const FACES = { Front: [0, 0, -1], Back: [0, 0, 1], Top: [0, 1, 0], Bottom: [0, -1, 0], Right: [1, 0, 0], Left: [-1, 0, 0] };
+let shadowSpots = 0;
 for (const l of (Array.isArray(data.lights) ? data.lights : [])) {
   const p = data.parts[l.part - 1];
-  const light = new THREE.PointLight(srgb(l.col), l.b * 40, l.range, 1.5);
-  light.position.set(p.cf[0], p.cf[1], p.cf[2]);
-  scene.add(light);
+  const origin = new THREE.Vector3(p.cf[0], p.cf[1], p.cf[2]);
+  if (l.kind === "SpotLight" || l.kind === "SurfaceLight") {
+    const m = matrixFor(p.cf);
+    const n = new THREE.Vector3(...FACES[l.face]).transformDirection(m);
+    const half = THREE.MathUtils.degToRad(Math.min(l.angle, 170) / 2);
+    const light = new THREE.SpotLight(srgb(l.col), l.b * (l.kind === "SurfaceLight" ? 70 : 90), l.range, half, 0.45, 1.4);
+    light.position.copy(origin);
+    light.target.position.copy(origin.clone().add(n.multiplyScalar(10)));
+    if (l.shadows && shadowSpots < 8) {
+      light.castShadow = true;
+      light.shadow.mapSize.set(1024, 1024);
+      light.shadow.bias = -0.0005;
+      shadowSpots++;
+    }
+    scene.add(light);
+    scene.add(light.target);
+  } else {
+    const light = new THREE.PointLight(srgb(l.col), l.b * 40, l.range, 1.5);
+    light.position.copy(origin);
+    scene.add(light);
+  }
 }
 for (const t of (Array.isArray(data.terrain) ? data.terrain : [])) {
   const colors = { Grass: 0x5da84a, Water: 0x3a86c8, Sand: 0xd9c38c, Rock: 0x8a8f96, Ground: 0x7a6a4f, LeafyGrass: 0x4f9a3c, Asphalt: 0x3c3f45 };
@@ -192,9 +225,52 @@ const views = {
   cars: { pos: [40, 14, 560], at: [40, 2, 600], fov: 45 },
   carsClose: { pos: [8, 6, 588], at: [8, 2, 600], fov: 45 },
 };
-const v = views[view] || views.overview;
+const cameras = data.cameras && !Array.isArray(data.cameras) ? data.cameras : {};
+const v = cameras[view] || views[view] || (showroom ? cameras.menu : views.overview);
 const camera = new THREE.PerspectiveCamera(v.fov, W / H, 0.5, 5000);
 camera.position.set(...(params.get("pos") ? params.get("pos").split(",").map(Number) : v.pos));
-camera.lookAt(new THREE.Vector3(...(params.get("at") ? params.get("at").split(",").map(Number) : v.at)));
-renderer.render(scene, camera);
+const lookAt = new THREE.Vector3(...(params.get("at") ? params.get("at").split(",").map(Number) : v.at));
+camera.lookAt(lookAt);
+camera.updateMatrixWorld();
+
+// Beams (light shafts): flat ribbons turned to face the camera, fading along their length.
+for (const b of (Array.isArray(data.beams) ? data.beams : [])) {
+  const a = new THREE.Vector3(...b.a), e = new THREE.Vector3(...b.b);
+  const axis = e.clone().sub(a).normalize();
+  const toCam = camera.position.clone().sub(a.clone().add(e).multiplyScalar(0.5)).normalize();
+  const side = axis.clone().cross(toCam).normalize();
+  const pts = [];
+  const cols = [];
+  const col = srgb(b.col);
+  const steps = [[0, b.t0], [b.tmAt, b.tm], [1, b.t1]];
+  for (const [t, tr] of steps) {
+    const c = a.clone().lerp(e, t);
+    const w = (b.w0 + (b.w1 - b.w0) * t) / 2;
+    pts.push(c.clone().addScaledVector(side, -w), c.clone().addScaledVector(side, w));
+    cols.push([col.r, col.g, col.b, 1 - tr], [col.r, col.g, col.b, 1 - tr]);
+  }
+  const pos = [], colors = [], idx = [];
+  pts.forEach((pt) => pos.push(pt.x, pt.y, pt.z));
+  cols.forEach((c) => colors.push(...c));
+  for (let i = 0; i < steps.length - 1; i++) {
+    const k = i * 2;
+    idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(colors, 4));
+  g.setIndex(idx);
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  scene.add(new THREE.Mesh(g, mat));
+}
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), showroom ? 0.55 : 0.3, 0.5, 0.9));
+if (showroom && params.get("dof") !== "0") {
+  const focus = camera.position.distanceTo(new THREE.Vector3(0, 1500, 3000));
+  composer.addPass(new BokehPass(scene, camera, { focus, aperture: 0.0009, maxblur: 0.006 }));
+}
+composer.addPass(new OutputPass());
+composer.render();
 window.__ready = true;

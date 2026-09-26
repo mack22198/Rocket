@@ -102,6 +102,11 @@ function Announcer.popup(text: string, color: Color3)
 	end)
 end
 
+-- Only shown during matches.
+function Announcer.setVisible(on: boolean)
+	gui.Enabled = on
+end
+
 function Announcer.start()
 	gui = Theme.screen("TurboAnnouncer", 6)
 

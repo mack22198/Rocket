@@ -2,9 +2,9 @@
 -- Reads keyboard, gamepad and touch controls and turns them into car input.
 --
 -- Keyboard: W/S or arrows = drive (and pitch in the air), A/D = steer, Space / right mouse = jump,
---           Shift / left mouse = boost, F = Mega Shot, C = ball cam, Q/E = air roll
+--           Shift / left mouse = boost, F = Mega Shot, C = ball cam, Q/E = air roll, M = menu
 -- Gamepad:  RT/LT = drive/brake, left stick = steer + pitch, A = jump, B = boost, X = Mega Shot,
---           Y = ball cam, LB/RB = air roll
+--           Y = ball cam, LB/RB = air roll, View/Back = menu
 -- Touch:    on-screen stick and buttons (see TouchControls)
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -19,12 +19,14 @@ local InputController = {}
 
 InputController.MegaPressed = Signal.new() :: Signal.Signal<>
 InputController.BallCamToggled = Signal.new() :: Signal.Signal<>
+InputController.MenuPressed = Signal.new() :: Signal.Signal<>
 
 local DEADZONE = 0.15
 
 local touchStick = Vector2.zero
 local touchHeld: { [string]: boolean } = {}
 local actionsBound = false
+local blocked = false
 
 local function keyDown(...: Enum.KeyCode): boolean
 	for _, key in { ... } do
@@ -50,9 +52,18 @@ function InputController.setTouchButton(name: string, held: boolean)
 	touchHeld[name] = held
 end
 
--- The current controls. Returns "no input" while the player is typing in chat.
+-- While a menu is open over the match, the car gets no input (it just rolls to a stop).
+function InputController.setBlocked(isBlocked: boolean)
+	blocked = isBlocked
+	if isBlocked then
+		touchStick = Vector2.zero
+		table.clear(touchHeld)
+	end
+end
+
+-- The current controls. Returns "no input" while the player is typing in chat or a menu is open.
 function InputController.read(): CarPhysics.Input
-	if UserInputService:GetFocusedTextBox() then
+	if blocked or UserInputService:GetFocusedTextBox() then
 		return CarPhysics.NoInput
 	end
 
@@ -161,6 +172,16 @@ function InputController.setDriving(driving: boolean)
 		touchStick = Vector2.zero
 		table.clear(touchHeld)
 	end
+end
+
+-- The menu key works everywhere (it opens the pause menu during a match).
+function InputController.start()
+	ContextActionService:BindActionAtPriority("TurboMenu", function(_, inputState)
+		if inputState == Enum.UserInputState.Begin then
+			InputController.MenuPressed:Fire()
+		end
+		return Enum.ContextActionResult.Sink
+	end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.M, Enum.KeyCode.ButtonSelect)
 end
 
 return InputController

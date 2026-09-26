@@ -1,7 +1,9 @@
 --!strict
--- The game loop:  lobby/garage -> 3v3 match (kickoff, 5:00 clock, goals, overtime) -> results + Scrap -> repeat.
--- Empty seats are filled with bots. Players who join mid-match take over a bot's seat straight away,
--- and a bot takes over for anyone who leaves.
+-- The game loop. Everyone starts in the main menu. Pressing PLAY puts you in the queue; a match starts a few
+-- seconds after someone is waiting (3v3, 5:00 clock, goals, overtime), then results + Scrap, then back to the
+-- menu (or straight into the next match with PLAY AGAIN).
+-- Empty seats are filled with bots. Pressing PLAY while a match is on takes over a bot's seat straight away,
+-- and a bot takes over for anyone who leaves the match or the game.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -48,7 +50,10 @@ local overtimeStartedAt = 0
 local matchRunning = false
 local pendingGoal: { side: number, position: Vector3 }? = nil
 local botCounter = 0
-local inMatch: { [Player]: boolean } = {}
+local Status = MatchState.Status
+local PlayerAttr = MatchState.PlayerAttr
+-- Players who pressed PLAY, first come first served.
+local queue: { Player } = {}
 
 -- Kickoff spots for one team, as (x, distance from the centre line). Mirrored for the other team.
 local KICKOFF_SPOTS = {
@@ -75,6 +80,22 @@ local function matchLength(): number
 		return GameConfig.Debug.StudioMatchLength
 	end
 	return M.Length
+end
+
+-- Moves a player between the menu, the queue and the match (the client shows the right screen for each).
+local function setStatus(player: Player, status: string)
+	player:SetAttribute(PlayerAttr.Status, status)
+	local index = table.find(queue, player)
+	if status == Status.Queued then
+		if not index then
+			table.insert(queue, player)
+		end
+	elseif index then
+		table.remove(queue, index)
+	end
+	if status ~= Status.Playing then
+		player:SetAttribute(PlayerAttr.Team, nil)
+	end
 end
 
 local function intermissionLength(): number
@@ -190,31 +211,6 @@ local function makePlayerParticipant(player: Player, team: Team, slot: number): 
 	})
 end
 
--- Players drive cars instead of walking around, so their character is removed during a match.
-local function removeCharacter(player: Player)
-	inMatch[player] = true
-	local character = player.Character
-	if character then
-		player.Character = nil
-		character:Destroy()
-	end
-end
-
-local function respawn(player: Player)
-	inMatch[player] = nil
-	player:SetAttribute("Team", nil)
-	if player.Parent == Players then
-		task.spawn(function()
-			local ok, err = pcall(function()
-				player:LoadCharacterAsync()
-			end)
-			if not ok then
-				warn(`[Match] Could not respawn {player.Name}: {err}`)
-			end
-		end)
-	end
-end
-
 local function isLivePhase(): boolean
 	local phase = MatchState.phase(stateObject)
 	return phase == Phases.Playing or phase == Phases.GoalScored
@@ -257,8 +253,8 @@ local function joinInProgress(player: Player): boolean
 	local p = makePlayerParticipant(player, seat.team, seat.slot)
 	p.boost = math.max(seat.boost, GameConfig.Car.StartingBoost)
 	Roster.add(p)
-	removeCharacter(player)
-	player:SetAttribute("Team", p.team)
+	setStatus(player, Status.Playing)
+	player:SetAttribute(PlayerAttr.Team, p.team)
 	if phase == Phases.Countdown then
 		CarService.spawn(p, kickoffCFrame(p))
 	else
@@ -314,10 +310,10 @@ local function setupMatch()
 	set(Attr.WaitingForBall, false)
 	set(Attr.Banner, "")
 
-	-- First come, first served for the six seats; the rest watch from the deck and play next time.
+	-- First come, first served for the six seats; anyone else keeps waiting and gets the next free seat.
 	local humans: { Player } = {}
-	for _, player in Players:GetPlayers() do
-		if #humans < M.TeamSize * 2 then
+	for _, player in queue do
+		if #humans < M.TeamSize * 2 and player.Parent == Players then
 			table.insert(humans, player)
 		end
 	end
@@ -341,8 +337,8 @@ local function setupMatch()
 
 	for _, p in Roster.all() do
 		if p.player then
-			removeCharacter(p.player)
-			p.player:SetAttribute("Team", p.team)
+			setStatus(p.player, Status.Playing)
+			p.player:SetAttribute(PlayerAttr.Team, p.team)
 		end
 		CarService.spawn(p, kickoffCFrame(p))
 	end
@@ -504,14 +500,29 @@ local function finishMatch(aborted: boolean)
 				},
 			})
 		end
+		-- The results stay up until everyone has picked PLAY AGAIN or MENU (or the time runs out).
 		setPhase(Phases.Results, M.ResultsLength)
-		task.wait(M.ResultsLength)
+		local endsAt = serverNow() + M.ResultsLength
+		while serverNow() < endsAt do
+			local deciding = false
+			for _, p in Roster.humans() do
+				local player = p.player
+				if player and player.Parent == Players and MatchState.statusOf(player) == Status.Playing then
+					deciding = true
+				end
+			end
+			if not deciding then
+				break
+			end
+			task.wait(0.2)
+		end
 	end
 
 	for _, p in Roster.all() do
 		CarService.despawn(p)
-		if p.player then
-			respawn(p.player)
+		local player = p.player
+		if player and MatchState.statusOf(player) == Status.Playing then
+			setStatus(player, Status.Menu)
 		end
 	end
 	Roster.clear()
@@ -548,55 +559,82 @@ local function runMatch()
 	finishMatch(aborted)
 end
 
--- Lobby time between matches. Returns false if everyone left.
-local function intermission(): boolean
-	if #Players:GetPlayers() == 0 then
+-- Waits until someone presses PLAY, then gives friends a few seconds to hop into the same match.
+-- Returns false if everyone waiting changed their mind.
+local function waitForPlayers(): boolean
+	if #queue == 0 then
 		setPhase(Phases.Waiting)
-		set(Attr.Banner, "Waiting for players...")
-		while #Players:GetPlayers() == 0 do
-			task.wait(1)
+		while #queue == 0 do
+			task.wait(0.2)
 		end
 	end
 	local duration = intermissionLength()
 	setPhase(Phases.Intermission, duration)
-	set(Attr.Banner, "Next match starting soon - check out the Garage!")
 	local endsAt = serverNow() + duration
 	while serverNow() < endsAt do
-		if #Players:GetPlayers() == 0 then
+		if #queue == 0 then
 			return false
 		end
-		task.wait(0.25)
+		task.wait(0.1)
 	end
 	return true
 end
 
-local function onPlayerAdded(player: Player)
-	player.CharacterAdded:Connect(function(character)
-		local humanoid = character:WaitForChild("Humanoid", 10)
-		if humanoid and humanoid:IsA("Humanoid") then
-			humanoid.Died:Connect(function()
-				task.wait(3)
-				if player.Parent == Players and not inMatch[player] and player.Character == character then
-					respawn(player)
-				end
-			end)
+-- Gives free bot seats in the running match to people waiting in the queue.
+local function fillFromQueue()
+	for _, player in table.clone(queue) do
+		if not joinInProgress(player) then
+			break
 		end
-	end)
-	-- Give their saved data a moment so they drive their own equipped car.
-	DataService.waitFor(player, 6)
-	if player.Parent ~= Players then
-		return
-	end
-	if not joinInProgress(player) and not inMatch[player] then
-		respawn(player)
 	end
 end
 
+-- PLAY from the menu (or PLAY AGAIN from the results screen).
+local function requestPlay(player: Player)
+	if not DataService.get(player) then
+		-- Wait for their save to load, so they drive their own car.
+		DataService.waitFor(player, 6)
+	end
+	if player.Parent ~= Players then
+		return
+	end
+	local status = MatchState.statusOf(player)
+	local phase = MatchState.phase(stateObject)
+	if status == Status.Playing then
+		if phase == Phases.Results then
+			setStatus(player, Status.Queued) -- play again
+		end
+		return
+	end
+	setStatus(player, Status.Queued)
+	fillFromQueue()
+end
+
+-- Back to the menu: out of the queue, or out of the match (a bot takes over the car).
+local function leaveMatch(player: Player)
+	local p = Roster.byPlayer(player)
+	if p and MatchState.phase(stateObject) ~= Phases.Results then
+		setStatus(player, Status.Menu)
+		replaceWithBot(p)
+		fillFromQueue()
+	else
+		setStatus(player, Status.Menu)
+	end
+end
+
+local function onPlayerAdded(player: Player)
+	setStatus(player, Status.Menu)
+end
+
 local function onPlayerRemoving(player: Player)
-	inMatch[player] = nil
+	local index = table.find(queue, player)
+	if index then
+		table.remove(queue, index)
+	end
 	local p = Roster.byPlayer(player)
 	if p then
 		replaceWithBot(p)
+		fillFromQueue()
 	end
 end
 
@@ -625,9 +663,12 @@ function MatchService.start()
 		end
 	end)
 
+	Remotes.Play.OnServerEvent:Connect(requestPlay)
+	Remotes.LeaveMatch.OnServerEvent:Connect(leaveMatch)
+
 	task.spawn(function()
 		while true do
-			if intermission() then
+			if waitForPlayers() then
 				local ok, err = pcall(function()
 					runMatch()
 				end)
@@ -636,8 +677,8 @@ function MatchService.start()
 					matchRunning = false
 					for _, p in Roster.all() do
 						CarService.despawn(p)
-						if p.player then
-							respawn(p.player)
+						if p.player and MatchState.statusOf(p.player) == Status.Playing then
+							setStatus(p.player, Status.Menu)
 						end
 					end
 					Roster.clear()

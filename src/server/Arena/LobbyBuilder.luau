@@ -1,7 +1,8 @@
 --!strict
--- The VIP deck built into the stands, where players wait between matches. It looks straight out over the
--- pitch, and has a showroom of every car (so there's always something to want), a how-to-play board, and the
--- big Turbo Ball sign that can be seen from the pitch too. LobbyController slowly spins the showroom stands.
+-- The VIP deck built into the stands on the +X side: a lounge looking straight out over the pitch, with a
+-- showroom of every car, a how-to-play board and the big Turbo Ball sign that everyone on the pitch can see.
+-- (Players themselves wait in the menu showroom now; this is scenery.) StadiumController spins the showroom
+-- stands.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -11,8 +12,8 @@ local CarModelBuilder = require(Shared.Cars.CarModelBuilder)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 
-local Palette = require(script.Parent.Palette)
-local PartKit = require(script.Parent.PartKit)
+local Palette = require(Shared.Build.Palette)
+local PartKit = require(Shared.Build.PartKit)
 
 local LobbyBuilder = {}
 

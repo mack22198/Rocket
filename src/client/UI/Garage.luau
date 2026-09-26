@@ -1,7 +1,8 @@
 --!strict
--- The garage. Left: every car, with a 3D preview and whether you own it. Right: the chosen car up close, its
--- strengths and weaknesses, its evolution track and the button for the next step (unlock, equip or EVOLVE).
--- Prices are fixed and shown up front; evolving is earned by driving the car. Changes apply from your next match.
+-- The garage, laid over the 3D showroom: your cars on the left, the chosen car big on the turntable in the
+-- middle, and on the right its strengths and weaknesses, its evolution track and the button for the next step
+-- (unlock, drive it, EVOLVE, or pick one of the looks it has earned). Prices are fixed and shown up front;
+-- evolving is earned by driving the car. Changes apply from your next match.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,11 +16,16 @@ local CarModelBuilder = require(Shared.Cars.CarModelBuilder)
 local Evolution = require(Shared.Config.Evolution)
 local GameConfig = require(Shared.Config.GameConfig)
 local Remotes = require(Shared.Net.Remotes)
+local Signal = require(Shared.Util.Signal)
 
 local PlayerDataClient = require(script.Parent.Parent.Controllers.PlayerDataClient)
+local ShowroomController = require(script.Parent.Parent.Controllers.ShowroomController)
 local Theme = require(script.Parent.Theme)
 
 local Garage = {}
+
+-- The BACK button (the menus decide where "back" goes).
+Garage.BackPressed = Signal.new() :: Signal.Signal<>
 
 local C = Theme.Colors
 local rgb = Color3.fromRGB
@@ -35,16 +41,16 @@ type Tile = {
 	status: TextLabel,
 }
 
-type Node = { circle: TextLabel, name: TextLabel }
+type Node = { circle: TextButton, name: TextLabel }
 
 local gui: ScreenGui
-local panel: Frame
+local leftGroup: Frame
+local rightGroup: Frame
+local backButton: TextButton
 local scrapPill: TextLabel
+local countLabel: TextLabel
 local toast: TextLabel
 local tiles: { Tile } = {}
-local detailViewport: ViewportFrame
-local detailModel: Model? = nil
-local detailKey = ""
 local nameLabel: TextLabel
 local rarityLabel: TextLabel
 local descriptionLabel: TextLabel
@@ -108,8 +114,8 @@ local function showToast(text: string, good: boolean)
 	end)
 end
 
--- Puts a freshly built car model in a viewport, with the camera pulled back to fit it.
-local function showCar(viewport: ViewportFrame, def: CarCatalog.CarDef, stage: number, distance: number): Model
+-- Puts a freshly built car model in a tile's little window, with the camera pulled back to fit it.
+local function showInViewport(viewport: ViewportFrame, def: CarCatalog.CarDef, stage: number): Model
 	for _, child in viewport:GetChildren() do
 		if child:IsA("Model") then
 			child:Destroy()
@@ -119,8 +125,8 @@ local function showCar(viewport: ViewportFrame, def: CarCatalog.CarDef, stage: n
 	model.Parent = viewport
 	local camera = viewport:FindFirstChildOfClass("Camera")
 	if camera then
-		local back = distance + def.Hitbox.Z * 0.45
-		camera.CFrame = CFrame.lookAt(Vector3.new(0, back * 0.42, back), Vector3.new(0, 0.3, 0))
+		local back = 9 + def.Hitbox.Z * 0.45
+		camera.CFrame = CFrame.lookAt(Vector3.new(0, back * 0.4, back), Vector3.new(0, 0.2, 0))
 	end
 	return model
 end
@@ -129,14 +135,14 @@ local function makeViewport(parent: Instance, size: UDim2, position: UDim2): Vie
 	local viewport = Instance.new("ViewportFrame")
 	viewport.Size = size
 	viewport.Position = position
-	viewport.BackgroundColor3 = rgb(46, 56, 96)
+	viewport.BackgroundColor3 = rgb(40, 48, 84)
 	viewport.Ambient = rgb(170, 172, 196)
 	viewport.LightColor = rgb(255, 255, 255)
 	viewport.LightDirection = Vector3.new(-1, -2, -1)
 	viewport.Parent = parent
-	Theme.gradient(viewport, rgb(255, 255, 255), rgb(120, 125, 150))
+	Theme.gradient(viewport, rgb(255, 255, 255), rgb(110, 115, 140))
 	local camera = Instance.new("Camera")
-	camera.FieldOfView = 36
+	camera.FieldOfView = 34
 	camera.Parent = viewport
 	viewport.CurrentCamera = camera
 	return viewport
@@ -159,41 +165,41 @@ local function request(action: string, def: CarCatalog.CarDef, extra: number?): 
 	return nil
 end
 
--- The big "it evolved!" moment.
+-- The big "it evolved!" moment: a white flash, the new name, and a light show in the showroom.
 local function celebrate(def: CarCatalog.CarDef, stage: number)
 	celebrationName.Text = CarCatalog.stageName(def, stage)
 	celebration.Visible = true
-	celebration.BackgroundTransparency = 0
+	celebration.BackgroundTransparency = 0.1
 	celebrationTitle.TextTransparency = 0
 	celebrationName.TextTransparency = 0
-	TweenService:Create(celebration, TweenInfo.new(0.8), { BackgroundTransparency = 0.35 }):Play()
-	celebrationTitle.Size = UDim2.new(1, 0, 0, 40)
+	TweenService:Create(celebration, TweenInfo.new(0.7), { BackgroundTransparency = 1 }):Play()
+	celebrationTitle.Size = UDim2.fromOffset(700, 50)
 	TweenService:Create(celebrationTitle, TweenInfo.new(0.5, Enum.EasingStyle.Back), {
-		Size = UDim2.new(1, 0, 0, 90),
+		Size = UDim2.fromOffset(700, 100),
 	}):Play()
 	-- Confetti.
-	for i = 1, 36 do
+	for i = 1, 40 do
 		local piece = Instance.new("Frame")
 		piece.Size = UDim2.fromOffset(10, 16)
 		piece.AnchorPoint = Vector2.new(0.5, 0.5)
-		piece.Position = UDim2.fromScale(0.5, 0.45)
+		piece.Position = UDim2.fromScale(0.5, 0.3)
 		piece.BackgroundColor3 = ({ C.Gold, C.Evolve, C.Blue, C.Orange, C.Good })[i % 5 + 1]
 		piece.BorderSizePixel = 0
 		piece.Rotation = i * 37
 		piece.Parent = celebration
-		local angle = i / 36 * math.pi * 2
-		TweenService:Create(piece, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Position = UDim2.new(0.5, math.cos(angle) * 420, 0.45, math.sin(angle) * 260),
+		local angle = i / 40 * math.pi * 2
+		TweenService:Create(piece, TweenInfo.new(1.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Position = UDim2.new(0.5, math.cos(angle) * 460, 0.3, math.sin(angle) * 280),
 			Rotation = i * 37 + 360,
 			BackgroundTransparency = 1,
 		}):Play()
-		task.delay(1.3, function()
+		task.delay(1.4, function()
 			piece:Destroy()
 		end)
 	end
+	ShowroomController.celebrate()
 	playSound("rbxasset://sounds/electronicpingshort.wav", 0.8)
 	task.delay(2.6, function()
-		TweenService:Create(celebration, TweenInfo.new(0.4), { BackgroundTransparency = 1 }):Play()
 		TweenService:Create(celebrationTitle, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()
 		TweenService:Create(celebrationName, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()
 		task.wait(0.45)
@@ -207,19 +213,25 @@ local function refresh()
 	scrapPill.Text = `🔩 {Theme.formatNumber(data.scrap)}`
 
 	-- Car list.
+	local ownedCount = 0
 	for _, tile in tiles do
 		local id = tile.def.Id
 		local owned = data.owned[id] == true
+		if owned then
+			ownedCount += 1
+		end
 		local look = if owned then data.carLook[id] or 1 else 1
 		if tile.shownStage ~= look or not tile.model then
-			tile.model = showCar(tile.viewport, tile.def, look, 9)
+			tile.model = showInViewport(tile.viewport, tile.def, look)
 			tile.shownStage = look
 		end
 		tile.viewport.ImageColor3 = if owned then rgb(255, 255, 255) else rgb(95, 100, 125)
+		tile.button.BackgroundColor3 = if id == selectedId then rgb(58, 70, 120) else C.PanelLight
 		local stroke = tile.button:FindFirstChildOfClass("UIStroke")
 		if stroke then
 			stroke.Color = if id == selectedId then C.Gold else CarCatalog.Rarities[tile.def.Rarity].Color
 			stroke.Thickness = if id == selectedId then 4 else 2
+			stroke.Transparency = if id == selectedId then 0 else 0.3
 		end
 		if data.equipped == id then
 			tile.status.Text = "✅ DRIVING"
@@ -233,6 +245,7 @@ local function refresh()
 			tile.status.TextColor3 = if data.scrap >= tile.def.Price then C.Gold else C.Muted
 		end
 	end
+	countLabel.Text = `{ownedCount} / {#tiles} OWNED`
 
 	-- Details.
 	local def = selectedDef()
@@ -243,14 +256,11 @@ local function refresh()
 	local progress = Evolution.progress(def, xp, stage)
 	local rarity = CarCatalog.Rarities[def.Rarity]
 
-	local key = `{def.Id}:{previewStage}`
-	if key ~= detailKey then
-		detailKey = key
-		detailModel = showCar(detailViewport, def, previewStage, 10)
+	if gui.Enabled then
+		ShowroomController.showCar(def, previewStage)
 	end
-	detailViewport.ImageColor3 = if previewStage <= stage then rgb(255, 255, 255) else rgb(150, 150, 175)
 	nameLabel.Text = `{def.Emoji} {CarCatalog.stageName(def, previewStage)}`
-	rarityLabel.Text = `{string.upper(def.Rarity)}  ·  {def.Tagline}`
+	rarityLabel.Text = `{string.upper(def.Rarity)}  ·  {string.upper(def.Tagline)}`
 	rarityLabel.TextColor3 = rarity.Color
 	descriptionLabel.Text = def.Description
 	for _, row in statBars do
@@ -275,7 +285,7 @@ local function refresh()
 			ring.Transparency = if i == previewStage or (owned and i == look) then 0 else 0.5
 		end
 		node.name.Text = shortStageName(def, i)
-		node.name.TextColor3 = if reached then C.Text else C.Muted
+		node.name.TextColor3 = if i == previewStage then C.Gold elseif reached then C.Text else C.Muted
 		if nextReady and pulse then
 			node.circle.BackgroundColor3 = C.Evolve
 		end
@@ -342,7 +352,10 @@ local function onPrimary()
 	elseif data.owned[def.Id] then
 		request("equip", def)
 	elseif data.scrap >= def.Price then
-		request("unlock", def)
+		local result = request("unlock", def)
+		if result and result.ok then
+			ShowroomController.celebrate()
+		end
 	else
 		showToast(`You need {Theme.formatNumber(def.Price - data.scrap)} more Scrap. Keep playing!`, false)
 	end
@@ -357,6 +370,7 @@ local function onSecondary()
 		local result = request("evolve", def)
 		if result and result.evolved then
 			previewStage = stage + 1
+			refresh()
 			celebrate(def, stage + 1)
 		end
 	elseif previewStage <= stage then
@@ -372,20 +386,21 @@ local function buildTile(parent: Instance, def: CarCatalog.CarDef, order: number
 	button.AutoButtonColor = true
 	button.BackgroundColor3 = C.PanelLight
 	button.Parent = parent
-	Theme.corner(button, 14)
+	Theme.corner(button, 12)
 	Theme.stroke(button, CarCatalog.Rarities[def.Rarity].Color, 2)
-	local viewport = makeViewport(button, UDim2.new(1, -12, 0, 100), UDim2.fromOffset(6, 6))
-	Theme.corner(viewport, 10)
+	Theme.pop(button)
+	local viewport = makeViewport(button, UDim2.new(1, -10, 0, 74), UDim2.fromOffset(5, 5))
+	Theme.corner(viewport, 9)
 	Theme.label(button, {
-		size = UDim2.new(1, -12, 0, 22),
-		position = UDim2.fromOffset(6, 110),
+		size = UDim2.new(1, -10, 0, 20),
+		position = UDim2.fromOffset(5, 82),
 		text = `{def.Emoji} {def.DisplayName}`,
 	})
 	local status = Theme.label(button, {
-		size = UDim2.new(1, -12, 0, 18),
-		position = UDim2.fromOffset(6, 134),
+		size = UDim2.new(1, -10, 0, 14),
+		position = UDim2.fromOffset(5, 105),
 		text = "",
-		font = Enum.Font.GothamBlack,
+		font = Theme.Caps,
 		stroke = false,
 	})
 	button.Activated:Connect(function()
@@ -394,26 +409,116 @@ local function buildTile(parent: Instance, def: CarCatalog.CarDef, order: number
 	return { def = def, button = button, viewport = viewport, model = nil, shownStage = 0, status = status }
 end
 
-local function buildDetails(parent: Frame)
-	detailViewport = makeViewport(parent, UDim2.new(1, 0, 0, 196), UDim2.new())
-	Theme.corner(detailViewport, 14)
-	nameLabel = Theme.label(parent, {
-		size = UDim2.new(1, 0, 0, 38),
-		position = UDim2.fromOffset(0, 204),
-		text = "",
+local function buildLeft()
+	leftGroup = Instance.new("Frame")
+	leftGroup.Name = "Left"
+	leftGroup.Size = UDim2.fromOffset(360, 720)
+	leftGroup.BackgroundTransparency = 1
+	leftGroup.Parent = gui
+	Theme.scaled(leftGroup)
+
+	backButton = Theme.button(leftGroup, {
+		name = "Back",
+		size = UDim2.fromOffset(120, 50),
+		position = UDim2.fromOffset(24, 64),
+		text = "◀ BACK",
+		color = C.PanelLight,
+		textColor = C.Text,
+	})
+	backButton.Activated:Connect(function()
+		Garage.BackPressed:Fire()
+	end)
+	Theme.label(leftGroup, {
+		name = "Title",
+		size = UDim2.fromOffset(200, 46),
+		position = UDim2.fromOffset(158, 66),
+		text = "GARAGE",
 		align = Enum.TextXAlignment.Left,
 	})
-	rarityLabel = Theme.label(parent, {
-		size = UDim2.new(1, 0, 0, 18),
-		position = UDim2.fromOffset(2, 244),
-		text = "",
-		font = Enum.Font.GothamBlack,
+
+	local list = Theme.panel(leftGroup, "Cars", UDim2.fromOffset(318, 572), UDim2.fromOffset(24, 126))
+	list.BackgroundTransparency = 0.15
+	Theme.padding(list, 12)
+	Theme.label(list, {
+		size = UDim2.fromOffset(160, 18),
+		text = "YOUR CARS",
+		font = Theme.Caps,
+		color = C.Muted,
 		align = Enum.TextXAlignment.Left,
 		stroke = false,
 	})
-	descriptionLabel = Theme.label(parent, {
-		size = UDim2.new(1, 0, 0, 16),
-		position = UDim2.fromOffset(2, 264),
+	countLabel = Theme.label(list, {
+		size = UDim2.fromOffset(130, 18),
+		position = UDim2.fromScale(1, 0),
+		anchor = Vector2.new(1, 0),
+		text = "",
+		font = Theme.Caps,
+		color = C.Gold,
+		align = Enum.TextXAlignment.Right,
+		stroke = false,
+	})
+	local scroller = Instance.new("ScrollingFrame")
+	scroller.Name = "List"
+	scroller.Size = UDim2.new(1, 0, 1, -28)
+	scroller.Position = UDim2.fromOffset(0, 28)
+	scroller.BackgroundTransparency = 1
+	scroller.BorderSizePixel = 0
+	scroller.ScrollBarThickness = 5
+	scroller.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scroller.CanvasSize = UDim2.new()
+	scroller.Parent = list
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.fromOffset(141, 126)
+	grid.CellPadding = UDim2.fromOffset(10, 10)
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = scroller
+	for i, def in CarCatalog.ordered() do
+		table.insert(tiles, buildTile(scroller, def, i))
+	end
+end
+
+local function buildRight()
+	rightGroup = Instance.new("Frame")
+	rightGroup.Name = "Right"
+	rightGroup.Size = UDim2.fromOffset(420, 720)
+	rightGroup.Position = UDim2.fromScale(1, 0)
+	rightGroup.AnchorPoint = Vector2.new(1, 0)
+	rightGroup.BackgroundTransparency = 1
+	rightGroup.Parent = gui
+	Theme.scaled(rightGroup)
+
+	scrapPill = Theme.pill(rightGroup, {
+		name = "Scrap",
+		size = UDim2.fromOffset(200, 46),
+		position = UDim2.fromOffset(396, 66),
+		anchor = Vector2.new(1, 0),
+		text = "",
+		color = C.Scrap,
+	})
+
+	local panel =
+		Theme.panel(rightGroup, "Details", UDim2.fromOffset(372, 572), UDim2.fromOffset(396, 126), Vector2.new(1, 0))
+	panel.BackgroundTransparency = 0.15
+	Theme.padding(panel, 16)
+	nameLabel = Theme.label(panel, {
+		name = "CarName",
+		size = UDim2.new(1, 0, 0, 36),
+		text = "",
+		align = Enum.TextXAlignment.Left,
+	})
+	rarityLabel = Theme.label(panel, {
+		name = "Rarity",
+		size = UDim2.new(1, 0, 0, 15),
+		position = UDim2.fromOffset(1, 40),
+		text = "",
+		font = Theme.Caps,
+		align = Enum.TextXAlignment.Left,
+		stroke = false,
+	})
+	descriptionLabel = Theme.label(panel, {
+		name = "Description",
+		size = UDim2.new(1, 0, 0, 36),
+		position = UDim2.fromOffset(1, 60),
 		text = "",
 		font = Theme.Body,
 		color = C.Muted,
@@ -421,12 +526,10 @@ local function buildDetails(parent: Frame)
 		stroke = false,
 	})
 	for i, row in STAT_ROWS do
-		local column = if i <= 3 then 0 else 1
-		local y = 290 + ((i - 1) % 3) * 22
-		local x = column * 320
-		Theme.label(parent, {
-			size = UDim2.fromOffset(80, 16),
-			position = UDim2.fromOffset(x, y),
+		local y = 106 + (i - 1) * 23
+		Theme.label(panel, {
+			size = UDim2.fromOffset(70, 16),
+			position = UDim2.fromOffset(0, y),
 			text = row.label,
 			font = Theme.Body,
 			color = C.Muted,
@@ -435,27 +538,29 @@ local function buildDetails(parent: Frame)
 		})
 		table.insert(statBars, {
 			key = row.key,
-			bar = Theme.bar(parent, UDim2.fromOffset(210, 12), UDim2.fromOffset(x + 84, y + 2), C.Gold),
+			bar = Theme.bar(panel, UDim2.new(1, -78, 0, 12), UDim2.fromOffset(78, y + 2), C.Gold),
 		})
 	end
 
-	-- Evolution track: one node per stage, joined by a line that fills up as the car evolves.
-	Theme.label(parent, {
-		size = UDim2.fromOffset(300, 18),
-		position = UDim2.fromOffset(0, 362),
+	-- Evolution track: one node per stage, joined by a line that fills up as the car evolves. Tap a node to see
+	-- that look on the turntable.
+	Theme.label(panel, {
+		size = UDim2.fromOffset(200, 16),
+		position = UDim2.fromOffset(0, 230),
 		text = "✨ EVOLUTION",
-		font = Enum.Font.GothamBlack,
+		font = Theme.Caps,
 		color = C.Evolve,
 		align = Enum.TextXAlignment.Left,
 		stroke = false,
 	})
+	local trackLeft, span = 26, 288
 	local track = Instance.new("Frame")
 	track.Name = "Track"
-	track.Size = UDim2.new(1, -120, 0, 6)
-	track.Position = UDim2.fromOffset(60, 403)
+	track.Size = UDim2.fromOffset(span, 6)
+	track.Position = UDim2.fromOffset(trackLeft, 273)
 	track.BackgroundColor3 = C.PanelDark
 	track.BorderSizePixel = 0
-	track.Parent = parent
+	track.Parent = panel
 	trackFill = Instance.new("Frame")
 	trackFill.Name = "Fill"
 	trackFill.Size = UDim2.fromScale(0, 1)
@@ -463,12 +568,12 @@ local function buildDetails(parent: Frame)
 	trackFill.BorderSizePixel = 0
 	trackFill.Parent = track
 	for i = 1, STAGES do
-		local x = 60 + (i - 1) / (STAGES - 1) * 512
+		local x = trackLeft + (i - 1) / (STAGES - 1) * span
 		local circle = Instance.new("TextButton")
 		circle.Name = `Stage{i}`
-		circle.Size = UDim2.fromOffset(42, 42)
+		circle.Size = UDim2.fromOffset(40, 40)
 		circle.AnchorPoint = Vector2.new(0.5, 0.5)
-		circle.Position = UDim2.fromOffset(x, 406)
+		circle.Position = UDim2.fromOffset(x, 276)
 		circle.BackgroundColor3 = C.PanelDark
 		circle.Text = tostring(i)
 		circle.Font = Theme.Title
@@ -476,16 +581,17 @@ local function buildDetails(parent: Frame)
 		circle.TextColor3 = C.Text
 		circle.AutoButtonColor = true
 		circle.ZIndex = 2
-		circle.Parent = parent
-		Theme.corner(circle, 21)
+		circle.Parent = panel
+		Theme.corner(circle, 20)
 		Theme.stroke(circle, rgb(0, 0, 0), 2)
+		Theme.pop(circle)
 		local padding = Instance.new("UIPadding")
 		padding.PaddingTop = UDim.new(0.22, 0)
 		padding.PaddingBottom = UDim.new(0.22, 0)
 		padding.Parent = circle
-		local name = Theme.label(parent, {
-			size = UDim2.fromOffset(110, 16),
-			position = UDim2.fromOffset(x, 430),
+		local name = Theme.label(panel, {
+			size = UDim2.fromOffset(84, 15),
+			position = UDim2.fromOffset(x, 300),
 			anchor = Vector2.new(0.5, 0),
 			text = "",
 			font = Theme.Body,
@@ -495,29 +601,29 @@ local function buildDetails(parent: Frame)
 			previewStage = i
 			refresh()
 		end)
-		table.insert(nodes, { circle = circle :: any, name = name })
+		table.insert(nodes, { circle = circle, name = name })
 	end
 
-	xpBar = Theme.bar(parent, UDim2.new(1, 0, 0, 16), UDim2.fromOffset(0, 456), C.Evolve)
-	xpLabel = Theme.label(parent, {
+	xpBar = Theme.bar(panel, UDim2.new(1, 0, 0, 14), UDim2.fromOffset(0, 330), C.Evolve)
+	xpLabel = Theme.label(panel, {
 		size = UDim2.new(1, 0, 0, 16),
-		position = UDim2.fromOffset(0, 476),
+		position = UDim2.fromOffset(0, 350),
 		text = "",
 		font = Theme.Body,
 		stroke = false,
 	})
 
-	primaryButton = Theme.button(parent, {
+	primaryButton = Theme.button(panel, {
 		name = "Primary",
-		size = UDim2.new(0.5, -6, 0, 50),
-		position = UDim2.fromOffset(0, 500),
+		size = UDim2.new(1, 0, 0, 62),
+		position = UDim2.new(0, 0, 1, -122),
 		text = "",
 	})
 	primaryButton.Activated:Connect(onPrimary)
-	secondaryButton = Theme.button(parent, {
+	secondaryButton = Theme.button(panel, {
 		name = "Secondary",
-		size = UDim2.new(0.5, -6, 0, 50),
-		position = UDim2.new(0.5, 6, 0, 500),
+		size = UDim2.new(1, 0, 0, 52),
+		position = UDim2.new(0, 0, 1, -52),
 		text = "",
 		color = C.Evolve,
 		textColor = C.Text,
@@ -528,101 +634,48 @@ end
 local function build()
 	gui = Theme.screen("TurboGarage", 12)
 	gui.Enabled = false
+	Theme.shade(gui, "LeftShade", true, 0.32, 0.6)
+	Theme.shade(gui, "RightShade", false, 0.36, 0.6)
+	buildLeft()
+	buildRight()
 
-	local dim = Instance.new("TextButton")
-	dim.Text = ""
-	dim.AutoButtonColor = false
-	dim.Size = UDim2.fromScale(1, 1)
-	dim.BackgroundColor3 = rgb(0, 0, 0)
-	dim.BackgroundTransparency = 0.45
-	dim.Parent = gui
-
-	panel = Theme.panel(gui, "Garage", UDim2.fromOffset(1080, 640), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
-	Theme.scaled(panel)
-	Theme.padding(panel, 18)
-	Theme.label(panel, {
-		size = UDim2.fromOffset(300, 44),
-		text = "🚗 GARAGE",
-		align = Enum.TextXAlignment.Left,
-	})
-	scrapPill = Theme.pill(panel, {
-		size = UDim2.fromOffset(200, 42),
-		position = UDim2.new(1, -60, 0, 2),
-		anchor = Vector2.new(1, 0),
-		text = "",
-		color = C.Scrap,
-	})
-	local close = Theme.button(panel, {
-		size = UDim2.fromOffset(46, 46),
-		position = UDim2.fromScale(1, 0),
-		anchor = Vector2.new(1, 0),
-		text = "X",
-		color = C.Bad,
-		textColor = C.Text,
-	})
-	close.Activated:Connect(function()
-		Garage.close()
-	end)
-
-	local list = Instance.new("ScrollingFrame")
-	list.Name = "Cars"
-	list.Size = UDim2.new(0, 404, 1, -62)
-	list.Position = UDim2.fromOffset(0, 60)
-	list.BackgroundTransparency = 1
-	list.BorderSizePixel = 0
-	list.ScrollBarThickness = 6
-	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	list.CanvasSize = UDim2.new()
-	list.Parent = panel
-	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = UDim2.fromOffset(194, 160)
-	grid.CellPadding = UDim2.fromOffset(10, 10)
-	grid.SortOrder = Enum.SortOrder.LayoutOrder
-	grid.Parent = list
-	for i, def in CarCatalog.ordered() do
-		table.insert(tiles, buildTile(list, def, i))
-	end
-
-	local details = Instance.new("Frame")
-	details.Name = "Details"
-	details.Size = UDim2.new(1, -424, 1, -62)
-	details.Position = UDim2.fromOffset(424, 60)
-	details.BackgroundTransparency = 1
-	details.Parent = panel
-	buildDetails(details)
-
-	toast = Theme.pill(panel, {
-		size = UDim2.fromOffset(620, 36),
-		position = UDim2.new(0.5, 0, 1, 26),
-		anchor = Vector2.new(0.5, 0),
+	toast = Theme.pill(gui, {
+		name = "Toast",
+		size = UDim2.fromOffset(520, 38),
+		position = UDim2.new(0.5, 0, 1, -24),
+		anchor = Vector2.new(0.5, 1),
 		text = "",
 		background = C.PanelDark,
 	})
 	toast.Visible = false
+	Theme.scaled(toast)
 
 	celebration = Instance.new("Frame")
 	celebration.Name = "Evolved"
 	celebration.Size = UDim2.fromScale(1, 1)
 	celebration.BackgroundColor3 = rgb(255, 255, 255)
+	celebration.BackgroundTransparency = 1
 	celebration.ZIndex = 10
 	celebration.Visible = false
-	celebration.Parent = panel
-	Theme.corner(celebration, 16)
+	celebration.Parent = gui
 	celebrationTitle = Theme.label(celebration, {
-		size = UDim2.new(1, 0, 0, 90),
-		position = UDim2.fromScale(0.5, 0.36),
+		size = UDim2.fromOffset(700, 100),
+		position = UDim2.fromScale(0.5, 0.2),
 		anchor = Vector2.new(0.5, 0.5),
 		text = "✨ EVOLVED! ✨",
 		color = C.Gold,
 		zIndex = 11,
 	})
+	Theme.stroke(celebrationTitle, rgb(40, 10, 60), 5).ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	celebrationName = Theme.label(celebration, {
-		size = UDim2.new(1, 0, 0, 46),
-		position = UDim2.fromScale(0.5, 0.52),
+		size = UDim2.fromOffset(700, 44),
+		position = UDim2.new(0.5, 0, 0.2, 70),
 		anchor = Vector2.new(0.5, 0.5),
 		text = "",
 		zIndex = 11,
 	})
+	Theme.scaled(celebrationTitle)
+	Theme.scaled(celebrationName)
 
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
 end
@@ -630,11 +683,21 @@ end
 -- Opens the garage, showing `carId` (or your current car).
 function Garage.open(carId: string?)
 	local data = PlayerDataClient.get()
-	selectCar(if carId and CarCatalog.get(carId) then carId else data.equipped)
+	local wasOpen = gui.Enabled
 	gui.Enabled = true
-	panel.Position = UDim2.fromScale(0.5, 0.56)
-	TweenService:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.52) })
-		:Play()
+	selectCar(if carId and CarCatalog.get(carId) then carId else data.equipped)
+	if wasOpen then
+		return
+	end
+	leftGroup.Position = UDim2.fromOffset(-60, 0)
+	TweenService:Create(leftGroup, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Position = UDim2.fromOffset(0, 0),
+	}):Play()
+	rightGroup.Position = UDim2.new(1, 60, 0, 0)
+	TweenService:Create(rightGroup, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Position = UDim2.fromScale(1, 0),
+	}):Play()
+	Theme.focus(primaryButton)
 end
 
 function Garage.close()
@@ -661,9 +724,6 @@ function Garage.start()
 			if tile.model then
 				tile.model:PivotTo(turn)
 			end
-		end
-		if detailModel then
-			detailModel:PivotTo(turn)
 		end
 		-- A few times a second, so the "ready to evolve" button pulses.
 		if os.clock() - lastRefresh > 0.15 then

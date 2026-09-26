@@ -15,8 +15,8 @@ local ArenaShape = require(Shared.Arena.ArenaShape)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 
-local Palette = require(script.Parent.Palette)
-local PartKit = require(script.Parent.PartKit)
+local Palette = require(Shared.Build.Palette)
+local PartKit = require(Shared.Build.PartKit)
 
 local ArenaBuilder = {}
 
@@ -162,6 +162,36 @@ local function buildField(arena: Instance, decor: Instance)
 		Query = false,
 		Shadow = false,
 	})
+
+	-- Painted on the grass: the game's name across the centre circle, and each team's name in front of its
+	-- goal (reading the right way up for the team attacking it).
+	local function paint(name: string, centre: Vector3, size: Vector2, turn: number, text: string, color: Color3)
+		local part = PartKit.decor(decor, {
+			Name = name,
+			Size = Vector3.new(size.X, 0.1, size.Y),
+			CFrame = CFrame.new(centre) * CFrame.Angles(0, turn, 0),
+			Color = Palette.Line,
+			Transparency = 1,
+			Shadow = false,
+		})
+		local gui = PartKit.screen(part, Enum.NormalId.Top, nil, 5)
+		gui.LightInfluence = 1
+		local label =
+			PartKit.label(gui, "Text", text, color, Vector2.new(0.5, 0.5), Vector2.new(1, 1), Enum.Font.LuckiestGuy)
+		label.TextTransparency = 0.3
+	end
+	paint("CentreLogo", Vector3.new(0, LINE_Y + 0.08, 0), Vector2.new(44, 11), math.pi / 2, "TURBO BALL", Palette.Line)
+	for _, side in { 1, -1 } do
+		local team = teamForSide(side)
+		paint(
+			"TeamName",
+			Vector3.new(0, LINE_Y + 0.08, side * (halfL - 58)),
+			Vector2.new(60, 12),
+			if side > 0 then math.pi else 0,
+			string.upper(team.Name),
+			team.Color:Lerp(Palette.Line, 0.35)
+		)
+	end
 
 	for _, side in { 1, -1 } do
 		local team = teamForSide(side)

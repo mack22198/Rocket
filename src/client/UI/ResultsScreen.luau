@@ -1,10 +1,12 @@
 --!strict
 -- End-of-match screen: win/lose, the scoreboard, Scrap earned line by line, and two progress bars: how close
 -- your car is to its next evolution, and how close you are to unlocking the next car.
--- This is the "okay, one more match" moment, so the progress gets the spotlight.
+-- This is the "okay, one more match" moment, so the progress gets the spotlight - and PLAY AGAIN is the big
+-- button. GARAGE and MENU take you back to the main menu (the menus handle all three, see GameFlow).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -16,8 +18,8 @@ local Theme = require(script.Parent.Theme)
 
 local ResultsScreen = {}
 
--- Fired with the car to show (or nil) when the player wants the garage.
-ResultsScreen.GarageRequested = Signal.new() :: Signal.Signal<string?>
+-- Fired with "again", "garage" or "menu" (and, for the garage, the car to show).
+ResultsScreen.Chosen = Signal.new() :: Signal.Signal<string, string?>
 
 local C = Theme.Colors
 local rgb = Color3.fromRGB
@@ -37,7 +39,8 @@ local totalLabel: TextLabel
 local board: Frame
 local carProgress: Progress
 local unlockProgress: Progress
-local garageButton: TextButton
+local againButton: TextButton
+local menuButton: TextButton
 local showToken = 0
 local lastCarId: string? = nil
 
@@ -171,26 +174,45 @@ local function build()
 	carProgress = progressCard(panel, "CarProgress", UDim2.fromOffset(0, 428), C.Evolve)
 	unlockProgress = progressCard(panel, "UnlockProgress", UDim2.new(0.5, 6, 0, 428), C.Good)
 
-	garageButton = Theme.button(panel, {
-		size = UDim2.fromOffset(260, 52),
-		position = UDim2.new(0.5, -8, 1, 0),
-		anchor = Vector2.new(1, 1),
-		text = "🚗 GARAGE",
-	})
-	garageButton.Activated:Connect(function()
-		gui.Enabled = false
-		ResultsScreen.GarageRequested:Fire(lastCarId)
+	local buttons = Instance.new("Frame")
+	buttons.Name = "Buttons"
+	buttons.Size = UDim2.new(1, 0, 0, 58)
+	buttons.Position = UDim2.fromScale(0, 1)
+	buttons.AnchorPoint = Vector2.new(0, 1)
+	buttons.BackgroundTransparency = 1
+	buttons.Parent = panel
+	local row = Instance.new("UIListLayout")
+	row.FillDirection = Enum.FillDirection.Horizontal
+	row.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	row.Padding = UDim.new(0, 12)
+	row.SortOrder = Enum.SortOrder.LayoutOrder
+	row.Parent = buttons
+	local function choice(order: number, name: string, width: number, text: string, color: Color3, textColor: Color3?)
+		local button = Theme.button(buttons, {
+			name = name,
+			size = UDim2.fromOffset(width, 58),
+			text = text,
+			color = color,
+			textColor = textColor,
+		})
+		button.LayoutOrder = order
+		return button
+	end
+	againButton = choice(1, "PlayAgain", 290, "▶  PLAY AGAIN", C.Gold)
+	Theme.sweep(againButton, 3)
+	againButton.Activated:Connect(function()
+		ResultsScreen.hide()
+		ResultsScreen.Chosen:Fire("again", nil)
 	end)
-	local close = Theme.button(panel, {
-		size = UDim2.fromOffset(200, 52),
-		position = UDim2.new(0.5, 8, 1, 0),
-		anchor = Vector2.new(0, 1),
-		text = "CLOSE",
-		color = C.PanelLight,
-		textColor = C.Text,
-	})
-	close.Activated:Connect(function()
-		gui.Enabled = false
+	local garage = choice(2, "Garage", 220, "🚗  GARAGE", C.Blue, C.Text)
+	garage.Activated:Connect(function()
+		ResultsScreen.hide()
+		ResultsScreen.Chosen:Fire("garage", lastCarId)
+	end)
+	menuButton = choice(3, "Menu", 200, "🏠  MENU", C.PanelLight, C.Text)
+	menuButton.Activated:Connect(function()
+		ResultsScreen.hide()
+		ResultsScreen.Chosen:Fire("menu", nil)
 	end)
 
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
@@ -264,6 +286,7 @@ local function show(payload: { [string]: any })
 	clearChildren(rewardList)
 	totalLabel.Text = ""
 	gui.Enabled = true
+	Theme.focus(againButton)
 	panel.Position = UDim2.fromScale(0.5, 0.57)
 	TweenService:Create(panel, TweenInfo.new(0.4, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.52) })
 		:Play()
@@ -356,6 +379,17 @@ local function show(payload: { [string]: any })
 	end
 end
 
+function ResultsScreen.hide()
+	if gui.Enabled then
+		gui.Enabled = false
+		Theme.focus(nil)
+	end
+end
+
+function ResultsScreen.isOpen(): boolean
+	return gui.Enabled
+end
+
 function ResultsScreen.start()
 	build()
 	Remotes.MatchResults.OnClientEvent:Connect(function(payload: any)
@@ -363,11 +397,17 @@ function ResultsScreen.start()
 			show(payload)
 		end
 	end)
-	-- Hide the results once the next match is about to start.
+	-- The MENU button counts down to when the server sends everyone back to the menu anyway.
 	local stateObject = MatchState.getObject()
-	stateObject:GetAttributeChangedSignal(MatchState.Attr.Phase):Connect(function()
-		if MatchState.phase(stateObject) == MatchState.Phases.Countdown then
-			gui.Enabled = false
+	RunService.Heartbeat:Connect(function()
+		if not gui.Enabled then
+			return
+		end
+		if MatchState.phase(stateObject) == MatchState.Phases.Results then
+			local left = math.ceil(MatchState.phaseSecondsLeft(stateObject, workspace:GetServerTimeNow()))
+			menuButton.Text = `🏠  MENU ({left})`
+		else
+			menuButton.Text = "🏠  MENU"
 		end
 	end)
 end

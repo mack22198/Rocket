@@ -2,8 +2,11 @@
 -- The world outside the stadium: grass all round, hills on the horizon, trees and clouds, so there's no empty
 -- void past the stands. Terrain is filled in when the server starts.
 
-local Palette = require(script.Parent.Palette)
-local PartKit = require(script.Parent.PartKit)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Palette = require(Shared.Build.Palette)
+local PartKit = require(Shared.Build.PartKit)
 local StadiumBuilder = require(script.Parent.StadiumBuilder)
 
 local EnvironmentBuilder = {}
