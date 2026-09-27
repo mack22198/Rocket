@@ -16,6 +16,7 @@ local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 local Powers = require(Shared.Config.Powers)
 local Remotes = require(Shared.Net.Remotes)
+local Twists = require(Shared.Config.Twists)
 local Signal = require(Shared.Util.Signal)
 
 local CameraController = require(script.Parent.Parent.Controllers.CameraController)
@@ -71,6 +72,12 @@ local powerPanel: Frame
 local itemSlot: Slot
 local powerSlot: Slot
 local statusPill: TextLabel
+local twistBanner: Frame
+local twistName: TextLabel
+local twistText: TextLabel
+local twistPill: TextLabel
+local twistShownFor = -1 -- the match whose twist banner has been shown
+local twistBannerUntil = 0
 local noticeText = ""
 local noticeUntil = 0
 
@@ -361,12 +368,55 @@ local function buildPowerPanel()
 	statusPill.Visible = false
 end
 
+-- "✨ MATCH TWIST ✨ - 🏀 GIANT BALL": shown big at the first kickoff, then as a small pill all match.
+local function buildTwist()
+	twistBanner =
+		Theme.panel(gui, "Twist", UDim2.fromOffset(560, 116), UDim2.fromScale(0.5, 0.58), Vector2.new(0.5, 0.5))
+	twistBanner.BackgroundTransparency = 0.1
+	Theme.stroke(twistBanner, C.Gold, 3)
+	Theme.label(twistBanner, {
+		size = UDim2.new(1, 0, 0, 18),
+		position = UDim2.fromOffset(0, 10),
+		text = "✨ MATCH TWIST ✨",
+		font = Theme.Caps,
+		color = C.Gold,
+		stroke = false,
+	})
+	twistName = Theme.label(twistBanner, {
+		name = "Name",
+		size = UDim2.new(1, -20, 0, 48),
+		position = UDim2.fromOffset(10, 30),
+		text = "",
+	})
+	twistText = Theme.label(twistBanner, {
+		name = "Text",
+		size = UDim2.new(1, -30, 0, 22),
+		position = UDim2.fromOffset(15, 82),
+		text = "",
+		font = Theme.Body,
+		color = C.Muted,
+		stroke = false,
+	})
+	twistBanner.Visible = false
+	twistPill = Theme.pill(gui, {
+		name = "TwistPill",
+		size = UDim2.fromOffset(230, 28),
+		position = UDim2.new(0.5, 0, 0, 108),
+		anchor = Vector2.new(0.5, 0),
+		text = "",
+		font = Theme.Caps,
+		color = C.Gold,
+	})
+	twistPill.Visible = false
+end
+
 local function build()
 	gui = Theme.screen("TurboHUD", 5)
 	buildScoreboard()
 	buildBoostDial()
 	buildMegaMeter()
 	buildPowerPanel()
+	buildTwist()
 	buildMenuButton()
 
 	-- Centre messages.
@@ -391,7 +441,7 @@ local function build()
 	subText.Visible = false
 
 	local scaledObjects: { GuiObject } =
-		{ scoreboard, bigText, subText, dial, camPill, megaPanel, powerPanel, statusPill }
+		{ scoreboard, bigText, subText, dial, camPill, megaPanel, powerPanel, statusPill, twistBanner, twistPill }
 	for _, object in scaledObjects do
 		Theme.scaled(object)
 	end
@@ -552,6 +602,22 @@ local function update()
 		HUD.flash("GO!", C.Good, nil, 0.8)
 	end
 	lastPhase = phase
+
+	-- The match twist: a big banner at the first kickoff, then a small reminder under the scoreboard.
+	local twist = Twists.get(stateObject:GetAttribute(Attr.Twist) :: string?)
+	local matchId = numberAttr(Attr.MatchId)
+	if twist and phase == Phases.Countdown and twistShownFor ~= matchId then
+		twistShownFor = matchId
+		twistBannerUntil = os.clock() + 4.5
+		twistName.Text = `{twist.Emoji} {string.upper(twist.Name)}`
+		twistText.Text = twist.Description
+	end
+	twistBanner.Visible = twist ~= nil and os.clock() < twistBannerUntil and inMatchPhase
+	twistPill.Visible = twist ~= nil and scoreboard.Visible and not twistBanner.Visible
+	if twist then
+		twistPill.Text = `{twist.Emoji} {string.upper(twist.Name)}`
+	end
+
 	if os.clock() > messageUntil then
 		bigText.Visible = false
 		subText.Visible = false

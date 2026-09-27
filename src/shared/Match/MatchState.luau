@@ -31,6 +31,7 @@ MatchState.Attr = {
 	OvertimeElapsed = "OvertimeElapsed",
 	WaitingForBall = "WaitingForBall", -- 0:00 but the ball is still in the air
 	Banner = "Banner", -- short status text shown in the lobby
+	Twist = "Twist", -- this match's twist (see Twists), "" for none
 }
 
 -- Where each player is: in the menu, waiting for a match (pressed PLAY), or driving in the match.
@@ -107,6 +108,7 @@ function MatchState.getObject(): Instance
 		object:SetAttribute(MatchState.Attr.WaitingForBall, false)
 		object:SetAttribute(MatchState.Attr.PhaseEndsAt, 0)
 		object:SetAttribute(MatchState.Attr.Banner, "")
+		object:SetAttribute(MatchState.Attr.Twist, "")
 		object.Parent = ReplicatedStorage
 		return object
 	end

@@ -58,8 +58,9 @@ local function forecast(): (number) -> Vector3
 	local arena = BallService.arena()
 	local state = BallService.getState()
 	local samples = { state.position }
-	local halfStep = GameConfig.Ball.FixedStep / 2
-	BallSim.simulate(arena, GameConfig.Ball, state, PREDICTION_STEP * PREDICTION_SAMPLES, function(s, elapsed)
+	local ballConfig = BallService.config()
+	local halfStep = ballConfig.FixedStep / 2
+	BallSim.simulate(arena, ballConfig, state, PREDICTION_STEP * PREDICTION_SAMPLES, function(s, elapsed)
 		local index = math.floor(elapsed / PREDICTION_STEP + 0.5)
 		if index == #samples and math.abs(elapsed - index * PREDICTION_STEP) < halfStep then
 			samples[index + 1] = s.position

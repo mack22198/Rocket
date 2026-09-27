@@ -9,6 +9,9 @@ local GameConfig = require(script.Parent.Parent.Config.GameConfig)
 local CarDriver = {}
 CarDriver.__index = CarDriver
 
+-- The car settings every driver uses (a match twist can swap in a changed copy; see setConfig).
+local config = GameConfig.Car
+
 export type CarDriver = typeof(setmetatable(
 	{} :: {
 		model: Model,
@@ -51,6 +54,15 @@ function CarDriver.addVelocity(self: CarDriver, change: Vector3)
 	self.pendingVelocity += change
 end
 
+-- Swaps the car settings for every car driven here (a match twist, e.g. low gravity or ice).
+function CarDriver.setConfig(newConfig: typeof(GameConfig.Car))
+	config = newConfig
+end
+
+function CarDriver.config(): typeof(GameConfig.Car)
+	return config
+end
+
 -- Spin out, get stuck in goo or freeze solid for a while (see CarPhysics.applyEffect).
 function CarDriver.applyEffect(self: CarDriver, effect: string, duration: number, direction: number?)
 	CarPhysics.applyEffect(self.state, effect, duration, direction)
@@ -65,7 +77,7 @@ function CarDriver.probeGround(self: CarDriver, cframe: CFrame): CarPhysics.Grou
 			table.insert(hits, { distance = result.Distance, normal = result.Normal })
 		end
 	end
-	return CarPhysics.groundFromHits(GameConfig.Car, hits)
+	return CarPhysics.groundFromHits(config, hits)
 end
 
 function CarDriver.isGrounded(self: CarDriver): boolean
@@ -83,7 +95,7 @@ function CarDriver.step(self: CarDriver, dt: number, input: CarPhysics.Input, ha
 	end
 	local cframe = chassis.CFrame
 	local result = CarPhysics.step({
-		config = GameConfig.Car,
+		config = config,
 		stats = self.def.Stats,
 		state = self.state,
 		input = input,

@@ -33,6 +33,7 @@ local PlayerDataClient = require(script.Parent.PlayerDataClient)
 local PodiumController = require(script.Parent.PodiumController)
 local ReplayController = require(script.Parent.ReplayController)
 local ShowroomController = require(script.Parent.ShowroomController)
+local TwistController = require(script.Parent.TwistController)
 
 local GameFlow = {}
 
@@ -85,7 +86,14 @@ local function apply(target: Screen)
 	ReplayController.setEnabled(inMatch)
 	ReplayScreen.hide()
 	ResultsScreen.hide()
-	ShowroomController.setActive(not inMatch)
+	-- The showroom and a Neon Night twist both change the lighting; each hands it back before the other starts.
+	if inMatch then
+		ShowroomController.setActive(false)
+		TwistController.setInMatch(true)
+	else
+		TwistController.setInMatch(false)
+		ShowroomController.setActive(true)
+	end
 	setMatchOverlay(inMatch)
 	if inMatch then
 		garageWanted = false

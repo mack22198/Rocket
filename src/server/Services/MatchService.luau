@@ -11,12 +11,15 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.Config.CarCatalog)
+local CarDriver = require(Shared.Cars.CarDriver)
 local Evolution = require(Shared.Config.Evolution)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 local MathUtil = require(Shared.Util.MathUtil)
+local Powers = require(Shared.Config.Powers)
 local Remotes = require(Shared.Net.Remotes)
 local Rewards = require(Shared.Config.Rewards)
+local Twists = require(Shared.Config.Twists)
 
 local Roster = require(script.Parent.Parent.Match.Roster)
 local BallService = require(script.Parent.BallService)
@@ -293,6 +296,18 @@ end
 -- Match flow
 ---------------------------------------------------------------------------------------------------------------
 
+-- Puts a match twist into effect everywhere on the server ("" = the normal rules). Clients read the Twist
+-- attribute and do the same on their side.
+local function applyTwist(id: string)
+	local twist = Twists.get(id)
+	set(Attr.Twist, id)
+	BallService.setConfig(Twists.ballConfig(id))
+	CarDriver.setConfig(Twists.carConfig(id))
+	CarService.setUnlimitedBoost(twist ~= nil and twist.UnlimitedBoost == true)
+	StatsService.setMegaMultiplier(if twist and twist.MegaMultiplier then twist.MegaMultiplier else 1)
+	ItemService.setRespawn(if twist and twist.BoxRespawn then twist.BoxRespawn else Powers.Tuning.BoxRespawn)
+end
+
 local function setupMatch()
 	Roster.clear()
 	StatsService.resetMatch()
@@ -312,6 +327,7 @@ local function setupMatch()
 	set(Attr.ClockRunning, false)
 	set(Attr.WaitingForBall, false)
 	set(Attr.Banner, "")
+	applyTwist(Twists.pick(os.time(), rng:NextNumber(), rng:NextNumber()))
 
 	-- First come, first served for the six seats; anyone else keeps waiting and gets the next free seat.
 	local humans: { Player } = {}
@@ -350,7 +366,7 @@ end
 
 local function kickoff()
 	pendingGoal = nil
-	BallService.reset(Vector3.new(0, GameConfig.Ball.Radius, 0))
+	BallService.reset(Vector3.new(0, BallService.config().Radius, 0))
 	BoostPadService.resetAll()
 	ItemService.resetAll()
 	BumpService.reset()
@@ -477,6 +493,7 @@ local function finishMatch(aborted: boolean)
 	end
 	local board = scoreboard()
 	local podium = podiumEntries(mvp)
+	local event = Twists.event(os.time())
 
 	if not aborted then
 		for _, p in Roster.humans() do
@@ -486,6 +503,12 @@ local function finishMatch(aborted: boolean)
 			end
 			local outcome: Rewards.Outcome = if winner == nil then "Draw" elseif winner == p.team then "Win" else "Loss"
 			local summary = Rewards.compute(p.stats, outcome, mvp == p)
+			-- Events (Twist Weekend) pay extra.
+			if event and event.ScrapMultiplier > 1 then
+				local bonus = math.floor(summary.total * (event.ScrapMultiplier - 1))
+				table.insert(summary.lines, { label = `{event.Emoji} {event.Name}!`, amount = bonus })
+				summary.total += bonus
+			end
 			-- A daily chest prize: double Scrap for a few matches.
 			local saved = DataService.get(player)
 			local boosted = saved ~= nil and saved.scrapBoost > 0
@@ -571,6 +594,7 @@ local function finishMatch(aborted: boolean)
 	end
 	Roster.clear()
 	StatsService.resetMatch()
+	applyTwist("")
 end
 
 local function runMatch()
@@ -722,6 +746,7 @@ function MatchService.start()
 					warn(`[Match] The match crashed: {err}`)
 					matchRunning = false
 					PowerService.clear()
+					applyTwist("")
 					for _, p in Roster.all() do
 						CarService.despawn(p)
 						if p.player and MatchState.statusOf(p.player) == Status.Playing then

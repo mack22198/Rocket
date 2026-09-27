@@ -41,17 +41,21 @@ local function sphere(name: string, diameter: number, cframe: CFrame, color: Col
 	return part
 end
 
--- Builds the ball model at the origin. Its PrimaryPart is the main white sphere, named "Ball".
-function BallModelBuilder.build(): Model
-	local radius = GameConfig.Ball.Radius
+-- Builds the ball model at the origin (normal size unless `size` is given). Its PrimaryPart is the main white
+-- sphere, named "Ball".
+function BallModelBuilder.build(size: number?): Model
+	local radius = size or GameConfig.Ball.Radius
 	local model = Instance.new("Model")
 	model.Name = "Ball"
 	local ball = sphere("Ball", radius * 2, CFrame.new(), Color3.fromRGB(248, 248, 252))
 	ball.Parent = model
 	model.PrimaryPart = ball
-	local offset = radius + PATCH_HEIGHT - PATCH_RADIUS
+	-- The patches grow with the ball, so a giant ball still looks like a soccer ball.
+	local scale = radius / GameConfig.Ball.Radius
+	local patchRadius = PATCH_RADIUS * scale
+	local offset = radius + PATCH_HEIGHT * scale - patchRadius
 	for _, direction in patchDirections() do
-		sphere("Patch", PATCH_RADIUS * 2, CFrame.new(direction * offset), PATCH_COLOR).Parent = model
+		sphere("Patch", patchRadius * 2, CFrame.new(direction * offset), PATCH_COLOR).Parent = model
 	end
 	return model
 end

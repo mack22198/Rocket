@@ -33,6 +33,10 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   **Magnet** that pulls the ball to your car, a **Freeze Ray** that freezes the closest opponent, a **Super
   Spring**, **Rocket Fuel** (boost that doesn't run out), a **Bubble Shield** and a **Mega Charge**. A team
   that's behind gets the comeback items more often, so matches stay close.
+- **Match twists:** most matches start with a surprise rule for the whole match - 🏀 **Giant Ball**, 🌙 **Low
+  Gravity**, 🏐 **Bouncy Ball**, ⛸️ **Ice Rink**, ⚡ **Turbo Mode** (boost never runs out), 💥 **Mega Madness** or
+  🌃 **Neon Night**. Each week one twist is featured, and every Saturday and Sunday is a **Twist Weekend**: a
+  twist in every match and +50% Scrap.
 - **Every car has its own power** (G), which recharges after each use: the Pizza Car drops a gooey **Cheese
   Trap**, the Banana Car a **Banana Peel** that spins cars out, the Tiny Kart has a **Nitro Dash**, the Neon
   Shark a **Shark Dive** that makes it untouchable, the Monster Truck a **Ground Pound** shockwave and the UFO a
@@ -114,6 +118,8 @@ Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
 - [`Powers.luau`](src/shared/Config/Powers.luau): the items and car powers, how often each item turns up
   (and how much that depends on the score), and how strong they all are.
 - [`Daily.luau`](src/shared/Config/Daily.luau): the streak rewards, the daily quests and the chest prizes.
+- [`Twists.luau`](src/shared/Config/Twists.luau): the match twists (what each one changes and how often it
+  turns up) and the weekend event.
 - `GameConfig.Evolution`: how much XP each evolution stage needs.
 
 Car looks (and every evolution stage) are built from plain parts in
@@ -167,7 +173,7 @@ real building code, which is handy for checking changes to how things look from 
 src/
   shared/   (ReplicatedStorage.Shared: used by both server and client)
     Config/       GameConfig, CarCatalog, Rewards, Evolution, Powers (items and car powers), Daily (streaks,
-                  quests, daily chest)
+                  quests, daily chest), Twists (match twists and weekend events)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay timing)
@@ -187,6 +193,7 @@ src/
     Showroom/     ShowroomBuilder (the menu's garage showroom and its mirror-floor reflection),
                   PodiumBuilder (the winners' podium)
     Controllers/  GameFlow (menu / garage / match), ReplayController (goal replays), PodiumController,
+                  TwistController (twist rules and the Neon Night sky on this screen),
                   LocalHide (hides real cars behind replays), InputController, CarController, CarVisuals (wheels,
                   trails), BallView, CameraController, EffectsController, PowerVisuals (item boxes,
                   shields, ice, beams), ShowroomController, StadiumController (live scoreboards, LED boards,
@@ -205,6 +212,9 @@ tools/      Offline previews of the 3D world and the UI
   are handled on the server.
 - **Cars** use arcade raycast suspension (`CarPhysics`). Each player's client drives their own car. Bots run
   the same code on the server.
+- **Twists change shared numbers only.** The server picks the twist and puts it in the `Twist` attribute; the
+  server and every client then swap in the same changed ball and car settings (`Twists.ballConfig` /
+  `carConfig`), so the ball's prediction and each player's own car stay in step with the server.
 - **Items and powers are decided by the server** (`PowerService`), which then tells each car's driver what
   happened to it (spun out, slowed, frozen). Magnets and Tractor Beams pull the ball with the same maths on the
   server and in every client's prediction of it, so the ball stays smooth.

@@ -2,7 +2,7 @@
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
 --   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay,
---              streak, chest, collection
+--              streak, chest, collection, twist
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -75,6 +75,16 @@ if scenario == "results" or scenario == "podium" then
 end
 if scenario == "replay" then
 	attrs.Phase = "GoalScored"
+end
+if scenario == "twist" then
+	attrs.Phase = "Countdown"
+	attrs.PhaseEndsAt = NOW + 2.5
+	attrs.BlueScore = 0
+	attrs.OrangeScore = 0
+	attrs.MatchId = 7
+	attrs.Twist = "moon"
+elseif scenario == "match" then
+	attrs.Twist = "giant"
 end
 local stateObject = {
 	Name = "MatchState",

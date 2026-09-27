@@ -39,6 +39,7 @@ local chains: { [Team]: Chain } = {
 
 local S = GameConfig.Style
 local P = GameConfig.Points
+local megaMultiplier = 1 -- the Mega Madness twist fills meters faster
 
 local function announce(kind: string, text: string, team: Team?, name: string?)
 	Remotes.Announce:FireAllClients(kind, text, team or "", name or "")
@@ -82,7 +83,7 @@ local function onTouch(info: BallService.TouchInfo)
 	end
 
 	-- Shots and saves: where was the ball heading before and after this touch?
-	local ballCfg = GameConfig.Ball
+	local ballCfg = BallService.config()
 	local ownSide = GameConfig.Teams[team].DefendsSide
 	local before = BallSim.predictGoal(arena, ballCfg, info.before, S.ShotLookahead)
 	local after = BallSim.predictGoal(arena, ballCfg, info.after, S.ShotLookahead)
@@ -99,7 +100,7 @@ local function onTouch(info: BallService.TouchInfo)
 		megaGain += GameConfig.Mega.PerShot
 	end
 	if not info.mega then
-		CarService.addMega(p, megaGain)
+		CarService.addMega(p, megaGain * megaMultiplier)
 	end
 
 	-- Combos: consecutive touches by one team chain together.
@@ -192,6 +193,10 @@ function StatsService.goal(side: number, ballSpeed: number): GoalSummary
 		comboText = text,
 		ownGoal = scorer == nil,
 	}
+end
+
+function StatsService.setMegaMultiplier(multiplier: number)
+	megaMultiplier = multiplier
 end
 
 function StatsService.announce(kind: string, text: string, team: Team?, name: string?)

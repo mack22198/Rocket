@@ -137,7 +137,8 @@ local function scorerTag(copy: Model, scorer: string)
 end
 
 local function buildBall(parent: Instance, team: string): Model
-	local ball = BallModelBuilder.build()
+	local radius = BallView.radius()
+	local ball = BallModelBuilder.build(radius)
 	local part = ball.PrimaryPart :: BasePart
 	for _, d in ball:GetDescendants() do
 		if d:IsA("BasePart") then
@@ -147,7 +148,6 @@ local function buildBall(parent: Instance, team: string): Model
 			d.CanTouch = false
 		end
 	end
-	local radius = GameConfig.Ball.Radius
 	local top = Instance.new("Attachment")
 	top.Position = Vector3.new(0, radius * 0.6, 0)
 	top.Parent = part
@@ -279,7 +279,7 @@ local function play(clip: { Frame }, scorer: string, team: string, combo: string
 		local flat = MathUtil.flat(moved)
 		if flat.Magnitude > 1e-3 then
 			local axis = Vector3.new(flat.Z, 0, -flat.X).Unit
-			rotation = CFrame.fromAxisAngle(axis, flat.Magnitude / GameConfig.Ball.Radius) * rotation
+			rotation = CFrame.fromAxisAngle(axis, flat.Magnitude / BallView.radius()) * rotation
 		end
 		ball:PivotTo(CFrame.new(ballPosition) * rotation)
 		if elapsed >= duration + 0.4 then

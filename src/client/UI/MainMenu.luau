@@ -19,6 +19,7 @@ local MatchState = require(Shared.Match.MatchState)
 local Remotes = require(Shared.Net.Remotes)
 local Rewards = require(Shared.Config.Rewards)
 local Signal = require(Shared.Util.Signal)
+local Twists = require(Shared.Config.Twists)
 
 local PlayerDataClient = require(script.Parent.Parent.Controllers.PlayerDataClient)
 local Theme = require(script.Parent.Theme)
@@ -51,6 +52,7 @@ local spinner: TextLabel
 local garageButton: TextButton
 local evolveBadge: TextLabel
 local statusPill: TextLabel
+local eventPill: TextLabel
 local playerStats: TextLabel
 local scrapPill: TextLabel
 local nextName: TextLabel
@@ -254,6 +256,17 @@ local function buildLeft()
 		font = Theme.Caps,
 		color = C.Muted,
 		transparency = 0.35,
+	})
+
+	-- What's on: the weekend event, or this week's featured twist.
+	eventPill = Theme.pill(left, {
+		name = "Event",
+		size = UDim2.fromOffset(400, 30),
+		position = UDim2.fromOffset(44, 580),
+		text = "",
+		font = Theme.Caps,
+		color = C.Gold,
+		transparency = 0.25,
 	})
 
 	-- You: avatar, name and lifetime stats.
@@ -678,6 +691,16 @@ local function update()
 		local count = #Players:GetPlayers()
 		statusPill.Text = if count == 1 then "1 PLAYER ONLINE" else `{count} PLAYERS ONLINE`
 		statusPill.TextColor3 = C.Muted
+	end
+
+	local event = Twists.event(math.floor(now))
+	if event then
+		eventPill.Text = `{event.Emoji} {string.upper(event.Name)}: A TWIST EVERY MATCH + 50% SCRAP!`
+		eventPill.TextColor3 = if math.floor(os.clock() * 2) % 2 == 0 then C.Gold else C.Text
+	else
+		local featured = Twists.featured(math.floor(now))
+		eventPill.Text = `⭐ TWIST OF THE WEEK: {featured.Emoji} {string.upper(featured.Name)}`
+		eventPill.TextColor3 = C.Gold
 	end
 
 	evolveBadge.Visible = evolveReady

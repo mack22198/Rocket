@@ -253,6 +253,19 @@ local function addBox(model: Instance)
 	end)
 end
 
+-- The beams reach for an attachment inside the ball (made again if the ball is rebuilt for a twist).
+local function ensureBallAttachment()
+	local ball = BallView.getPart()
+	local current = ballAttachment
+	if current and current.Parent == ball then
+		return
+	end
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "PullTarget"
+	attachment.Parent = ball
+	ballAttachment = attachment
+end
+
 local function updateBoxes()
 	local t = os.clock()
 	for _, box in boxes do
@@ -382,11 +395,7 @@ function PowerVisuals.start()
 	holder.Parent = workspace.CurrentCamera or workspace
 	folder = holder
 
-	local ball = BallView.getPart()
-	local attachment = Instance.new("Attachment")
-	attachment.Name = "PullTarget"
-	attachment.Parent = ball
-	ballAttachment = attachment
+	ensureBallAttachment()
 
 	local matchFolder = workspace:WaitForChild(MatchState.Folders.Match)
 	local carsFolder = matchFolder:WaitForChild(MatchState.Folders.Cars)
@@ -413,6 +422,7 @@ function PowerVisuals.start()
 	end)
 
 	RunService.RenderStepped:Connect(function()
+		ensureBallAttachment()
 		updateBoxes()
 		local ballPosition = BallView.getPosition()
 		local ballShown = BallView.isVisible()

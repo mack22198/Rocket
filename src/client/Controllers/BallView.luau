@@ -26,13 +26,12 @@ local BallView = {}
 -- Fired with (position, strength 0..1, isMine) whenever the ball gets hit, for sounds and sparks.
 BallView.Hit = Signal.new() :: Signal.Signal<Vector3, number, boolean>
 
-local cfg = GameConfig.Ball
+local cfg = GameConfig.Ball -- (a match twist can swap in a changed copy; see setConfig)
 local STEP = cfg.FixedStep
-local RADIUS = cfg.Radius
 local A = MatchState.CarAttr
 
 local arena = ArenaShape.new(GameConfig.Arena)
-local sim = BallSim.newState(Vector3.new(0, RADIUS, 0))
+local sim = BallSim.newState(Vector3.new(0, cfg.Radius, 0))
 local simTime = 0
 local visualOffset = Vector3.zero
 local lastSnapshotTime = -math.huge
@@ -70,14 +69,14 @@ local function hasFlag(flags: number, flag: number): boolean
 end
 
 local function buildBall()
-	local model = BallModelBuilder.build()
+	local model = BallModelBuilder.build(cfg.Radius)
 	local part = model.PrimaryPart :: Part
 
 	local top = Instance.new("Attachment")
-	top.Position = Vector3.new(0, RADIUS * 0.6, 0)
+	top.Position = Vector3.new(0, cfg.Radius * 0.6, 0)
 	top.Parent = part
 	local bottom = Instance.new("Attachment")
-	bottom.Position = Vector3.new(0, -RADIUS * 0.6, 0)
+	bottom.Position = Vector3.new(0, -cfg.Radius * 0.6, 0)
 	bottom.Parent = part
 	local t = Instance.new("Trail")
 	t.Attachment0 = top
@@ -111,7 +110,7 @@ local function buildBall()
 	local s = Instance.new("Part")
 	s.Name = "BallShadow"
 	s.Shape = Enum.PartType.Cylinder
-	s.Size = Vector3.new(0.05, RADIUS * 2, RADIUS * 2)
+	s.Size = Vector3.new(0.05, cfg.Radius * 2, cfg.Radius * 2)
 	s.Color = Color3.fromRGB(10, 10, 20)
 	s.Material = Enum.Material.SmoothPlastic
 	s.Transparency = 0.5
@@ -190,7 +189,7 @@ local function tryLocalHit()
 		return
 	end
 	local carCFrame = chassis.CFrame
-	local contact = HitModel.findContact(carCFrame, chassis.Size / 2, sim.position, RADIUS)
+	local contact = HitModel.findContact(carCFrame, chassis.Size / 2, sim.position, cfg.Radius)
 	if not contact then
 		return
 	end
@@ -203,7 +202,7 @@ local function tryLocalHit()
 		carVelocity,
 		before.position,
 		before.velocity,
-		RADIUS,
+		cfg.Radius,
 		contact,
 		mega,
 		cfg.MaxSpeed
@@ -269,9 +268,9 @@ local function update(dt: number)
 
 	-- Roll when touching the floor, keep spinning in the air.
 	local horizontal = Vector3.new(sim.velocity.X, 0, sim.velocity.Z)
-	if shown.Y < RADIUS + 1 and horizontal.Magnitude > 0.5 then
+	if shown.Y < cfg.Radius + 1 and horizontal.Magnitude > 0.5 then
 		-- Rolling spin axis = up x velocity.
-		spin = Vector3.new(horizontal.Z, 0, -horizontal.X) / RADIUS
+		spin = Vector3.new(horizontal.Z, 0, -horizontal.X) / cfg.Radius
 	end
 	if spin.Magnitude > 1e-3 then
 		rotation = CFrame.fromAxisAngle(spin.Unit, spin.Magnitude * dt) * rotation
@@ -288,7 +287,7 @@ local function update(dt: number)
 	fire.Enabled = visible and os.clock() < fireUntil
 	ballModel:PivotTo(CFrame.new(shown) * rotation)
 
-	local height = math.max(0, shown.Y - RADIUS)
+	local height = math.max(0, shown.Y - cfg.Radius)
 	shadow.Transparency = if visible then math.clamp(0.45 + height / 80, 0.45, 0.95) else 1
 	shadow.CFrame = CFrame.new(shown.X, 0.08, shown.Z) * CFrame.Angles(0, 0, math.rad(90))
 end
@@ -328,9 +327,25 @@ function BallView.getPosition(): Vector3
 	return ballPart.Position
 end
 
--- The ball's main part (effects hang beams off it).
+-- The ball's main part (effects hang beams off it). It's replaced when a twist changes the ball's size.
 function BallView.getPart(): BasePart
 	return ballPart
+end
+
+-- The ball's settings for this match (a twist can change its size, gravity and bounce). A new size means a
+-- new ball model.
+function BallView.setConfig(newConfig: typeof(GameConfig.Ball))
+	local resized = newConfig.Radius ~= cfg.Radius
+	cfg = newConfig
+	if resized and ballModel then
+		ballModel:Destroy()
+		shadow:Destroy()
+		buildBall()
+	end
+end
+
+function BallView.radius(): number
+	return cfg.Radius
 end
 
 function BallView.isVisible(): boolean

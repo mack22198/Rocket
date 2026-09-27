@@ -24,6 +24,7 @@ local CarService = {}
 
 local carsFolder: Folder
 local arenaFolder: Instance
+local unlimitedBoost = false -- the Turbo Mode twist
 
 local A = MatchState.CarAttr
 
@@ -236,7 +237,7 @@ end
 function CarService.tick(dt: number, live: boolean)
 	local now = workspace:GetServerTimeNow()
 	for _, p in Roster.all() do
-		if Roster.hasEffect(p, "rocket", now) then
+		if unlimitedBoost or Roster.hasEffect(p, "rocket", now) then
 			p.boost = 100
 		elseif live and p.boosting and p.boost > 0 then
 			p.boost = math.max(0, p.boost - GameConfig.Car.BoostDrainPerSecond * dt)
@@ -246,6 +247,11 @@ function CarService.tick(dt: number, live: boolean)
 		end
 		syncAttributes(p)
 	end
+end
+
+-- Turbo Mode: boost never runs out.
+function CarService.setUnlimitedBoost(on: boolean)
+	unlimitedBoost = on
 end
 
 -- Pushes this car's attributes out now (after an item or power changed something).

@@ -27,6 +27,7 @@ local ItemService = {}
 
 local T = Powers.Tuning
 local boxes: { Box } = {}
+local respawn = T.BoxRespawn -- (the Mega Madness twist makes boxes come back sooner)
 local rng = Random.new()
 local stateObject = MatchState.getObject()
 
@@ -73,7 +74,7 @@ local function tryPickup(box: Box, now: number)
 			p.item = rollItem(p)
 			p.itemReadyAt = now + T.Roulette
 			CarService.sync(p)
-			box.respawnAt = now + T.BoxRespawn
+			box.respawnAt = now + respawn
 			setActive(box, false)
 			Remotes.PowerFx:FireAllClients("box", box.position + Vector3.new(0, T.BoxHeight, 0), p.team, p.car)
 			return
@@ -91,6 +92,11 @@ function ItemService.init()
 			{ position = position, model = PropBuilder.itemBox(folder, position, i), active = true, respawnAt = 0 }
 		table.insert(boxes, box)
 	end
+end
+
+-- How long a box takes to come back after it's picked up.
+function ItemService.setRespawn(seconds: number)
+	respawn = seconds
 end
 
 -- Every box back for a kickoff.

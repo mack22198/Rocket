@@ -45,7 +45,7 @@ local BallService = {}
 BallService.Touched = Signal.new() :: Signal.Signal<TouchInfo>
 BallService.GoalScored = Signal.new() :: Signal.Signal<number, Vector3>
 
-local cfg = GameConfig.Ball
+local cfg = GameConfig.Ball -- (a match twist can swap this for a changed copy; see setConfig)
 local STEP = cfg.FixedStep
 local HISTORY_SECONDS = 1
 local MAX_STEPS_PER_FRAME = 8
@@ -345,6 +345,15 @@ function BallService.update(dt: number)
 	if snapshotTimer >= interval then
 		broadcast(false)
 	end
+end
+
+-- The ball's settings for this match (a twist can change its size, gravity and bounce).
+function BallService.setConfig(newConfig: typeof(GameConfig.Ball))
+	cfg = newConfig
+end
+
+function BallService.config(): typeof(GameConfig.Ball)
+	return cfg
 end
 
 -- A power shoves the ball (a Ground Pound). It counts as `p` touching the ball, so it can score them a goal.
