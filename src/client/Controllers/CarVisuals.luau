@@ -14,6 +14,7 @@ local MathUtil = require(Shared.Util.MathUtil)
 
 local CarController = require(script.Parent.CarController)
 local InputController = require(script.Parent.InputController)
+local LocalHide = require(script.Parent.LocalHide)
 
 local CarVisuals = {}
 
@@ -187,7 +188,7 @@ local function step(dt: number)
 			wheel.motor.Transform = turn * CFrame.Angles(wheel.spin, 0, 0)
 		end
 
-		local boosting = isBoosting(car)
+		local boosting = isBoosting(car) and not LocalHide.isHidden(model)
 		for _, trail in car.trails do
 			trail.Enabled = boosting
 		end

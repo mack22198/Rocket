@@ -13,7 +13,7 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   turntable in a dark studio with a polished, reflective floor, spotlights and a big screen. From there: **PLAY**,
   **GARAGE** and **HOW TO PLAY**. After a match you pick **PLAY AGAIN**, **GARAGE** or **MENU**, and the ☰ MENU
   button (or M) lets you leave a match at any time.
-- **3v3 matches, 5 minutes long.** Bots fill any empty seats, so one kid alone still gets a full game. Pressing
+- **3v3 matches, 3 minutes long.** Bots fill any empty seats, so one kid alone still gets a full game. Pressing
   PLAY while a match is on takes over a bot's seat right away; otherwise the next match starts a few seconds
   later (so friends who press PLAY together play together).
 - **Car soccer:** a curved-wall arena with glowing goals and nets, boost pads, kickoff countdowns, a scoreboard and
@@ -22,8 +22,11 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   scrolling LED advert boards that flash team colours after a goal, the game's name painted on the pitch, glass
   walls, floodlights and giant screens showing the live score, under a late-afternoon sky with hills and trees.
 - **Big moments look big:** every goal sets off a shockwave, a fireball and smoke in the net, confetti over the
-  goal and fireworks above the stands. Hard hits flash, Mega Shots explode, boosting cars stream light trails
-  and the camera widens as you go faster.
+  goal and fireworks above the stands, then a **slow-motion replay** of the goal (with cinema bars and the
+  scorer's name; SKIP to get back to driving). Hard hits flash, Mega Shots explode, boosting cars stream light
+  trails and the camera widens as you go faster.
+- **The winners' podium:** at the final whistle the top three cars appear on a podium in the middle of the
+  pitch - the MVP on the top step - with confetti and fireworks, before the results screen.
 - **Arcade driving:** boost, jump, double jump, flips (dodges), air control and air roll, driving up the curved
   walls, and bumping other cars.
 - **Item boxes:** spinning "?" boxes on the pitch give you a random item to use whenever you like (R): a
@@ -112,8 +115,8 @@ lobby and scenery are built the same way in [`src/server/Arena`](src/server/Aren
 [`ShowroomBuilder.luau`](src/client/Showroom/ShowroomBuilder.luau); their colours are in
 [`Palette.luau`](src/shared/Build/Palette.luau). The stadium lighting (sun, haze, glow) is set in
 [`default.project.json`](default.project.json), and the showroom's studio lighting in
-[`ShowroomController.luau`](src/client/Controllers/ShowroomController.luau). Sounds use Roblox's built-in ones; to add a goal horn or crowd cheer, paste audio
-IDs from the Creator Store into `SOUNDS` in
+[`ShowroomController.luau`](src/client/Controllers/ShowroomController.luau). Sounds use Roblox's built-in ones;
+to add a goal horn or crowd cheer, paste audio IDs from the Creator Store into `SOUNDS` in
 [`EffectsController.luau`](src/client/Controllers/EffectsController.luau).
 
 ## Working on the code
@@ -159,7 +162,7 @@ src/
     Config/       GameConfig, CarCatalog, Rewards, Evolution, Powers (items and car powers)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
-    Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits)
+    Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay timing)
     Bots/         BotBrain (bot decisions)
     Cars/         CarModelBuilder (car looks at every evolution stage), CarDriver (connects CarPhysics to a car)
     Ball/         BallModelBuilder (the ball's look)
@@ -172,13 +175,15 @@ src/
                   StatsService, BoostPadService, BumpService, ItemService (item boxes), PowerService
                   (using items and powers, cheese and banana traps), DataService (saving), GarageService
   client/   (StarterPlayerScripts.Client)
-    Showroom/     ShowroomBuilder (the menu's garage showroom and its mirror-floor reflection)
-    Controllers/  GameFlow (menu / garage / match), InputController, CarController, CarVisuals (wheels,
+    Showroom/     ShowroomBuilder (the menu's garage showroom and its mirror-floor reflection),
+                  PodiumBuilder (the winners' podium)
+    Controllers/  GameFlow (menu / garage / match), ReplayController (goal replays), PodiumController,
+                  LocalHide (hides real cars behind replays), InputController, CarController, CarVisuals (wheels,
                   trails), BallView, CameraController, EffectsController, PowerVisuals (item boxes,
                   shields, ice, beams), ShowroomController, StadiumController (live scoreboards, LED boards,
                   cheering crowd)
-    UI/           MainMenu, Garage, PauseMenu, HowToPlay, HUD, Announcer, ResultsScreen, TouchControls,
-                  Transition, Theme
+    UI/           MainMenu, Garage, PauseMenu, HowToPlay, HUD, Announcer, ResultsScreen, ReplayScreen,
+                  TouchControls, Transition, Theme
 tests/      Lune unit tests (run outside Roblox)
 tools/      Offline previews of the 3D world and the UI
 ```

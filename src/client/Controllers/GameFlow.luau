@@ -3,6 +3,8 @@
 -- The server says where you are - the Status attribute on your Player: "Menu", "Queued" (pressed PLAY and
 -- waiting) or "Playing" - and the garage is opened on top of the menu from here. Switching between the
 -- showroom and the stadium fades through black.
+-- In a match it also runs the big moments: goal replays (the HUD steps aside) and, at the final whistle, the
+-- winners' podium followed by the results.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,11 +21,15 @@ local HowToPlay = require(UI.HowToPlay)
 local HUD = require(UI.HUD)
 local MainMenu = require(UI.MainMenu)
 local PauseMenu = require(UI.PauseMenu)
+local ReplayScreen = require(UI.ReplayScreen)
 local ResultsScreen = require(UI.ResultsScreen)
+local TouchControls = require(UI.TouchControls)
 local Transition = require(UI.Transition)
 
 local InputController = require(script.Parent.InputController)
 local PlayerDataClient = require(script.Parent.PlayerDataClient)
+local PodiumController = require(script.Parent.PodiumController)
+local ReplayController = require(script.Parent.ReplayController)
 local ShowroomController = require(script.Parent.ShowroomController)
 
 local GameFlow = {}
@@ -36,6 +42,24 @@ local Status = MatchState.Status
 local screen: Screen? = nil
 local garageWanted = false
 local garageCar: string? = nil
+local pauseOpen = false
+local replaying = false
+local resultsToken = 0
+
+-- How long the podium shows on its own before the results panel slides in.
+local PODIUM_SECONDS = 4.5
+
+-- The car gets no input while a menu or a replay is on screen.
+local function updateBlocked()
+	InputController.setBlocked(pauseOpen or replaying)
+end
+
+-- The match HUD, the announcer feed and the touch buttons, together.
+local function setMatchOverlay(on: boolean)
+	HUD.setVisible(on)
+	Announcer.setVisible(on)
+	TouchControls.setHidden(not on)
+end
 
 local function showEquippedCar()
 	local data = PlayerDataClient.get()
@@ -53,9 +77,14 @@ end
 -- Puts every screen in the right state for `target`.
 local function apply(target: Screen)
 	local inMatch = target == "Match"
+	-- Whatever was left over from the last match (a replay, the podium) goes away.
+	resultsToken += 1
+	PodiumController.stop()
+	ReplayController.setEnabled(inMatch)
+	ReplayScreen.hide()
+	ResultsScreen.hide()
 	ShowroomController.setActive(not inMatch)
-	HUD.setVisible(inMatch)
-	Announcer.setVisible(inMatch)
+	setMatchOverlay(inMatch)
 	if inMatch then
 		garageWanted = false
 		MainMenu.hide()
@@ -64,7 +93,6 @@ local function apply(target: Screen)
 		return
 	end
 	PauseMenu.close()
-	ResultsScreen.hide()
 	if target == "Garage" then
 		ShowroomController.setMode("garage")
 		MainMenu.hide()
@@ -143,7 +171,8 @@ function GameFlow.start()
 		PauseMenu.open()
 	end)
 	PauseMenu.Toggled:Connect(function(open: boolean)
-		InputController.setBlocked(open)
+		pauseOpen = open
+		updateBlocked()
 	end)
 	PauseMenu.LeaveRequested:Connect(function()
 		garageWanted = false
@@ -164,8 +193,44 @@ function GameFlow.start()
 			Remotes.LeaveMatch:FireServer()
 		end
 	end)
-	Remotes.MatchResults.OnClientEvent:Connect(function()
+	-- Goal replays: the HUD steps aside while one plays (and SKIP ends it).
+	ReplayController.Started:Connect(function(scorer: string, team: string, combo: string)
+		replaying = true
+		updateBlocked()
+		setMatchOverlay(false)
+		ReplayScreen.show(scorer, team, combo)
+	end)
+	ReplayController.Finished:Connect(function()
+		replaying = false
+		updateBlocked()
+		ReplayScreen.hide()
+		if screen == "Match" and not PodiumController.isShowing() then
+			setMatchOverlay(true)
+		end
+	end)
+	ReplayScreen.SkipPressed:Connect(ReplayController.stop)
+
+	-- The final whistle: the winners' podium with a big headline, then the results panel.
+	Remotes.MatchResults.OnClientEvent:Connect(function(payload: unknown)
 		PauseMenu.close()
+		if type(payload) ~= "table" or screen ~= "Match" then
+			return
+		end
+		local results = payload :: { [string]: any }
+		ReplayController.stop()
+		setMatchOverlay(false)
+		resultsToken += 1
+		local token = resultsToken
+		PodiumController.show(results.podium, results.winner)
+		local delay = if PodiumController.isShowing() then PODIUM_SECONDS else 0
+		if delay > 0 then
+			ResultsScreen.showHeadline(results)
+		end
+		task.delay(delay, function()
+			if token == resultsToken and screen == "Match" then
+				ResultsScreen.show(results)
+			end
+		end)
 	end)
 
 	-- The car on the turntable follows the car you drive (while the garage isn't choosing one).

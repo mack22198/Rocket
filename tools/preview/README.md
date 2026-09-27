@@ -8,12 +8,15 @@ layouts and proportions from anywhere (including CI machines).
 | --- | --- | --- |
 | Stadium, lobby, cars, ball | `lune run tools/preview/export tools/preview/scene.json` | `index.html?view=<name>` |
 | Menu showroom with a car | `lune run tools/preview/export tools/preview/showroom.json showroom <carId> <stage> <yaw>` | `index.html?scene=showroom.json&view=menu` (or `garage`) |
+| End-of-match podium in the stadium | `lune run tools/preview/export tools/preview/scene-podium.json podium` | `index.html?scene=scene-podium.json&view=podium` |
 | Screens (menus, HUD, garage, results) | `lune run tools/preview/ui-export <scenario> tools/preview/ui-<scenario>.json` | `ui.html?scenario=<scenario>` |
 
 3D views: `overview`, `aerial`, `kickoff`, `midfield`, `goal`, `goalInside`, `corner`, `wallRide`, `stands`,
-`lobby`, `lobbyShowroom`, `lobbyFromField`, `outside`, `ball`, `cars`, `carsClose` (or pass `pos=x,y,z&at=x,y,z`).
+`lobby`, `lobbyShowroom`, `lobbyFromField`, `outside`, `ball`, `cars`, `carsClose`, `items` (item boxes and traps),
+`podium` (or pass `pos=x,y,z&at=x,y,z`).
 
-UI scenarios: `menu`, `queued`, `live`, `garage`, `evolve`, `howto`, `match`, `pause`, `touch`, `goal`, `results`. Add
+UI scenarios: `menu`, `queued`, `live`, `garage`, `evolve`, `howto`, `match`, `pause`, `touch`, `goal`, `replay`,
+`podium`, `results`. Add
 `bg=<image>` to draw them on top of a screenshot of the game (for example a showroom render saved as `bg-menu.png`).
 
 To save PNGs of any of these with headless Chromium:

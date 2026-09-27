@@ -1,7 +1,7 @@
 -- Builds the game's real screens (HUD, garage, results...) in Lune with pretend services, then writes the
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
---   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results
+--   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -60,8 +60,11 @@ if not MENU_SCENARIOS[scenario] then
 	attrs.ClockRunning = true
 	attrs.ClockEndsAt = NOW + 154
 end
-if scenario == "results" then
+if scenario == "results" or scenario == "podium" then
 	attrs.Phase = "Results"
+end
+if scenario == "replay" then
+	attrs.Phase = "GoalScored"
 end
 local stateObject = {
 	Name = "MatchState",
@@ -350,6 +353,7 @@ for _, name in
 		"MainMenu",
 		"PauseMenu",
 		"HowToPlay",
+		"ReplayScreen",
 	}
 do
 	harness.sourceTransforms["src/client/UI/" .. name] = function(source)
@@ -370,6 +374,7 @@ local TouchControls = harness.require(UI.TouchControls)
 local MainMenu = harness.require(UI.MainMenu)
 local PauseMenu = harness.require(UI.PauseMenu)
 local HowToPlay = harness.require(UI.HowToPlay)
+local ReplayScreen = harness.require(UI.ReplayScreen)
 HUD.start()
 Announcer.start()
 ResultsScreen.start()
@@ -377,13 +382,15 @@ Garage.start()
 MainMenu.start()
 PauseMenu.start()
 HowToPlay.start()
+ReplayScreen.start()
 if touch then
 	TouchControls.start()
 end
 -- What GameFlow would show for each scenario.
 local inMatch = not MENU_SCENARIOS[scenario] and scenario ~= "live"
-HUD.setVisible(inMatch)
-Announcer.setVisible(inMatch)
+local overlay = inMatch and scenario ~= "podium" and scenario ~= "replay" and scenario ~= "results"
+HUD.setVisible(overlay)
+Announcer.setVisible(overlay)
 if not inMatch and scenario ~= "garage" and scenario ~= "evolve" then
 	MainMenu.setQueued(scenario == "queued")
 	MainMenu.show()
@@ -410,8 +417,10 @@ elseif scenario == "pause" then
 elseif scenario == "evolve" then
 	data.carXp.pizza = 520
 	Garage.open("pizza")
-elseif scenario == "results" then
-	remotes.MatchResults.OnClientEvent:Fire({
+elseif scenario == "replay" then
+	ReplayScreen.show("Player1", "Blue", "🔥 AIR COMBO!")
+elseif scenario == "results" or scenario == "podium" then
+	local payload = {
 		outcome = "Win",
 		team = "Blue",
 		blueScore = 3,
@@ -462,7 +471,12 @@ elseif scenario == "results" then
 				ready = true,
 			},
 		},
-	})
+	}
+	if scenario == "podium" then
+		ResultsScreen.showHeadline(payload)
+	else
+		ResultsScreen.show(payload)
+	end
 end
 -- Let delayed animations (reward lines counting up, etc.) finish, then take the picture.
 task.wait(if scenario == "goal" then 0.3 else 2.5)

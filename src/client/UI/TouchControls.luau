@@ -21,7 +21,8 @@ local C = Theme.Colors
 local localPlayer = Players.LocalPlayer
 local STICK_RADIUS = 70
 
-local gui: ScreenGui
+local gui: ScreenGui? = nil
+local hidden = false -- replays and the podium hide the controls
 local stickInput: InputObject? = nil
 local stickOrigin = Vector2.zero
 local stickBase: Frame
@@ -97,10 +98,11 @@ local function holdButton(button: TextButton, onChange: (boolean) -> ())
 end
 
 local function build()
-	gui = Theme.screen("TurboTouch", 4)
-	gui.Enabled = false
+	local screen = Theme.screen("TurboTouch", 4)
+	gui = screen
+	screen.Enabled = false
 	-- Touch positions are measured below the top bar, so this GUI must use the same space.
-	gui.IgnoreGuiInset = false
+	screen.IgnoreGuiInset = false
 
 	-- Left half of the screen: touch anywhere to place the stick.
 	local stickZone = Instance.new("Frame")
@@ -241,7 +243,7 @@ local function build()
 	placeAll(Theme.getScale())
 	Theme.onScaleChanged(placeAll)
 
-	gui.Parent = localPlayer:WaitForChild("PlayerGui")
+	screen.Parent = localPlayer:WaitForChild("PlayerGui")
 end
 
 function TouchControls.start()
@@ -250,12 +252,27 @@ function TouchControls.start()
 	end
 	build()
 	CarController.CarChanged:Connect(function(car)
-		gui.Enabled = car ~= nil
+		if gui then
+			gui.Enabled = car ~= nil and not hidden
+		end
 		if not car then
 			releaseStick()
 		end
 	end)
-	gui.Enabled = CarController.getCar() ~= nil
+	if gui then
+		gui.Enabled = CarController.getCar() ~= nil and not hidden
+	end
+end
+
+-- Hides the controls while a replay or the podium is on screen.
+function TouchControls.setHidden(on: boolean)
+	hidden = on
+	if gui then
+		gui.Enabled = not on and CarController.getCar() ~= nil
+		if on then
+			releaseStick()
+		end
+	end
 end
 
 return TouchControls

@@ -18,6 +18,7 @@ local BallView = require(script.Parent.BallView)
 local CameraController = require(script.Parent.CameraController)
 local CarController = require(script.Parent.CarController)
 local EffectsController = require(script.Parent.EffectsController)
+local LocalHide = require(script.Parent.LocalHide)
 
 local PowerVisuals = {}
 
@@ -30,7 +31,7 @@ type CarLook = {
 	pullBeam: Beam,
 	rocketFire: ParticleEmitter?,
 	ghostParts: { BasePart },
-	ghosted: boolean,
+	ghosted: boolean?, -- nil = needs setting again (after the car was hidden for a replay)
 }
 
 type Box = { model: Model, home: Vector3, shell: BasePart?, core: BasePart?, phase: number }
@@ -166,6 +167,18 @@ local function updateCar(look: CarLook, ballPosition: Vector3, ballShown: boolea
 	local model, chassis = look.model, look.chassis
 	local frame = chassis.CFrame
 	local t = os.clock()
+
+	if LocalHide.isHidden(model) then
+		-- A replay or the podium is showing a stand-in; keep everything of the real car out of sight.
+		look.bubble.Transparency = 1
+		look.ice.Transparency = 1
+		look.pullBeam.Enabled = false
+		if look.rocketFire then
+			look.rocketFire.Enabled = false
+		end
+		look.ghosted = nil
+		return
+	end
 
 	local shield = model:GetAttribute(A.Shield) == true
 	look.bubble.Transparency = if shield then 0 else 1

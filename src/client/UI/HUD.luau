@@ -143,7 +143,7 @@ local function buildScoreboard()
 	clockLabel = Theme.label(clock, {
 		size = UDim2.new(1, -20, 0.84, 0),
 		position = UDim2.new(0, 10, 0.08, 0),
-		text = "5:00",
+		text = MatchState.formatClock(GameConfig.Match.Length),
 		stroke = false,
 	})
 	clockNote = Theme.pill(scoreboard, {

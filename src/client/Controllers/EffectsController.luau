@@ -19,6 +19,7 @@ local Remotes = require(Shared.Net.Remotes)
 local BallView = require(script.Parent.BallView)
 local CameraController = require(script.Parent.CameraController)
 local CarController = require(script.Parent.CarController)
+local LocalHide = require(script.Parent.LocalHide)
 
 local EffectsController = {}
 
@@ -257,6 +258,18 @@ EffectsController.burst = burst
 EffectsController.shockwave = shockwave
 EffectsController.flash = flash
 
+-- A party over a spot (the podium): confetti raining down and fireworks going off overhead.
+function EffectsController.party(centre: Vector3, color: Color3)
+	confetti(centre + Vector3.new(0, 26, 0), Vector3.new(46, 4, 26), 40)
+	for i = 1, 6 do
+		local angle = i / 6 * math.pi * 2
+		local target = centre + Vector3.new(math.cos(angle) * 34, rng:NextNumber(46, 64), math.sin(angle) * 22 + 20)
+		local fireworkColor = if i % 2 == 0 then color else rgb(255, 214, 90)
+		firework(target, fireworkColor, 0.3 + i * 0.35)
+	end
+	EffectsController.play("Goal", 0.8, 1.1)
+end
+
 local function teamColor(team: unknown): Color3
 	if team == "Blue" then
 		return GameConfig.Teams.Blue.Color
@@ -302,15 +315,17 @@ local function decorateCar(model: Instance)
 	local flames = if exhaust then exhaust:WaitForChild("BoostFlames", 5) else nil
 	local megaGlow = chassis:WaitForChild("MegaGlow", 5)
 	local function refresh()
+		local shown = not LocalHide.isHidden(model)
 		if flames and flames:IsA("ParticleEmitter") and not isMine then
-			flames.Enabled = model:GetAttribute(A.Boosting) == true
+			flames.Enabled = shown and model:GetAttribute(A.Boosting) == true
 		end
 		if megaGlow and megaGlow:IsA("ParticleEmitter") then
-			megaGlow.Enabled = model:GetAttribute(A.MegaArmed) == true
+			megaGlow.Enabled = shown and model:GetAttribute(A.MegaArmed) == true
 		end
 	end
 	model:GetAttributeChangedSignal(A.Boosting):Connect(refresh)
 	model:GetAttributeChangedSignal(A.MegaArmed):Connect(refresh)
+	model:GetAttributeChangedSignal("HiddenLocally"):Connect(refresh)
 	refresh()
 end
 
@@ -324,7 +339,7 @@ local function updateMyFlames()
 	local exhaust = chassis:FindFirstChild("Exhaust")
 	local flames = if exhaust then exhaust:FindFirstChild("BoostFlames") else nil
 	if flames and flames:IsA("ParticleEmitter") then
-		flames.Enabled = not chassis.Anchored and CarController.isBoosting()
+		flames.Enabled = not chassis.Anchored and CarController.isBoosting() and not LocalHide.isHidden(car)
 	end
 end
 

@@ -158,6 +158,13 @@ function CameraController.setProvider(newProvider: Provider?)
 	end
 end
 
+-- Hands the camera back, but only if `oldProvider` is still the one placing it.
+function CameraController.releaseProvider(oldProvider: Provider)
+	if provider == oldProvider then
+		CameraController.setProvider(nil)
+	end
+end
+
 function CameraController.toggleBallCam()
 	ballCam = not ballCam
 	CameraController.BallCamChanged:Fire(ballCam)

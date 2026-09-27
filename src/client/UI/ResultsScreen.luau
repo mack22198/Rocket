@@ -1,6 +1,7 @@
 --!strict
--- End-of-match screen: win/lose, the scoreboard, Scrap earned line by line, and two progress bars: how close
--- your car is to its next evolution, and how close you are to unlocking the next car.
+-- End-of-match screen: first a big headline over the winners' podium (who won, who's MVP), then the panel
+-- with win/lose, the scoreboard, Scrap earned line by line, and two progress bars: how close your car is to
+-- its next evolution, and how close you are to unlocking the next car.
 -- This is the "okay, one more match" moment, so the progress gets the spotlight - and PLAY AGAIN is the big
 -- button. GARAGE and MENU take you back to the main menu (the menus handle all three, see GameFlow).
 
@@ -11,7 +12,6 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local MatchState = require(Shared.Match.MatchState)
-local Remotes = require(Shared.Net.Remotes)
 local Signal = require(Shared.Util.Signal)
 
 local Theme = require(script.Parent.Theme)
@@ -43,6 +43,11 @@ local againButton: TextButton
 local menuButton: TextButton
 local showToken = 0
 local lastCarId: string? = nil
+-- The headline over the podium.
+local headlineGui: ScreenGui
+local headlineTitle: TextLabel
+local headlineMvp: TextLabel
+local headlineScore: TextLabel
 
 local function clearChildren(frame: Instance)
 	for _, child in frame:GetChildren() do
@@ -242,15 +247,79 @@ local function row(parent: Instance, order: number, cells: { string }, color: Co
 	end
 end
 
-local function show(payload: { [string]: any })
+local function outcomeTitle(outcome: unknown): (string, Color3)
+	if outcome == "Win" then
+		return "🏆 VICTORY! 🏆", C.Gold
+	elseif outcome == "Draw" then
+		return "IT'S A DRAW!", C.Text
+	end
+	return "GOOD GAME!", C.Text
+end
+
+local function buildHeadline()
+	headlineGui = Theme.screen("TurboPodium", 9)
+	headlineGui.Enabled = false
+	local holder = Instance.new("Frame")
+	holder.Name = "Headline"
+	holder.Size = UDim2.fromOffset(1000, 190)
+	holder.Position = UDim2.new(0.5, 0, 0, 16)
+	holder.AnchorPoint = Vector2.new(0.5, 0)
+	holder.BackgroundTransparency = 1
+	holder.Parent = headlineGui
+	Theme.scaled(holder)
+	headlineTitle = Theme.label(holder, {
+		name = "Title",
+		size = UDim2.fromOffset(1000, 86),
+		position = UDim2.fromScale(0.5, 0),
+		anchor = Vector2.new(0.5, 0),
+		text = "",
+		font = Theme.Logo,
+	})
+	Theme.stroke(headlineTitle, rgb(40, 20, 0), 5).ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	headlineMvp = Theme.label(holder, {
+		name = "Mvp",
+		size = UDim2.fromOffset(800, 44),
+		position = UDim2.new(0.5, 0, 0, 90),
+		anchor = Vector2.new(0.5, 0),
+		text = "",
+		color = C.Gold,
+	})
+	headlineScore = Theme.pill(holder, {
+		name = "Score",
+		size = UDim2.fromOffset(280, 36),
+		position = UDim2.new(0.5, 0, 0, 140),
+		anchor = Vector2.new(0.5, 0),
+		text = "",
+		font = Theme.Caps,
+	})
+	headlineGui.Parent = localPlayer:WaitForChild("PlayerGui")
+end
+
+-- The big headline shown over the podium, before the results panel.
+function ResultsScreen.showHeadline(payload: { [string]: any })
+	local text, color = outcomeTitle(payload.outcome)
+	headlineTitle.Text = text
+	headlineTitle.TextColor3 = color
+	headlineMvp.Text = if payload.youAreMvp
+		then "⭐ YOU ARE THE MVP! ⭐"
+		elseif type(payload.mvp) == "string" and payload.mvp ~= "" then `👑 MVP: {payload.mvp}`
+		else ""
+	headlineScore.Text = `BLUE {payload.blueScore or 0}  -  {payload.orangeScore or 0} ORANGE`
+	headlineGui.Enabled = true
+	headlineTitle.Size = UDim2.fromOffset(500, 50)
+	TweenService:Create(headlineTitle, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Size = UDim2.fromOffset(1000, 86),
+	}):Play()
+end
+
+function ResultsScreen.show(payload: { [string]: any })
+	headlineGui.Enabled = false
 	showToken += 1
 	local token = showToken
 	local outcome = payload.outcome
-	title.Text = if outcome == "Win"
-		then "🏆 VICTORY! 🏆"
-		elseif outcome == "Draw" then "IT'S A DRAW!"
-		else "GOOD GAME!"
-	title.TextColor3 = if outcome == "Win" then C.Gold elseif outcome == "Draw" then C.Text else C.Muted
+	local text, color = outcomeTitle(outcome)
+	title.Text = text
+	title.TextColor3 = if outcome == "Win" or outcome == "Draw" then color else C.Muted
 	blueScore.Text = `BLUE {payload.blueScore or 0}`
 	orangeScore.Text = `{payload.orangeScore or 0} ORANGE`
 	mvpLine.Text = if payload.youAreMvp
@@ -380,6 +449,8 @@ local function show(payload: { [string]: any })
 end
 
 function ResultsScreen.hide()
+	headlineGui.Enabled = false
+	showToken += 1
 	if gui.Enabled then
 		gui.Enabled = false
 		Theme.focus(nil)
@@ -390,13 +461,10 @@ function ResultsScreen.isOpen(): boolean
 	return gui.Enabled
 end
 
+-- (GameFlow shows the headline and then the panel when the match results arrive.)
 function ResultsScreen.start()
 	build()
-	Remotes.MatchResults.OnClientEvent:Connect(function(payload: any)
-		if type(payload) == "table" then
-			show(payload)
-		end
-	end)
+	buildHeadline()
 	-- The MENU button counts down to when the server sends everyone back to the menu anyway.
 	local stateObject = MatchState.getObject()
 	RunService.Heartbeat:Connect(function()

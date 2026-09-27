@@ -35,10 +35,11 @@ export type NextGoal = {
 
 local Rewards = {}
 
+-- Tuned for 3-minute matches (daily quests and the daily chest add more on top).
 Rewards.Scrap = {
-	Played = 60,
-	Win = 60,
-	Draw = 30,
+	Played = 50,
+	Win = 50,
+	Draw = 25,
 	Goal = 25,
 	Assist = 15,
 	Save = 20,
@@ -48,7 +49,7 @@ Rewards.Scrap = {
 	Style = 5,
 	MegaShot = 5,
 	Mvp = 20,
-	MatchCap = 400,
+	MatchCap = 350,
 }
 
 function Rewards.emptyStats(): MatchStats

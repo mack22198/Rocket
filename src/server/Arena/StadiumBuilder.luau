@@ -318,7 +318,9 @@ local function buildScreen(folder: Instance, centre: Vector3, facing: Vector3, w
 	)
 	PartKit.label(gui, "BlueScore", "0", white, Vector2.new(0.17, 0.58), Vector2.new(0.26, 0.52))
 	PartKit.label(gui, "OrangeScore", "0", white, Vector2.new(0.83, 0.58), Vector2.new(0.26, 0.52))
-	PartKit.label(gui, "Clock", "5:00", white, Vector2.new(0.5, 0.42), Vector2.new(0.36, 0.4))
+	local length = GameConfig.Match.Length
+	local clock = string.format("%d:%02d", length // 60, length % 60)
+	PartKit.label(gui, "Clock", clock, white, Vector2.new(0.5, 0.42), Vector2.new(0.36, 0.4))
 	PartKit.label(gui, "Message", "TURBO BALL", Palette.Gold, Vector2.new(0.5, 0.82), Vector2.new(0.36, 0.16))
 	return frame
 end

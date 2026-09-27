@@ -8,12 +8,12 @@ GameConfig.GameName = "Turbo Ball"
 
 GameConfig.Match = {
 	TeamSize = 3, -- 3v3; empty seats are filled with bots
-	Length = 300, -- 5:00 of regulation play
-	OvertimeLength = 120, -- golden-goal overtime; still tied after this = draw
+	Length = 180, -- 3:00 of regulation play: short enough for "just one more"
+	OvertimeLength = 90, -- golden-goal overtime; still tied after this = draw
 	Intermission = 5, -- after someone presses PLAY, wait this long so friends can hop into the same match
 	CountdownLength = 3, -- 3-2-1-GO before every kickoff
-	GoalCelebration = 4, -- pause between a goal and the next kickoff
-	ResultsLength = 12, -- how long the results screen stays up
+	GoalCelebration = 6.5, -- pause between a goal and the next kickoff (long enough for the replay)
+	ResultsLength = 16, -- how long the podium and results screen stay up
 	ZeroSecondsMaxWait = 8, -- at 0:00 play continues until the ball touches the floor (at most this long)
 }
 

@@ -3,6 +3,7 @@
 -- Usage (from the repository root):
 --   lune run tools/preview/export <out.json>                                       the stadium
 --   lune run tools/preview/export <out.json> showroom [carId] [stage] [yawDegrees]   the garage showroom
+--   lune run tools/preview/export <out.json> podium                                the end-of-match podium
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -112,6 +113,17 @@ local function buildStadium()
 			pivotTo(model, roblox.CFrame.fromMatrix(pos, right, up))
 			model.Parent = showcase
 		end
+	end
+
+	if which == "podium" then
+		-- The winners' podium in the middle of the pitch (instead of the ball and the item boxes).
+		local PodiumBuilder = harness.require(harness.Client.Showroom.PodiumBuilder)
+		PodiumBuilder.build(workspaceInstance, {
+			{ name = "Player1", team = "Blue", carId = "banana", stage = 2, points = 412 },
+			{ name = "Bolt (bot)", team = "Orange", carId = "monster", stage = 3, points = 250 },
+			{ name = "Sparky (bot)", team = "Blue", carId = "kart", stage = 4, points = 180 },
+		})
+		return
 	end
 
 	-- The ball on the centre spot.

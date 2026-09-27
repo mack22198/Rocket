@@ -1,6 +1,6 @@
 --!strict
 -- The game loop. Everyone starts in the main menu. Pressing PLAY puts you in the queue; a match starts a few
--- seconds after someone is waiting (3v3, 5:00 clock, goals, overtime), then results + Scrap, then back to the
+-- seconds after someone is waiting (3v3, 3:00 clock, goals, overtime), then results + Scrap, then back to the
 -- menu (or straight into the next match with PLAY AGAIN).
 -- Empty seats are filled with bots. Pressing PLAY while a match is on takes over a bot's seat straight away,
 -- and a bot takes over for anyone who leaves the match or the game.
@@ -438,6 +438,29 @@ local function scoreboard(): { { [string]: any } }
 	return rows
 end
 
+-- The podium: the MVP on top, then the two players with the most points.
+local function podiumEntries(mvp: Participant?): { { [string]: any } }
+	local ranked = table.clone(Roster.all())
+	table.sort(ranked, function(a, b)
+		return a.stats.points > b.stats.points
+	end)
+	local list = {}
+	local function add(p: Participant)
+		table.insert(list, { name = p.name, team = p.team, carId = p.def.Id, stage = p.stage, points = p.stats.points })
+	end
+	if mvp then
+		add(mvp)
+	end
+	for _, p in ranked do
+		if #list >= 3 then
+			break
+		elseif p ~= mvp then
+			add(p)
+		end
+	end
+	return list
+end
+
 local function finishMatch(aborted: boolean)
 	matchRunning = false
 	BallService.hide()
@@ -452,6 +475,7 @@ local function finishMatch(aborted: boolean)
 		end
 	end
 	local board = scoreboard()
+	local podium = podiumEntries(mvp)
 
 	if not aborted then
 		for _, p in Roster.humans() do
@@ -490,6 +514,8 @@ local function finishMatch(aborted: boolean)
 				orangeScore = orangeScore,
 				mvp = if mvp then mvp.name else "",
 				youAreMvp = mvp == p,
+				winner = winner or "",
+				podium = podium,
 				lines = summary.lines,
 				total = summary.total,
 				scrap = scrap,
