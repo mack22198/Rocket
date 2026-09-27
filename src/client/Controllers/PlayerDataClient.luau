@@ -1,6 +1,6 @@
 --!strict
--- The client's copy of this player's saved data (Scrap, cars, evolutions, daily quests), kept fresh by the
--- server.
+-- The client's copy of this player's saved data (Scrap, cars, evolutions, daily quests, style, the season),
+-- kept fresh by the server.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -9,6 +9,7 @@ local CarCatalog = require(Shared.Config.CarCatalog)
 local Cosmetics = require(Shared.Config.Cosmetics)
 local Daily = require(Shared.Config.Daily)
 local Remotes = require(Shared.Net.Remotes)
+local Season = require(Shared.Config.Season)
 local Signal = require(Shared.Util.Signal)
 
 export type Data = {
@@ -22,6 +23,7 @@ export type Data = {
 	daily: Daily.State,
 	scrapBoost: number,
 	style: Style,
+	season: Season.State,
 }
 
 -- Hats, horns and goal celebrations (see Cosmetics).
@@ -52,6 +54,7 @@ local current: Data = {
 		horn = Cosmetics.defaultFor("horn"),
 		celebration = Cosmetics.defaultFor("celebration"),
 	},
+	season = Season.newState(),
 }
 local loaded = false
 
@@ -108,6 +111,18 @@ local function readDaily(raw: any): Daily.State
 	return state
 end
 
+local function readSeason(raw: any): Season.State
+	local state = Season.newState()
+	if type(raw) == "table" then
+		for _, key in { "number", "xp", "tier" } do
+			if type(raw[key]) == "number" then
+				(state :: any)[key] = raw[key]
+			end
+		end
+	end
+	return state
+end
+
 local function apply(raw: any)
 	if type(raw) ~= "table" then
 		return
@@ -123,6 +138,7 @@ local function apply(raw: any)
 		daily = readDaily(raw.daily),
 		scrapBoost = if type(raw.scrapBoost) == "number" then raw.scrapBoost else 0,
 		style = readStyle(raw.style),
+		season = readSeason(raw.season),
 	}
 	loaded = true
 	PlayerDataClient.Changed:Fire(current)

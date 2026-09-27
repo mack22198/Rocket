@@ -25,6 +25,7 @@ local MainMenu = require(UI.MainMenu)
 local PauseMenu = require(UI.PauseMenu)
 local ReplayScreen = require(UI.ReplayScreen)
 local ResultsScreen = require(UI.ResultsScreen)
+local SeasonTrack = require(UI.SeasonTrack)
 local TouchControls = require(UI.TouchControls)
 local Transition = require(UI.Transition)
 
@@ -55,6 +56,11 @@ local PODIUM_SECONDS = 4.5
 -- The car gets no input while a menu or a replay is on screen.
 local function updateBlocked()
 	InputController.setBlocked(pauseOpen or replaying)
+end
+
+-- Is one of the menu's pop-up screens open (so the streak reward shouldn't pop up over it)?
+local function overlayOpen(): boolean
+	return HowToPlay.isOpen() or CollectionBook.isOpen() or SeasonTrack.isOpen()
 end
 
 -- The match HUD, the announcer feed and the touch buttons, together.
@@ -102,6 +108,7 @@ local function apply(target: Screen)
 		HowToPlay.close()
 		DailyRewards.close()
 		CollectionBook.close()
+		SeasonTrack.close()
 		return
 	end
 	PauseMenu.close()
@@ -116,7 +123,7 @@ local function apply(target: Screen)
 		MainMenu.show()
 		-- First visit to the menu today: here's your streak reward.
 		task.delay(0.8, function()
-			if screen == "Menu" and not HowToPlay.isOpen() and not CollectionBook.isOpen() then
+			if screen == "Menu" and not overlayOpen() then
 				DailyRewards.offerStreak()
 			end
 		end)
@@ -161,6 +168,8 @@ local function onMenuKey()
 		DailyRewards.close()
 	elseif CollectionBook.isOpen() then
 		CollectionBook.close()
+	elseif SeasonTrack.isOpen() then
+		SeasonTrack.close()
 	elseif screen == "Match" then
 		if not ResultsScreen.isOpen() then
 			PauseMenu.toggle()
@@ -189,6 +198,9 @@ function GameFlow.start()
 	end)
 	MainMenu.CollectionPressed:Connect(function()
 		CollectionBook.open()
+	end)
+	MainMenu.SeasonPressed:Connect(function()
+		SeasonTrack.open()
 	end)
 	MainMenu.StreakPressed:Connect(function()
 		DailyRewards.openStreak()
@@ -268,7 +280,7 @@ function GameFlow.start()
 	PlayerDataClient.Changed:Connect(function()
 		if screen == "Menu" then
 			showEquippedCar()
-			if not DailyRewards.isOpen() and not HowToPlay.isOpen() and not CollectionBook.isOpen() then
+			if not DailyRewards.isOpen() and not overlayOpen() then
 				DailyRewards.offerStreak()
 			end
 		end

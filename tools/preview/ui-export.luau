@@ -2,7 +2,7 @@
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
 --   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay,
---              streak, chest, collection, twist, style, fuse
+--              streak, chest, collection, twist, style, fuse, season
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -59,6 +59,7 @@ local MENU_SCENARIOS = {
 	collection = true,
 	style = true,
 	fuse = true,
+	season = true,
 }
 if MENU_SCENARIOS[scenario] and scenario ~= "queued" then
 	attrs.Phase = "Waiting"
@@ -264,6 +265,7 @@ local data = {
 		horn = "beep",
 		celebration = "fireworks",
 	},
+	season = { number = 1, xp = 1120, tier = 4 },
 }
 local carAttrs = {
 	Boost = 67,
@@ -409,6 +411,7 @@ for _, name in
 		"DailyRewards",
 		"CollectionBook",
 		"StylePanel",
+		"SeasonTrack",
 	}
 do
 	harness.sourceTransforms["src/client/UI/" .. name] = function(source)
@@ -432,6 +435,7 @@ local HowToPlay = harness.require(UI.HowToPlay)
 local ReplayScreen = harness.require(UI.ReplayScreen)
 local DailyRewards = harness.require(UI.DailyRewards)
 local CollectionBook = harness.require(UI.CollectionBook)
+local SeasonTrack = harness.require(UI.SeasonTrack)
 HUD.start()
 Announcer.start()
 ResultsScreen.start()
@@ -442,6 +446,7 @@ HowToPlay.start()
 ReplayScreen.start()
 DailyRewards.start()
 CollectionBook.start()
+SeasonTrack.start()
 if touch then
 	TouchControls.start()
 end
@@ -490,6 +495,8 @@ elseif scenario == "chest" then
 	DailyRewards.openChest()
 elseif scenario == "collection" then
 	CollectionBook.open()
+elseif scenario == "season" then
+	SeasonTrack.open()
 elseif scenario == "replay" then
 	ReplayScreen.show("Player1", "Blue", "🔥 AIR COMBO!")
 elseif scenario == "results" or scenario == "podium" then
@@ -510,6 +517,17 @@ elseif scenario == "results" or scenario == "podium" then
 		},
 		total = 216,
 		scrap = 956,
+		season = {
+			number = 1,
+			name = "Food Fight",
+			emoji = "🍔",
+			tier = 5,
+			xp = 86,
+			need = 250,
+			gained = 216,
+			rewards = { "⭐ Tier 5: 🎺 Champion Fanfare!" },
+			nextReward = "🔩 200 Scrap",
+		},
 		nextGoal = {
 			carId = "shark",
 			displayName = "Neon Shark",

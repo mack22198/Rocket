@@ -46,7 +46,7 @@ local CARDS = {
 	{
 		icon = "🔩",
 		title = "UNLOCK & EVOLVE",
-		text = "Every match earns Scrap. Spend it on new cars in the Garage, and drive them to make them evolve!",
+		text = "Matches earn Scrap for new cars and season rewards (more with friends!). Drive a car to make it evolve!",
 		color = C.Evolve,
 	},
 }

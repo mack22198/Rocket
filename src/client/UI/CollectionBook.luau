@@ -12,6 +12,7 @@ local CarCatalog = require(Shared.Config.CarCatalog)
 local CarModelBuilder = require(Shared.Cars.CarModelBuilder)
 local Cosmetics = require(Shared.Config.Cosmetics)
 local GameConfig = require(Shared.Config.GameConfig)
+local Season = require(Shared.Config.Season)
 local Signal = require(Shared.Util.Signal)
 
 local PlayerDataClient = require(script.Parent.Parent.Controllers.PlayerDataClient)
@@ -86,6 +87,11 @@ local function carEntries(): { Entry }
 	return list
 end
 
+local function seasonName(themeId: string): string
+	local theme = Season.theme(themeId)
+	return if theme then `{theme.Emoji} {theme.Name}` else "A"
+end
+
 -- A page for one kind of style item (hats, horns or goal parties).
 local function styleEntries(kind: Cosmetics.Kind): () -> { Entry }
 	return function(): { Entry }
@@ -100,7 +106,7 @@ local function styleEntries(kind: Cosmetics.Kind): () -> { Entry }
 				name = item.Name,
 				owned = owned[item.Id] == true,
 				hint = if item.Season
-					then `🏆 Season {item.Season} reward`
+					then `🏆 {seasonName(item.Season)} season reward`
 					else `🔩 {Theme.formatNumber(item.Price)} in the Garage`,
 				color = if item.Season then C.Evolve else C.Gold,
 				emoji = item.Emoji,

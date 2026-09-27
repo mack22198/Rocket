@@ -16,6 +16,7 @@ local Cosmetics = require(Shared.Config.Cosmetics)
 local Daily = require(Shared.Config.Daily)
 local GameConfig = require(Shared.Config.GameConfig)
 local Remotes = require(Shared.Net.Remotes)
+local Season = require(Shared.Config.Season)
 local Signal = require(Shared.Util.Signal)
 
 export type LifetimeStats = {
@@ -51,8 +52,9 @@ export type SavedData = {
 	carStage: { [string]: number }, -- how far each car has evolved (1 = not yet)
 	carLook: { [string]: number }, -- which unlocked stage each car shows off
 	daily: DailyData,
-	scrapBoost: number, -- matches left that pay double Scrap (a daily chest prize)
+	scrapBoost: number, -- matches left that pay double Scrap (a daily chest or season prize)
 	style: StyleData,
+	season: Season.State, -- this season's XP and the tiers that have paid out (see Season)
 }
 
 type Profile = {
@@ -66,7 +68,7 @@ local DataService = {}
 -- Fired once a player's data has loaded (before it's sent to them), so other services can bring it up to date.
 DataService.Loaded = Signal.new() :: Signal.Signal<Player>
 
-local DATA_VERSION = 4
+local DATA_VERSION = 5
 local LOAD_ATTEMPTS = 6
 local LOAD_RETRY_DELAY = 3
 
@@ -93,6 +95,7 @@ local function defaultData(): SavedData
 			horn = Cosmetics.defaultFor("horn"),
 			celebration = Cosmetics.defaultFor("celebration"),
 		},
+		season = Season.newState(),
 	}
 end
 
@@ -185,6 +188,13 @@ local function sanitize(raw: any): SavedData
 			end
 		end
 	end
+	-- Season progress (added in version 5).
+	local season = raw.season
+	if type(season) == "table" then
+		data.season.number = number(season.number, 0)
+		data.season.xp = number(season.xp, 0)
+		data.season.tier = math.min(number(season.tier, 0), Season.tierFor(data.season.xp))
+	end
 	return data
 end
 
@@ -217,6 +227,7 @@ local function serialize(data: SavedData, withSession: boolean): { [string]: any
 		daily = copyDaily(data.daily),
 		scrapBoost = data.scrapBoost,
 		style = copyStyle(data.style),
+		season = table.clone(data.season),
 	}
 	if withSession then
 		copy.session = { jobId = game.JobId, time = os.time() }
@@ -258,6 +269,7 @@ local function clientView(data: SavedData): { [string]: any }
 		daily = copyDaily(data.daily),
 		scrapBoost = data.scrapBoost,
 		style = copyStyle(data.style),
+		season = table.clone(data.season),
 	}
 end
 

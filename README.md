@@ -47,8 +47,13 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   F to arm it and your next hit blasts the ball on fire. It's earned in the match, never bought.
 - **Style and combos:** air hits, wall hits, passes and Mega Shots chain into combo goals ("🔥 3X COMBO!").
   Saves, style moves and MVP are all announced.
-- **Rewards:** everyone earns **Scrap** every match (more for winning, goals, saves and style). Scrap is the
-  only currency and there are no loot boxes.
+- **Rewards:** everyone earns **Scrap** every match (more for winning, goals, saves and style, and +25% when one
+  of your Roblox friends is in the match too). Scrap is the only currency and there are no loot boxes.
+- **Seasons:** a free reward track that changes every six weeks, starting with 🍔 **Season 1: Food Fight**. Every
+  match earns season XP (as much as the Scrap you win), and each of the 20 tiers pays out the moment you reach it:
+  Scrap, matches of double Scrap, and season-only style - a 🎺 fanfare horn, a 🌈 rainbow goal party and a 👑
+  Golden Crown at the end. There's no paid track; the menu shows your tier, what's next and the days left, and
+  the whole track is one tap away.
 - **Daily reasons to come back:** a **login streak** (more Scrap every day in a row, up to day 7), **three daily
   quests** ("Score 2 goals", "Use 5 items"...) and a **daily chest** once they're done - its three prizes are
   shown face up and you pick one (Scrap, XP for your car, or double Scrap for a few matches). Nothing is random
@@ -128,6 +133,8 @@ Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
   boost, jump height, gravity, bot skill, Mega Shot, boost pads and Studio shortcuts.
 - [`CarCatalog.luau`](src/shared/Config/CarCatalog.luau): the cars, prices and stats, and the fusion recipes.
 - [`Rewards.luau`](src/shared/Config/Rewards.luau): how much Scrap each thing is worth.
+- [`Season.luau`](src/shared/Config/Season.luau): when seasons start, how much XP a tier takes, and each season's
+  rewards.
 - [`Powers.luau`](src/shared/Config/Powers.luau): the items and car powers, how often each item turns up
   (and how much that depends on the score), and how strong they all are.
 - [`Daily.luau`](src/shared/Config/Daily.luau): the streak rewards, the daily quests and the chest prizes.
@@ -188,7 +195,7 @@ src/
   shared/   (ReplicatedStorage.Shared: used by both server and client)
     Config/       GameConfig, CarCatalog, Rewards, Evolution, Powers (items and car powers), Daily (streaks,
                   quests, daily chest), Twists (match twists and weekend events), Cosmetics (hats, horns,
-                  goal parties)
+                  goal parties), Season (the free season reward track)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay timing)
@@ -203,7 +210,8 @@ src/
     Services/     MatchService (menu -> queue -> match loop), BallService, CarService, BotService,
                   StatsService, BoostPadService, BumpService, ItemService (item boxes), PowerService
                   (using items and powers, cheese and banana traps), DailyService (streaks, quests, chest),
-                  DataService (saving), GarageService
+                  SeasonService (season XP and tier rewards), DataService (saving), GarageService (unlocking,
+                  fusing, evolving, style)
   client/   (StarterPlayerScripts.Client)
     Showroom/     ShowroomBuilder (the menu's garage showroom and its mirror-floor reflection),
                   PodiumBuilder (the winners' podium)
@@ -215,7 +223,7 @@ src/
                   cheering crowd)
     UI/           MainMenu, Garage, PauseMenu, HowToPlay, HUD, Announcer, ResultsScreen, ReplayScreen,
                   DailyRewards (streak and chest pop-ups), CollectionBook, StylePanel (the garage's STYLE tab),
-                  TouchControls, Transition, Theme
+                  SeasonTrack (every tier of the season), TouchControls, Transition, Theme
 tests/      Lune unit tests (run outside Roblox)
 tools/      Offline previews of the 3D world and the UI
 ```
@@ -246,7 +254,7 @@ tools/      Offline previews of the 3D world and the UI
 Ideas from the design, roughly in order:
 
 1. A bigger lobby hub with a practice area, mini-games and secrets.
-2. Seasons (Spaceball, Dinosaurs, Pirates, Candy...) with new arenas and cars.
+2. More season themes (Spaceball, Dinosaurs, Pirates, Candy...) with their own rewards, arenas and cars.
 3. More fusions (Shark + Banana, Kart + Hot Dog...).
 
 ## Known limitations

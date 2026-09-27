@@ -1,7 +1,8 @@
 --!strict
 -- End-of-match screen: first a big headline over the winners' podium (who won, who's MVP), then the panel
--- with win/lose, the scoreboard, Scrap earned line by line, and two progress bars: how close your car is to
--- its next evolution, and how close you are to unlocking the next car.
+-- with win/lose, the scoreboard, Scrap earned line by line, and three progress bars: how close your car is to
+-- its next evolution, how far along the season's reward track you are, and how close you are to unlocking the
+-- next car.
 -- This is the "okay, one more match" moment, so the progress gets the spotlight - and PLAY AGAIN is the big
 -- button. GARAGE and MENU take you back to the main menu (the menus handle all three, see GameFlow).
 
@@ -38,6 +39,7 @@ local rewardList: Frame
 local totalLabel: TextLabel
 local board: Frame
 local carProgress: Progress
+local seasonProgress: Progress
 local unlockProgress: Progress
 local againButton: TextButton
 local menuButton: TextButton
@@ -70,8 +72,9 @@ local function section(parent: Instance, name: string, size: UDim2, position: UD
 	return frame
 end
 
-local function progressCard(parent: Instance, name: string, position: UDim2, color: Color3): Progress
-	local card = section(parent, name, UDim2.new(0.5, -6, 0, 86), position)
+-- One of the three progress cards along the bottom (`column` 0, 1 or 2).
+local function progressCard(parent: Instance, name: string, column: number, color: Color3): Progress
+	local card = section(parent, name, UDim2.new(1 / 3, -8, 0, 86), UDim2.new(column / 3, column * 4, 0, 428))
 	local cardTitle = Theme.label(card, {
 		size = UDim2.new(1, 0, 0, 24),
 		text = "",
@@ -175,9 +178,10 @@ local function build()
 	boardLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	boardLayout.Parent = board
 
-	-- Bottom: your car's evolution progress and the next car to unlock.
-	carProgress = progressCard(panel, "CarProgress", UDim2.fromOffset(0, 428), C.Evolve)
-	unlockProgress = progressCard(panel, "UnlockProgress", UDim2.new(0.5, 6, 0, 428), C.Good)
+	-- Bottom: your car's evolution, the season track and the next car to unlock.
+	carProgress = progressCard(panel, "CarProgress", 0, C.Evolve)
+	seasonProgress = progressCard(panel, "SeasonProgress", 1, C.Gold)
+	unlockProgress = progressCard(panel, "UnlockProgress", 2, C.Good)
 
 	local buttons = Instance.new("Frame")
 	buttons.Name = "Buttons"
@@ -410,20 +414,46 @@ function ResultsScreen.show(payload: { [string]: any })
 		}):Play()
 		carProgress.bar.fill.Visible = true
 		if progress.ready then
-			carProgress.note.Text = `✨ READY TO EVOLVE into the {progress.nextName}! Open the Garage.`
+			carProgress.note.Text = "✨ Ready to evolve! Open the Garage."
 			carProgress.note.TextColor3 = C.Gold
 		elseif progress.nextStage then
 			carProgress.note.Text =
-				`{Theme.formatNumber(math.max(0, progress.xpForNext - progress.xp))} XP until it evolves into the {progress.nextName}`
+				`{Theme.formatNumber(math.max(0, progress.xpForNext - progress.xp))} XP until it evolves`
 			carProgress.note.TextColor3 = C.Muted
 		else
-			carProgress.note.Text = "⭐ Fully evolved - what a car!"
+			carProgress.note.Text = "⭐ Fully evolved!"
 			carProgress.note.TextColor3 = C.Gold
 		end
 	else
 		carProgress.title.Text = "🚗 Your car"
 		carProgress.bar.set(0)
 		carProgress.note.Text = ""
+	end
+
+	-- The season track (any tiers reached this match have already paid out).
+	local season = payload.season
+	if type(season) == "table" and type(season.tier) == "number" then
+		seasonProgress.title.Text = `{season.emoji or "⭐"} TIER {season.tier}   +{season.gained or 0} XP`
+		local need = if type(season.need) == "number" and season.need > 0 then season.need else 1
+		local into = if type(season.xp) == "number" then season.xp else 0
+		seasonProgress.bar.set(0)
+		TweenService:Create(seasonProgress.bar.fill, TweenInfo.new(1.2, Enum.EasingStyle.Quad), {
+			Size = UDim2.fromScale(math.clamp(into / need, 0, 1), 1),
+		}):Play()
+		seasonProgress.bar.fill.Visible = true
+		local reached = if type(season.rewards) == "table" then season.rewards else {}
+		if #reached > 0 then
+			local latest = tostring(reached[#reached])
+			seasonProgress.note.Text = if #reached > 1 then `{latest} (and {#reached - 1} more!)` else latest
+			seasonProgress.note.TextColor3 = C.Gold
+		else
+			seasonProgress.note.Text = `Next: {season.nextReward or "?"} ({need - into} XP)`
+			seasonProgress.note.TextColor3 = C.Muted
+		end
+	else
+		seasonProgress.title.Text = "⭐ Season"
+		seasonProgress.bar.set(0)
+		seasonProgress.note.Text = ""
 	end
 
 	-- The next car to unlock.
@@ -438,8 +468,8 @@ function ResultsScreen.show(payload: { [string]: any })
 		unlockProgress.bar.fill.Visible = true
 		unlockProgress.bar.fill.BackgroundColor3 = if goal.canAfford then C.Gold else C.Good
 		unlockProgress.note.Text = if goal.canAfford
-			then `You can unlock the {goal.displayName} now!`
-			else `{goal.remaining} more Scrap to unlock it. One more match?`
+			then "You can unlock it now!"
+			else `{goal.remaining} more Scrap. One more match?`
 		unlockProgress.note.TextColor3 = if goal.canAfford then C.Gold else C.Muted
 	else
 		unlockProgress.title.Text = "🏆 Every car unlocked!"

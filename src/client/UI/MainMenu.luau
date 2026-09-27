@@ -1,7 +1,8 @@
 --!strict
 -- The main menu: where you start, and where you come back to after a match. Your car turns on its turntable in
 -- the garage showroom behind it; the big buttons are on the left - PLAY, GARAGE, HOW TO PLAY and COLLECTION -
--- and on the right are your Scrap, the car you're saving up for, today's quests and the daily chest.
+-- and on the right are your Scrap, the car you're saving up for, today's quests, the daily chest and how far
+-- you are along this season's reward track.
 --
 -- After PLAY you either drop straight into a match that's already going (taking over from a bot), or wait a few
 -- seconds for the next one to start, so friends who press PLAY together end up in the same match.
@@ -18,6 +19,7 @@ local Evolution = require(Shared.Config.Evolution)
 local MatchState = require(Shared.Match.MatchState)
 local Remotes = require(Shared.Net.Remotes)
 local Rewards = require(Shared.Config.Rewards)
+local Season = require(Shared.Config.Season)
 local Signal = require(Shared.Util.Signal)
 local Twists = require(Shared.Config.Twists)
 
@@ -33,6 +35,7 @@ MainMenu.HowToPlayPressed = Signal.new() :: Signal.Signal<>
 MainMenu.CollectionPressed = Signal.new() :: Signal.Signal<>
 MainMenu.StreakPressed = Signal.new() :: Signal.Signal<>
 MainMenu.ChestPressed = Signal.new() :: Signal.Signal<>
+MainMenu.SeasonPressed = Signal.new() :: Signal.Signal<>
 
 local C = Theme.Colors
 local rgb = Color3.fromRGB
@@ -58,10 +61,12 @@ local scrapPill: TextLabel
 local nextName: TextLabel
 local nextAmount: TextLabel
 local nextBar: Theme.Bar
-local carName: TextLabel
-local carLine: TextLabel
-local carBar: Theme.Bar
-local carXp: TextLabel
+local seasonTitle: TextLabel
+local seasonDays: TextLabel
+local seasonTier: TextLabel
+local seasonNext: TextLabel
+local seasonBar: Theme.Bar
+local seasonXp: TextLabel
 -- Daily quests
 type QuestRow = {
 	frame: Frame,
@@ -476,46 +481,69 @@ local function buildRight()
 		stroke = false,
 	})
 
-	-- The car you're driving, and how close it is to evolving.
-	local car = Theme.panel(right, "Car", UDim2.fromOffset(380, 100), UDim2.fromOffset(416, 696), Vector2.new(1, 1))
-	car.BackgroundTransparency = 0.2
-	Theme.label(car, {
-		size = UDim2.fromOffset(200, 14),
+	-- The season: which tier you're on and what's next. Opens the season track.
+	local season =
+		Theme.panel(right, "Season", UDim2.fromOffset(380, 100), UDim2.fromOffset(416, 696), Vector2.new(1, 1))
+	season.BackgroundTransparency = 0.2
+	seasonTitle = Theme.label(season, {
+		name = "Title",
+		size = UDim2.fromOffset(250, 14),
 		position = UDim2.fromOffset(16, 10),
-		text = "YOUR CAR",
-		font = Theme.Caps,
-		color = C.Muted,
-		align = Enum.TextXAlignment.Left,
-		stroke = false,
-	})
-	carName = Theme.label(car, {
-		name = "Name",
-		size = UDim2.new(1, -32, 0, 28),
-		position = UDim2.fromOffset(16, 26),
-		text = "",
-		align = Enum.TextXAlignment.Left,
-	})
-	carLine = Theme.label(car, {
-		name = "Rarity",
-		size = UDim2.new(1, -32, 0, 14),
-		position = UDim2.fromOffset(16, 56),
 		text = "",
 		font = Theme.Caps,
 		align = Enum.TextXAlignment.Left,
 		stroke = false,
 	})
-	carBar = Theme.bar(car, UDim2.new(1, -32, 0, 10), UDim2.fromOffset(16, 76), C.Evolve)
-	carXp = Theme.label(car, {
-		name = "Xp",
-		size = UDim2.fromOffset(200, 14),
-		position = UDim2.new(1, -16, 0, 56),
+	seasonDays = Theme.label(season, {
+		name = "Days",
+		size = UDim2.fromOffset(110, 14),
+		position = UDim2.new(1, -16, 0, 10),
 		anchor = Vector2.new(1, 0),
 		text = "",
-		font = Theme.Body,
+		font = Theme.Caps,
 		color = C.Muted,
 		align = Enum.TextXAlignment.Right,
 		stroke = false,
 	})
+	seasonTier = Theme.label(season, {
+		name = "Tier",
+		size = UDim2.fromOffset(140, 28),
+		position = UDim2.fromOffset(16, 26),
+		text = "",
+		color = C.Gold,
+		align = Enum.TextXAlignment.Left,
+	})
+	seasonNext = Theme.label(season, {
+		name = "Next",
+		size = UDim2.new(1, -170, 0, 22),
+		position = UDim2.new(1, -16, 0, 30),
+		anchor = Vector2.new(1, 0),
+		text = "",
+		font = Theme.Body,
+		align = Enum.TextXAlignment.Right,
+		stroke = false,
+	})
+	seasonXp = Theme.label(season, {
+		name = "Xp",
+		size = UDim2.new(1, -32, 0, 14),
+		position = UDim2.fromOffset(16, 58),
+		text = "",
+		font = Theme.Body,
+		color = C.Muted,
+		align = Enum.TextXAlignment.Left,
+		stroke = false,
+	})
+	seasonBar = Theme.bar(season, UDim2.new(1, -32, 0, 10), UDim2.fromOffset(16, 76), C.Gold)
+	local open = Instance.new("TextButton")
+	open.Name = "Open"
+	open.Text = ""
+	open.Size = UDim2.fromScale(1, 1)
+	open.BackgroundTransparency = 1
+	open.ZIndex = 5
+	open.Parent = season
+	open.Activated:Connect(function()
+		MainMenu.SeasonPressed:Fire()
+	end)
 end
 
 local function build()
@@ -620,25 +648,23 @@ local function refreshData()
 		nextBar.set(1)
 	end
 
-	local def = CarCatalog.get(data.equipped) or (CarCatalog.get(CarCatalog.StarterId) :: CarCatalog.CarDef)
-	local look = data.carLook[def.Id] or 1
-	local stage = data.carStage[def.Id] or 1
-	local progress = Evolution.progress(def, data.carXp[def.Id] or 0, stage)
-	local rarity = CarCatalog.Rarities[def.Rarity]
-	carName.Text = `{def.Emoji} {CarCatalog.stageName(def, look)}`
-	carLine.Text = `{string.upper(def.Rarity)}  ·  STAGE {stage} OF {progress.maxStage}`
-	carLine.TextColor3 = if rarity then rarity.Color else C.Muted
-	if progress.nextStage then
-		carBar.set(progress.fraction)
-		carXp.Text = if progress.ready
-			then "READY TO EVOLVE!"
-			else `{Theme.formatNumber(progress.xp)} / {Theme.formatNumber(progress.xpForNext)} XP`
-		carXp.TextColor3 = if progress.ready then C.Gold else C.Muted
-	else
-		carBar.set(1)
-		carXp.Text = "FULLY EVOLVED"
-		carXp.TextColor3 = C.Gold
-	end
+	-- This season.
+	local day = PlayerDataClient.today()
+	local info = Season.at(day)
+	local current = data.season.number == info.number
+	local tier = if current then data.season.tier else 0
+	local xp = if current then data.season.xp else 0
+	local into = xp - tier * Season.XpPerTier
+	seasonTitle.Text = `{info.theme.Emoji} SEASON {info.number} · {string.upper(info.theme.Name)}`
+	seasonTitle.TextColor3 = info.theme.Color
+	local days = Season.daysLeft(day)
+	seasonDays.Text = if days <= 1 then "LAST DAY!" else `⏳ {days} DAYS LEFT`
+	seasonTier.Text = `⭐ TIER {tier}`
+	local emoji, text = Season.describe(Season.rewardFor(info.theme, tier + 1))
+	seasonNext.Text = `NEXT: {emoji} {text}`
+	seasonXp.Text = `{Theme.formatNumber(into)} / {Theme.formatNumber(Season.XpPerTier)} XP · TAP TO SEE EVERY REWARD`
+	seasonBar.set(into / Season.XpPerTier)
+	seasonBar.fill.BackgroundColor3 = info.theme.Color
 
 	evolveReady = false
 	for id in data.owned do

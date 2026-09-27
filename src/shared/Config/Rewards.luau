@@ -50,6 +50,7 @@ Rewards.Scrap = {
 	MegaShot = 5,
 	Mvp = 20,
 	MatchCap = 350,
+	FriendBonus = 0.25, -- +25% when one of your Roblox friends is in the match too
 }
 
 function Rewards.emptyStats(): MatchStats

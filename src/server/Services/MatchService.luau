@@ -32,6 +32,7 @@ local DailyService = require(script.Parent.DailyService)
 local DataService = require(script.Parent.DataService)
 local ItemService = require(script.Parent.ItemService)
 local PowerService = require(script.Parent.PowerService)
+local SeasonService = require(script.Parent.SeasonService)
 local StatsService = require(script.Parent.StatsService)
 
 type Participant = Roster.Participant
@@ -516,6 +517,39 @@ local function podiumEntries(mvp: Participant?): { { [string]: any } }
 	return list
 end
 
+-- Are these two players Roblox friends? (Each pair is only asked about once.)
+local friendsCache: { [string]: boolean } = {}
+local function areFriends(a: Player, b: Player): boolean
+	local key = `{math.min(a.UserId, b.UserId)}:{math.max(a.UserId, b.UserId)}`
+	local known = friendsCache[key]
+	if known ~= nil then
+		return known
+	end
+	local ok, result = pcall(function()
+		return a:IsFriendsWithAsync(b.UserId)
+	end)
+	local friends = ok and result == true
+	if ok then
+		friendsCache[key] = friends
+	end
+	return friends
+end
+
+-- Is one of this player's friends in the match with them (on either team)?
+local function playingWithFriends(p: Participant): boolean
+	local player = p.player
+	if not player then
+		return false
+	end
+	for _, other in Roster.humans() do
+		local otherPlayer = other.player
+		if other ~= p and otherPlayer and otherPlayer.Parent == Players and areFriends(player, otherPlayer) then
+			return true
+		end
+	end
+	return false
+end
+
 local function finishMatch(aborted: boolean)
 	matchRunning = false
 	BallService.hide()
@@ -545,6 +579,12 @@ local function finishMatch(aborted: boolean)
 			if event and event.ScrapMultiplier > 1 then
 				local bonus = math.floor(summary.total * (event.ScrapMultiplier - 1))
 				table.insert(summary.lines, { label = `{event.Emoji} {event.Name}!`, amount = bonus })
+				summary.total += bonus
+			end
+			-- Playing with friends pays a little extra.
+			if playingWithFriends(p) then
+				local bonus = math.floor(summary.total * Rewards.Scrap.FriendBonus)
+				table.insert(summary.lines, { label = "🤝 Playing with friends!", amount = bonus })
 				summary.total += bonus
 			end
 			-- A daily chest prize: double Scrap for a few matches.
@@ -580,6 +620,13 @@ local function finishMatch(aborted: boolean)
 				scrap = data.scrap
 				owned = table.clone(data.owned)
 			end)
+			-- The season track moves on by as much as the Scrap they won (and pays out any tiers reached).
+			local season = SeasonService.recordMatch(player, summary.total)
+			local latest = DataService.get(player)
+			if latest then
+				scrap = latest.scrap
+				owned = table.clone(latest.owned)
+			end
 			Remotes.MatchResults:FireClient(player, {
 				outcome = outcome,
 				team = p.team,
@@ -590,6 +637,7 @@ local function finishMatch(aborted: boolean)
 				winner = winner or "",
 				podium = podium,
 				questsDone = questsDone,
+				season = season,
 				lines = summary.lines,
 				total = summary.total,
 				scrap = scrap,

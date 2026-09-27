@@ -8,6 +8,7 @@ local SoundService = game:GetService("SoundService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Cosmetics = require(Shared.Config.Cosmetics)
+local Season = require(Shared.Config.Season)
 local Remotes = require(Shared.Net.Remotes)
 local Signal = require(Shared.Util.Signal)
 
@@ -91,7 +92,8 @@ function StylePanel.refresh()
 			tile.status.Text = "OWNED"
 			tile.status.TextColor3 = C.Text
 		elseif def.Season then
-			tile.status.Text = `🏆 SEASON {def.Season}`
+			local theme = Season.theme(def.Season)
+			tile.status.Text = if theme then `🏆 {string.upper(theme.Name)}` else "🏆 SEASON"
 			tile.status.TextColor3 = C.Evolve
 		else
 			tile.status.Text = `🔩 {Theme.formatNumber(def.Price)}`
@@ -129,7 +131,9 @@ function StylePanel.refresh()
 		primaryButton.Text = "USE THIS"
 		Theme.setButtonColor(primaryButton, C.Good)
 	elseif def.Season then
-		statusLabel.Text = `A reward on the Season {def.Season} track - keep playing to earn it!`
+		local theme = Season.theme(def.Season)
+		local name = if theme then `{theme.Emoji} {theme.Name}` else "season"
+		statusLabel.Text = `A reward on the {name} season track - keep playing to earn it!`
 		primaryButton.Text = "🏆 SEASON REWARD"
 		Theme.setButtonColor(primaryButton, C.PanelLight, C.Muted)
 	elseif data.scrap >= def.Price then

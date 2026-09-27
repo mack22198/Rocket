@@ -1,7 +1,8 @@
 --!strict
 -- Collectible style: hats that sit on your car's roof, horns you honk in a match (H), and the celebration that
 -- goes off when YOU score. Only looks and sounds - nothing here changes how a car drives.
--- Prices are fixed and shown up front in the garage's STYLE tab; a few come only from the season track.
+-- Prices are fixed and shown up front in the garage's STYLE tab; a few come only from a season's free reward
+-- track (see Season).
 
 local Cosmetics = {}
 
@@ -15,7 +16,7 @@ export type CosmeticDef = {
 	Description: string,
 	Price: number, -- Scrap (0 = free)
 	Default: boolean?, -- everyone starts with it
-	Season: number?, -- only from that season's reward track
+	Season: string?, -- only from the reward track of the season with this theme (see Season.Themes)
 	Sound: string?, -- horns: which sound, and how high it plays
 	Pitch: number?,
 	Word: string?, -- horns: the word that pops up over your car
@@ -64,9 +65,9 @@ Cosmetics.List = {
 		Kind = "topper",
 		Name = "Golden Crown",
 		Emoji = "👑",
-		Description = "For the champions of Season 1.",
+		Description = "The top prize of the Food Fight season.",
 		Price = 0,
-		Season = 1,
+		Season = "foodfight",
 	},
 	-- Horns
 	{
@@ -130,9 +131,9 @@ Cosmetics.List = {
 		Kind = "horn",
 		Name = "Champion Fanfare",
 		Emoji = "🎺",
-		Description = "Season 1's winning tune.",
+		Description = "A winning tune from the Food Fight season.",
 		Price = 0,
-		Season = 1,
+		Season = "foodfight",
 		Sound = "rbxasset://sounds/electronicpingshort.wav",
 		Pitch = 1.9,
 		Word = "TA-DA!",
@@ -184,9 +185,9 @@ Cosmetics.List = {
 		Kind = "celebration",
 		Name = "Rainbow Blast",
 		Emoji = "🌈",
-		Description = "Season 1's rainbow over the goal.",
+		Description = "A rainbow over the goal, from the Food Fight season.",
 		Price = 0,
-		Season = 1,
+		Season = "foodfight",
 	},
 } :: { CosmeticDef }
 
