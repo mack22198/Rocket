@@ -166,8 +166,10 @@ local function showroomStand(folder: Instance, def: CarCatalog.CarDef, position:
 	subtitle.TextScaled = true
 	subtitle.TextColor3 = rarity.Color
 	subtitle.TextStrokeTransparency = 0.3
-	subtitle.Text = if def.Price == 0
-		then `{string.upper(def.Rarity)}  ·  STARTER CAR`
+	local base, flavor = CarCatalog.parents(def)
+	subtitle.Text = if base and flavor
+		then `FUSED  ·  {string.upper(base.DisplayName)} + {string.upper(flavor.DisplayName)}`
+		elseif def.Price == 0 then `{string.upper(def.Rarity)}  ·  STARTER CAR`
 		else `{string.upper(def.Rarity)}  ·  {def.Price} SCRAP`
 	subtitle.Parent = tag
 

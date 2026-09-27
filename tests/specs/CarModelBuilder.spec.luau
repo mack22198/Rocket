@@ -1,4 +1,5 @@
 -- Builds every car with real (Lune) Roblox instances, which rejects unknown properties or bad values.
+-- Fused cars are built from their base car's design, so they're checked here too.
 local CarCatalog = require(Shared.Config.CarCatalog)
 local CarModelBuilder = require(Shared.Cars.CarModelBuilder)
 
@@ -41,7 +42,9 @@ return function(t)
 				end
 			end
 			expect.atLeast(parts, 8)
-			if def.Id ~= "ufo" then
+			-- (Saucers hover on pads instead of wheels.)
+			local shape = if def.Fusion then def.Fusion.Base else def.Id
+			if shape ~= "ufo" then
 				expect.equal(hubs, 4, "four turning wheels")
 				expect.atLeast(wheelParts, 12)
 			end

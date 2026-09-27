@@ -3,7 +3,8 @@
 --
 -- Items come out of the spinning "?" boxes on the pitch. You hold one at a time and use it whenever you like
 -- (R / RB / ITEM). A team that's behind gets the better items more often, so matches stay close.
--- Powers belong to cars: every car has its own (G / LB / POWER), which recharges after each use.
+-- Powers belong to cars: every car has its own (G / LB / POWER), which recharges after each use. A fused car
+-- (see CarCatalog) gets a combo: both its parents' powers at once, with a longer recharge.
 --
 -- This is plain data plus a few pure helpers, so the server, the clients and the tests all agree.
 
@@ -28,6 +29,7 @@ export type PowerDef = {
 	Description: string,
 	Cooldown: number,
 	Duration: number,
+	Combo: { string }?, -- a fused car's power: the ids of the two powers it does at once
 }
 
 export type Standing = "ahead" | "level" | "behind"
@@ -175,7 +177,43 @@ Powers.CarPowers = {
 		Cooldown = 14,
 		Duration = 2.5,
 	},
+	-- Fused cars
+	pizzashark = {
+		Id = "cheesydive",
+		Name = "Cheesy Dive",
+		Emoji = "🧀",
+		Color = rgb(255, 170, 60),
+		Description = "A Shark Dive that leaves a Cheese Trap behind you!",
+		Cooldown = 17,
+		Duration = 1.6,
+		Combo = { "dive", "cheese" },
+	},
+	ducksaucer = {
+		Id = "quackbeam",
+		Name = "Quack Beam",
+		Emoji = "🛸",
+		Color = rgb(200, 240, 80),
+		Description = "A Tractor Beam with a mighty QUACK that spins out cars nearby.",
+		Cooldown = 17,
+		Duration = 2.5,
+		Combo = { "beam", "quack" },
+	},
+	monstertaco = {
+		Id = "spicypound",
+		Name = "Spicy Pound",
+		Emoji = "🌶️",
+		Color = rgb(255, 96, 50),
+		Description = "A Ground Pound, then Hot Sauce: hit the ball straight after and it's a Mega Shot!",
+		Cooldown = 18,
+		Duration = 4,
+		Combo = { "pound", "hotsauce" },
+	},
 } :: { [string]: PowerDef }
+
+local powersById: { [string]: PowerDef } = {}
+for _, def in Powers.CarPowers do
+	powersById[def.Id] = def
+end
 
 Powers.Tuning = {
 	-- Item boxes
@@ -235,6 +273,27 @@ end
 -- The power that comes with a car (every car has one).
 function Powers.forCar(carId: string): PowerDef
 	return Powers.CarPowers[carId] or Powers.CarPowers.kart
+end
+
+-- The car power with this id (a combo too), or nil.
+function Powers.power(id: string): PowerDef?
+	return powersById[id]
+end
+
+-- The powers a power is made of: a combo's two halves, or just the power itself.
+function Powers.components(power: PowerDef): { PowerDef }
+	local combo = power.Combo
+	if not combo then
+		return { power }
+	end
+	local parts = {}
+	for _, id in combo do
+		local part = powersById[id]
+		if part then
+			table.insert(parts, part)
+		end
+	end
+	return parts
 end
 
 -- Is your team ahead, level or behind?
@@ -409,6 +468,15 @@ function Powers.botWantsPower(power: string, v: BotView): boolean
 		return v.nearestEnemy < t.PoundRadius * 0.6 or (v.shotLinedUp and v.ballDistance < t.PoundBallRadius * 0.7)
 	elseif power == "beam" then
 		return v.role == "attack" and v.ballInFront and v.ballDistance < 40
+	end
+	local combo = powersById[power]
+	if combo and combo.Combo then
+		-- A combo is worth using whenever either half would be.
+		for _, part in Powers.components(combo) do
+			if Powers.botWantsPower(part.Id, v) then
+				return true
+			end
+		end
 	end
 	return false
 end

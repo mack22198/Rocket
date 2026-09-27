@@ -2,8 +2,8 @@
 -- Finds this player's car and drives it every physics step. The server gives each player physics ownership
 -- of their own car, so steering and jumping respond instantly on their screen.
 -- Items and powers are the server's call, but the ones that launch your own car (Super Spring, Nitro Dash,
--- Shark Dive) launch it here the moment you press the button, and the server tells this car when it has been
--- spun out, slowed down or frozen.
+-- Shark Dive and the Pizza Shark's Cheesy Dive) launch it here the moment you press the button, and the
+-- server tells this car when it has been spun out, slowed down or frozen.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -202,7 +202,12 @@ function CarController.usePower()
 		return
 	end
 	powerUsedAt = now
-	launchNow(power, chassis)
+	local def = Powers.power(power)
+	if def then
+		for _, part in Powers.components(def) do
+			launchNow(part.Id, chassis)
+		end
+	end
 	Remotes.UsePower:FireServer()
 end
 

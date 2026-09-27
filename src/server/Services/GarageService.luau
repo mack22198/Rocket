@@ -1,6 +1,7 @@
 --!strict
--- Unlocking, equipping and evolving cars. Prices are fixed and shown up front: no random boxes.
+-- Unlocking, fusing, equipping and evolving cars. Prices are fixed and shown up front: no random boxes.
 -- Evolving is free once a car has earned enough XP; players can also switch back to any look they've unlocked.
+-- Fusing makes a new car out of two you own (see CarCatalog), and you keep both of them.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -14,7 +15,7 @@ local DataService = require(script.Parent.DataService)
 
 local GarageService = {}
 
-type Result = { ok: boolean, message: string, evolved: boolean? }
+type Result = { ok: boolean, message: string, evolved: boolean?, fused: boolean? }
 
 local lastRequest: { [Player]: number } = {}
 
@@ -82,8 +83,24 @@ local function handle(player: Player, action: unknown, carId: unknown, extra: un
 		return { ok = false, message = "Your garage is still loading..." }
 	end
 
-	if action == "unlock" then
-		if data.owned[def.Id] then
+	if action == "fuse" then
+		-- Two cars you own make a new one (and you keep both).
+		local ok, reason = CarCatalog.canFuse(def, data.owned, data.scrap)
+		local fusion = def.Fusion
+		if not ok or not fusion then
+			return { ok = false, message = reason or "That car can't be fused." }
+		end
+		DataService.update(player, function(d)
+			d.scrap -= fusion.Cost
+			d.owned[def.Id] = true
+			d.equipped = def.Id
+		end)
+		DataService.saveNow(player)
+		return { ok = true, fused = true, message = `🧬 You made the {def.DisplayName}! You'll drive it next match.` }
+	elseif action == "unlock" then
+		if def.Fusion then
+			return { ok = false, message = "Fuse this car from its two parts." }
+		elseif data.owned[def.Id] then
 			return { ok = false, message = "You already own this car." }
 		end
 		if data.scrap < def.Price then

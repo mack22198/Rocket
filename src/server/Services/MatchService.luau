@@ -190,8 +190,9 @@ end
 
 local function makeBot(team: Team, slot: number): Participant
 	botCounter += 1
-	local names = GameConfig.Bots.Names
-	local carIds = GameConfig.Bots.CarIds
+	local bots = GameConfig.Bots
+	local names = bots.Names
+	local carIds = if rng:NextNumber() < bots.FusedChance then bots.FusedCarIds else bots.CarIds
 	local def = CarCatalog.get(carIds[rng:NextInteger(1, #carIds)])
 		or CarCatalog.get(CarCatalog.StarterId) :: CarCatalog.CarDef
 	local bot = Roster.newParticipant({

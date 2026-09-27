@@ -2,7 +2,7 @@
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
 --   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay,
---              streak, chest, collection, twist, style
+--              streak, chest, collection, twist, style, fuse
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -58,6 +58,7 @@ local MENU_SCENARIOS = {
 	chest = true,
 	collection = true,
 	style = true,
+	fuse = true,
 }
 if MENU_SCENARIOS[scenario] and scenario ~= "queued" then
 	attrs.Phase = "Waiting"
@@ -449,7 +450,8 @@ local inMatch = not MENU_SCENARIOS[scenario] and scenario ~= "live"
 local overlay = inMatch and scenario ~= "podium" and scenario ~= "replay" and scenario ~= "results"
 HUD.setVisible(overlay)
 Announcer.setVisible(overlay)
-if not inMatch and scenario ~= "garage" and scenario ~= "evolve" and scenario ~= "style" then
+local GARAGE_SCENARIOS = { garage = true, evolve = true, style = true, fuse = true }
+if not inMatch and not GARAGE_SCENARIOS[scenario] then
 	MainMenu.setQueued(scenario == "queued")
 	MainMenu.show()
 end
@@ -478,6 +480,10 @@ elseif scenario == "pause" then
 elseif scenario == "evolve" then
 	data.carXp.pizza = 520
 	Garage.open("pizza")
+elseif scenario == "fuse" then
+	data.owned.shark = true
+	data.scrap = 1240
+	Garage.open("pizzashark")
 elseif scenario == "streak" then
 	DailyRewards.openStreak()
 elseif scenario == "chest" then

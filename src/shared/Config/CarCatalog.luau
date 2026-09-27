@@ -2,7 +2,7 @@
 -- The collectible cars. Rarity is about looks and bragging rights, never raw power:
 -- every car trades one strength for a weakness so the rarest car is not simply the best.
 
-export type Rarity = "Common" | "Rare" | "Epic" | "Legendary"
+export type Rarity = "Common" | "Rare" | "Epic" | "Legendary" | "Fused"
 
 export type CarStats = {
 	Speed: number, -- top speed multiplier
@@ -14,12 +14,16 @@ export type CarStats = {
 	Jump: number,
 }
 
+-- A fused car is made from two cars you own (they're kept): the Base gives its shape, the Flavor its colours.
+export type Fusion = { Base: string, Flavor: string, Cost: number }
+
 export type CarDef = {
 	Id: string,
 	DisplayName: string,
 	Emoji: string,
 	Rarity: Rarity,
-	Price: number, -- Scrap cost (0 = starter car)
+	Price: number, -- Scrap cost (0 = starter car, or a fused car)
+	Fusion: Fusion?,
 	Tagline: string,
 	Description: string,
 	Hitbox: Vector3, -- width, height, length of the physics box
@@ -36,6 +40,7 @@ CarCatalog.Rarities = {
 	Rare = { Order = 2, Color = Color3.fromRGB(60, 150, 255) },
 	Epic = { Order = 3, Color = Color3.fromRGB(180, 80, 255) },
 	Legendary = { Order = 4, Color = Color3.fromRGB(255, 190, 40) },
+	Fused = { Order = 5, Color = Color3.fromRGB(255, 100, 210) },
 }
 
 local STANDARD_HITBOX = Vector3.new(5.5, 2.2, 8.5)
@@ -215,8 +220,65 @@ local cars: { CarDef } = {
 	},
 }
 
+-- Fused cars: shape from the Base, colours from the Flavor, stats halfway between the two.
+local FUSIONS = {
+	{
+		Id = "pizzashark",
+		DisplayName = "Pizza Shark",
+		Emoji = "🦈",
+		Base = "shark",
+		Flavor = "pizza",
+		Tagline = "Hungry hunter",
+		Description = "A Neon Shark with extra cheese. Dives through defenders and leaves cheese behind.",
+		StageNames = { "Pizza Shark", "Deluxe Pizza Shark", "Lava Pizza Shark", "Galaxy Pizza Shark" },
+	},
+	{
+		Id = "ducksaucer",
+		DisplayName = "Duck Saucer",
+		Emoji = "🛸",
+		Base = "ufo",
+		Flavor = "duck",
+		Tagline = "Quack from space",
+		Description = "A UFO piloted by a rubber duck. Its beam lifts the ball with a mighty QUACK.",
+		StageNames = { "Duck Saucer", "Disco Saucer", "Lava Saucer", "Galaxy Saucer" },
+	},
+	{
+		Id = "monstertaco",
+		DisplayName = "Monster Taco",
+		Emoji = "🛻",
+		Base = "monster",
+		Flavor = "taco",
+		Tagline = "Spicy stomper",
+		Description = "A Monster Truck from the taco stand. Its Ground Pound comes with hot sauce.",
+		StageNames = { "Monster Taco", "Spicy Monster Taco", "Lava Monster Taco", "Galaxy Monster Taco" },
+	},
+}
+
 local byId: { [string]: CarDef } = {}
 for _, def in cars do
+	byId[def.Id] = def
+end
+for _, recipe in FUSIONS do
+	local base, flavor = byId[recipe.Base], byId[recipe.Flavor]
+	assert(base and flavor, `fusion {recipe.Id} needs {recipe.Base} and {recipe.Flavor}`)
+	local stats = table.clone(base.Stats)
+	for key, value in stats do
+		(stats :: any)[key] = (value + (flavor.Stats :: any)[key]) / 2
+	end
+	local def: CarDef = {
+		Id = recipe.Id,
+		DisplayName = recipe.DisplayName,
+		Emoji = recipe.Emoji,
+		Rarity = "Fused",
+		Price = 0,
+		Fusion = { Base = recipe.Base, Flavor = recipe.Flavor, Cost = 1000 },
+		Tagline = recipe.Tagline,
+		Description = recipe.Description,
+		Hitbox = base.Hitbox,
+		Stats = stats,
+		StageNames = recipe.StageNames,
+	}
+	table.insert(cars, def)
 	byId[def.Id] = def
 end
 
@@ -224,16 +286,49 @@ function CarCatalog.get(id: string): CarDef?
 	return byId[id]
 end
 
--- Starter car first, then by price.
+-- Starter car first, then by price, and the fused cars at the end.
 function CarCatalog.ordered(): { CarDef }
 	local list = table.clone(cars)
 	table.sort(list, function(a, b)
+		local fusedA, fusedB = a.Fusion ~= nil, b.Fusion ~= nil
+		if fusedA ~= fusedB then
+			return fusedB
+		end
 		if a.Price == b.Price then
 			return a.DisplayName < b.DisplayName
 		end
 		return a.Price < b.Price
 	end)
 	return list
+end
+
+-- The two cars a fused car is made from (nil for ordinary cars).
+function CarCatalog.parents(def: CarDef): (CarDef?, CarDef?)
+	local fusion = def.Fusion
+	if not fusion then
+		return nil, nil
+	end
+	return byId[fusion.Base], byId[fusion.Flavor]
+end
+
+-- Can a player with these cars and this much Scrap fuse this car? If not, says why.
+function CarCatalog.canFuse(def: CarDef, owned: { [string]: boolean }, scrap: number): (boolean, string?)
+	local fusion = def.Fusion
+	if not fusion then
+		return false, "That car can't be fused."
+	elseif owned[def.Id] then
+		return false, "You already have this car."
+	end
+	local base, flavor = CarCatalog.parents(def)
+	for _, parent in { base, flavor } do
+		if parent and not owned[parent.Id] then
+			return false, `You need the {parent.DisplayName} first.`
+		end
+	end
+	if scrap < fusion.Cost then
+		return false, `You need {fusion.Cost - scrap} more Scrap.`
+	end
+	return true, nil
 end
 
 -- The car's name at an evolution stage (1 = as unlocked).

@@ -1,6 +1,7 @@
 --!strict
--- Using items (from the item boxes) and car powers (every car has its own), and everything they leave lying
--- around: cheese puddles and banana peels. What each one does is described in Powers.
+-- Using items (from the item boxes) and car powers (every car has its own; a fused car's does two at once),
+-- and everything they leave lying around: cheese puddles, banana peels and ketchup. What each one does is
+-- described in Powers.
 --
 -- The server decides everything, then tells the cars: a player's own client drives their car, so spin-outs,
 -- slow-downs and freezes are sent to it (CarService.applyEffect), and it launches itself straight away when its
@@ -290,18 +291,12 @@ local function quack(p: Participant, chassis: BasePart, now: number)
 	end
 end
 
-function PowerService.usePower(p: Participant)
-	local now = serverNow()
-	local chassis = readyChassis(p, now)
-	if not chassis or now < p.powerReadyAt then
-		return
-	end
-	local power = Powers.forCar(p.def.Id)
-	p.powerReadyAt = now + power.Cooldown
-	p.stats.powers += 1
+-- Does one power (a fused car's combo does two of these at once).
+local function doPower(p: Participant, power: Powers.PowerDef, chassis: BasePart, now: number)
 	local id = power.Id
 	if id == "cheese" or id == "peel" or id == "ketchup" then
 		dropHazard(p, id, chassis, power.Duration, now)
+		return -- (the drop shows its own effect)
 	elseif id == "hotsauce" then
 		setEffect(p, "hotsauce", power.Duration, now)
 	elseif id == "quack" then
@@ -316,10 +311,22 @@ function PowerService.usePower(p: Participant)
 	elseif id == "beam" then
 		setEffect(p, "beam", power.Duration, now)
 	end
-	CarService.sync(p)
-	if id ~= "cheese" and id ~= "peel" and id ~= "ketchup" then
-		fx(id, chassis.CFrame.Position, p.team, p.car)
+	fx(id, chassis.CFrame.Position, p.team, p.car)
+end
+
+function PowerService.usePower(p: Participant)
+	local now = serverNow()
+	local chassis = readyChassis(p, now)
+	if not chassis or now < p.powerReadyAt then
+		return
 	end
+	local power = Powers.forCar(p.def.Id)
+	p.powerReadyAt = now + power.Cooldown
+	p.stats.powers += 1
+	for _, part in Powers.components(power) do
+		doPower(p, part, chassis, now)
+	end
+	CarService.sync(p)
 end
 
 ---------------------------------------------------------------------------------------------------------------

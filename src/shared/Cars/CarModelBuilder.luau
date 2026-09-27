@@ -7,7 +7,8 @@
 --
 -- The cars are sporty "battle cars": chunky wheels with spoked rims under flared arches, a low glasshouse,
 -- light bars and spoilers - each dressed in its own theme (a pizza delivery hot hatch, a banana roadster, a
--- go-kart, a shark supercar, a monster truck and a flying saucer).
+-- go-kart, a shark supercar, a monster truck, a flying saucer, a taco truck, a rubber duck and a hot dog).
+-- Fused cars are built from their base car's design, repainted, with a piece of the other car added on.
 --
 -- Parts are coloured by role ("body", "accent", ...) so each evolution stage can repaint the whole car:
 -- stages 1 and 2 use the car's own colours, stage 3 turns every car into glowing lava and stage 4 into
@@ -1619,6 +1620,241 @@ designs.hotdog = {
 		end
 	end,
 }
+
+---------------------------------------------------------------------------------------------------------------
+-- Fused cars (see CarCatalog): the Base car's shape in new colours, with a piece of the Flavor car added on.
+---------------------------------------------------------------------------------------------------------------
+
+type Fused = {
+	roles: { Roles }, -- laid over the base car's own colours, at stage 1 and stage 2
+	skip: { [string]: boolean }?, -- base car parts to leave off (by name)
+	extra: (h: Vector3, stage: number, add: Add) -> (),
+}
+
+local FUSED: { [string]: Fused } = {}
+
+-- Pizza Shark: a Neon Shark made of melted cheese on a crust, covered in pepperoni, with a slice of pizza for
+-- a fin. Deluxe adds olives and green peppers.
+FUSED.pizzashark = {
+	roles = {
+		{
+			body = look(rgb(255, 200, 76)),
+			body2 = look(rgb(214, 146, 64)),
+			accent = look(rgb(255, 120, 40), NEON),
+			crust = look(rgb(196, 124, 52)),
+			pepperoni = look(rgb(186, 40, 34)),
+			olive = look(rgb(34, 30, 34)),
+			pepper = look(rgb(70, 170, 60)),
+		},
+		{ -- Deluxe: golden brown, with all the toppings
+			body = look(rgb(255, 184, 56)),
+			body2 = look(rgb(160, 100, 44)),
+			accent = look(rgb(255, 90, 30), NEON),
+			rim = look(rgb(255, 196, 70), METAL),
+		},
+	},
+	skip = { TigerStripe = true },
+	extra = function(_h, stage, add)
+		-- (The shark's bonnet rises from y -0.8 at its nose, z -4.5, to y 0.05 at the windscreen, z -1.4.)
+		local nose, belt, front, screen = -0.8, 0.05, -4.5, -1.4
+		local slope = math.atan2(belt - nose, screen - front)
+		local function onBonnet(x: number, z: number, lift: number): CFrame
+			local y = nose + (z - front) / (screen - front) * (belt - nose)
+			return CFrame.new(x, y + lift, z) * CFrame.Angles(-slope, 0, 0)
+		end
+		for _, spot in { { -1.1, -3.7 }, { 0.9, -3.3 }, { -0.3, -2.4 }, { 1.4, -2.0 }, { -1.5, -1.9 } } do
+			add(
+				"pepperoni",
+				"Cylinder",
+				Vector3.new(0.06, 0.9, 0.9),
+				onBonnet(spot[1], spot[2], 0.04) * CYL_ALONG_Y,
+				"Pepperoni"
+			)
+		end
+		for _, side in { -1, 1 } do
+			add(
+				"pepperoni",
+				"Cylinder",
+				Vector3.new(0.06, 0.8, 0.8),
+				at(side * 1.75, 0.08, 3.3) * CYL_ALONG_Y,
+				"Pepperoni"
+			)
+		end
+		badges(add, 2.33, -0.37, -0.05, 0.78, "🍕")
+		-- The dorsal fin is a slice of pizza: crust down its back edge, pepperoni on both sides.
+		box(add, "crust", Vector3.new(-0.26, 1.0, 1.58), Vector3.new(0.26, 2.55, 1.95), "Crust")
+		for _, side in { -1, 1 } do
+			add("pepperoni", "Cylinder", Vector3.new(0.05, 0.44, 0.44), at(side * 0.18, 1.5, 1.08), "Pepperoni")
+			add("pepperoni", "Cylinder", Vector3.new(0.05, 0.36, 0.36), at(side * 0.18, 1.98, 1.42), "Pepperoni")
+		end
+		if stage >= 2 then
+			for _, spot in { { 0.2, -3.9 }, { -0.9, -2.9 }, { 1.0, -2.6 }, { 0.3, -1.7 } } do
+				local where = onBonnet(spot[1], spot[2], 0.05)
+				add("olive", "Cylinder", Vector3.new(0.07, 0.42, 0.42), where * CYL_ALONG_Y, "Olive")
+				add("body", "Cylinder", Vector3.new(0.08, 0.18, 0.18), where * CYL_ALONG_Y, "OliveHole")
+			end
+			for _, spot in { { -1.6, -3.2, 30 }, { 1.75, -3.7, -25 }, { -0.9, -1.75, 60 } } do
+				local where = onBonnet(spot[1], spot[2], 0.05) * CFrame.Angles(0, math.rad(spot[3]), 0)
+				add("pepper", "Block", Vector3.new(0.16, 0.06, 0.8), where, "GreenPepper")
+			end
+		end
+	end,
+}
+
+-- Duck Saucer: a rubber-duck-yellow UFO, with a rubber duck at the controls instead of the alien. At Disco it
+-- turns purple and the pilot puts its shades on.
+FUSED.ducksaucer = {
+	roles = {
+		{
+			body = look(rgb(255, 214, 46)),
+			body2 = look(rgb(255, 150, 40)),
+			accent = look(rgb(90, 200, 255), NEON),
+			light = look(rgb(255, 150, 40), NEON),
+			glass = look(rgb(210, 245, 255), GLASS, 0.7, 0.1), -- clearer, so you can see who's flying
+			duck = look(rgb(255, 222, 60)),
+			beak = look(rgb(255, 134, 30)),
+		},
+		{ -- Disco
+			body = look(rgb(170, 100, 255), SMOOTH, 0, 0.1),
+			body2 = look(rgb(255, 210, 56)),
+			accent = look(rgb(255, 120, 230), NEON),
+			light = look(rgb(90, 232, 255), NEON),
+		},
+	},
+	skip = {
+		Alien = true,
+		AlienHead = true,
+		AlienEye = true,
+		EyeShine = true,
+		AlienAntenna = true,
+		AntennaTip = true,
+	},
+	extra = function(_h, stage, add)
+		-- (The glass dome is 3.6 wide and 3 tall, centred at y 0.45, z 0.3.)
+		add("duck", "Ellipsoid", Vector3.new(1.5, 1.1, 1.8), at(0, 0.45, 0.6), "DuckPilot")
+		add(
+			"duck",
+			"Ellipsoid",
+			Vector3.new(0.8, 0.5, 0.75),
+			at(0, 0.82, 1.35) * CFrame.Angles(math.rad(-35), 0, 0),
+			"DuckTail"
+		)
+		add("duck", "Ball", Vector3.one * 1.35, at(0, 1.18, 0.2), "DuckHead")
+		add("beak", "Ellipsoid", Vector3.new(0.8, 0.32, 0.66), at(0, 1.05, -0.52), "Beak")
+		for _, side in { -1, 1 } do
+			add("pupil", "Ball", Vector3.one * 0.26, at(side * 0.28, 1.36, -0.37), "Eye")
+			add("shine", "Ball", Vector3.one * 0.09, at(side * 0.28 + 0.04, 1.42, -0.48), "EyeShine")
+		end
+		if stage >= 2 then
+			add("dark", "Block", Vector3.new(1.05, 0.26, 0.1), at(0, 1.36, -0.5), "Shades")
+			add("light", "Block", Vector3.new(1.1, 0.05, 0.12), at(0, 1.5, -0.49), "ShadesRim")
+		end
+	end,
+}
+
+-- Monster Taco: a teal-and-yellow Monster Truck from the taco stand, with a giant taco riding in its bed.
+-- At Spicy it turns hot-sauce red with chillies on the bonnet.
+FUSED.monstertaco = {
+	roles = {
+		{
+			body = look(rgb(38, 184, 168)),
+			body2 = look(rgb(26, 124, 116)),
+			accent = look(rgb(255, 96, 64)),
+			stripe = look(rgb(255, 204, 64)),
+			rim = look(rgb(255, 204, 64), METAL),
+			shell = look(rgb(240, 184, 72)),
+			leaf = look(rgb(104, 190, 64)),
+			tomato = look(rgb(230, 52, 40)),
+			meat = look(rgb(132, 72, 40)),
+		},
+		{ -- Spicy
+			body = look(rgb(214, 56, 34)),
+			body2 = look(rgb(140, 32, 22)),
+			accent = look(rgb(255, 176, 40), NEON),
+			stripe = look(rgb(255, 150, 30), NEON),
+			rim = look(rgb(255, 196, 70), METAL),
+		},
+	},
+	skip = { Badge = true },
+	extra = function(_h, stage, add)
+		-- (The truck's sides are 2.6 out; its bed floor is at y 0.85, from z 1.3 back to 4.35.)
+		badges(add, 2.63, 1.05, 0.0, 1.3, "🌮")
+		for _, side in { -1, 1 } do
+			box(add, "stripe", Vector3.new(side * 2.59, 0.6, -4.55), Vector3.new(side * 2.64, 0.78, 4.55), "Stripe")
+		end
+		-- The taco: two halves of a crunchy shell with the filling between them.
+		for _, side in { -1, 1 } do
+			add("shell", "Cylinder", Vector3.new(0.24, 2.8, 2.8), at(side * 0.55, 1.5, 2.95), "TacoShell")
+		end
+		add("meat", "Ellipsoid", Vector3.new(0.9, 0.75, 2.3), at(0, 2.47, 2.95), "TacoMeat")
+		add("leaf", "Ellipsoid", Vector3.new(1.0, 0.45, 2.5), at(0, 2.75, 2.95), "TacoLettuce")
+		for k = 0, 3 do
+			add(
+				"tomato",
+				"Ball",
+				Vector3.one * 0.36,
+				at(if k % 2 == 0 then -0.18 else 0.18, 2.9, 2.1 + k * 0.57),
+				"TacoTomato"
+			)
+		end
+		if stage >= 2 then
+			for _, side in { -1, 1 } do
+				add(
+					"tomato",
+					"Ellipsoid",
+					Vector3.new(0.5, 0.5, 1.5),
+					at(side * 1.65, 1.4, -3.0) * CFrame.Angles(0, math.rad(side * 12), 0),
+					"Chilli"
+				)
+				add(
+					"leaf",
+					"Cylinder",
+					Vector3.new(0.3, 0.14, 0.14),
+					at(side * 1.8, 1.6, -2.3) * CYL_ALONG_Y,
+					"ChilliStem"
+				)
+			end
+		end
+	end,
+}
+
+-- Makes a fused car's design: its base car's build (without the skipped parts) plus the extras.
+local function fusedDesign(recipe: Fused, base: Design): Design
+	-- Each stage's colours: the base car's for that stage, then the fused car's own, then that stage's changes.
+	local roles: { Roles } = {}
+	for stage, over in recipe.roles do
+		local merged = table.clone(base.roles[math.min(stage, #base.roles)])
+		for _, layer in { recipe.roles[1], over } do
+			for role, value in layer do
+				merged[role] = value
+			end
+		end
+		roles[stage] = merged
+	end
+	local skip = recipe.skip or {}
+	return {
+		roles = roles,
+		antenna = base.antenna,
+		topper = base.topper,
+		build = function(h, stage, add)
+			base.build(h, stage, function(role, shape, size, cframe, name, text)
+				if not skip[name or ""] then
+					add(role, shape, size, cframe, name, text)
+				end
+			end)
+			recipe.extra(h, stage, add)
+		end,
+	}
+end
+
+for _, def in CarCatalog.ordered() do
+	local fusion = def.Fusion
+	local recipe = FUSED[def.Id]
+	local base = if fusion then designs[fusion.Base] else nil
+	if recipe and base then
+		designs[def.Id] = fusedDesign(recipe, base)
+	end
+end
 
 ---------------------------------------------------------------------------------------------------------------
 -- Hats (see Cosmetics). Each is built around the middle of its brim, sitting on the car's roof.

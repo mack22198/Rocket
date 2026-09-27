@@ -1,8 +1,9 @@
 --!strict
 -- The garage, laid over the 3D showroom: your cars on the left, the chosen car big on the turntable in the
 -- middle, and on the right its special power, its strengths and weaknesses, its evolution track and the button
--- for the next step (unlock, drive it, EVOLVE, or pick one of the looks it has earned). Prices are fixed and
--- shown up front; evolving is earned by driving the car. Changes apply from your next match.
+-- for the next step (unlock, FUSE, drive it, EVOLVE, or pick one of the looks it has earned). Prices are fixed
+-- and shown up front; evolving is earned by driving the car, and a fused car is made from two cars you own
+-- (you keep both). Changes apply from your next match.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -177,8 +178,9 @@ local function request(action: string, def: CarCatalog.CarDef, extra: number?): 
 	return nil
 end
 
--- The big "it evolved!" moment: a white flash, the new name, and a light show in the showroom.
-local function celebrate(def: CarCatalog.CarDef, stage: number)
+-- The big "it evolved!" (or "fused!") moment: a white flash, the new name, and a light show in the showroom.
+local function celebrate(def: CarCatalog.CarDef, stage: number, title: string?)
+	celebrationTitle.Text = title or "✨ EVOLVED! ✨"
 	celebrationName.Text = CarCatalog.stageName(def, stage)
 	celebration.Visible = true
 	celebration.BackgroundTransparency = 0.1
@@ -219,6 +221,17 @@ local function celebrate(def: CarCatalog.CarDef, stage: number)
 	end)
 end
 
+-- The first of a fused car's two parts that you don't have yet (nil if you have both).
+local function missingParent(def: CarCatalog.CarDef, owned: { [string]: boolean }): CarCatalog.CarDef?
+	local base, flavor = CarCatalog.parents(def)
+	for _, parent in { base, flavor } do
+		if parent and not owned[parent.Id] then
+			return parent
+		end
+	end
+	return nil
+end
+
 local function refresh()
 	lastRefresh = os.clock()
 	local data = PlayerDataClient.get()
@@ -252,6 +265,13 @@ local function refresh()
 			local ready = Evolution.progress(tile.def, data.carXp[id] or 0, data.carStage[id] or 1).ready
 			tile.status.Text = if ready then "✨ EVOLVE!" else "OWNED"
 			tile.status.TextColor3 = if ready then C.Evolve else C.Text
+		elseif tile.def.Fusion then
+			local canFuse = CarCatalog.canFuse(tile.def, data.owned, data.scrap)
+			tile.status.Text = if canFuse then "🧬 FUSE!" else "🧬 FUSION"
+			tile.status.TextColor3 = if canFuse
+				then C.Evolve
+				elseif missingParent(tile.def, data.owned) then C.Muted
+				else C.Gold
 		else
 			tile.status.Text = `🔒 🔩 {Theme.formatNumber(tile.def.Price)}`
 			tile.status.TextColor3 = if data.scrap >= tile.def.Price then C.Gold else C.Muted
@@ -272,7 +292,10 @@ local function refresh()
 		ShowroomController.showCar(def, previewStage, data.style.topper)
 	end
 	nameLabel.Text = `{def.Emoji} {CarCatalog.stageName(def, previewStage)}`
-	rarityLabel.Text = `{string.upper(def.Rarity)}  ·  {string.upper(def.Tagline)}`
+	local base, flavor = CarCatalog.parents(def)
+	rarityLabel.Text = if base and flavor
+		then `FUSED  ·  {string.upper(base.DisplayName)} + {string.upper(flavor.DisplayName)}`
+		else `{string.upper(def.Rarity)}  ·  {string.upper(def.Tagline)}`
 	rarityLabel.TextColor3 = rarity.Color
 	descriptionLabel.Text = def.Description
 	local power = Powers.forCar(def.Id)
@@ -311,7 +334,10 @@ local function refresh()
 	end
 	trackFill.Size = UDim2.fromScale((math.max(stage, 1) - 1) / (STAGES - 1), 1)
 
-	if not owned then
+	if not owned and base and flavor then
+		xpBar.set(0)
+		xpLabel.Text = `Fuse your {base.DisplayName} and {flavor.DisplayName} to make it (you keep both!)`
+	elseif not owned then
 		xpBar.set(0)
 		xpLabel.Text = "Unlock this car to start evolving it"
 	elseif progress.nextStage then
@@ -326,7 +352,20 @@ local function refresh()
 	xpLabel.TextColor3 = if owned and progress.ready then C.Gold else C.Muted
 
 	-- Buttons.
-	if not owned then
+	local fusion = def.Fusion
+	if not owned and fusion then
+		local canFuse = CarCatalog.canFuse(def, data.owned, data.scrap)
+		local missing = missingParent(def, data.owned)
+		primaryButton.Text = if canFuse
+			then `🧬 FUSE  🔩 {Theme.formatNumber(fusion.Cost)}`
+			elseif missing then `🔒 NEEDS {string.upper(missing.DisplayName)}`
+			else `🔒 {Theme.formatNumber(fusion.Cost - data.scrap)} MORE SCRAP`
+		Theme.setButtonColor(
+			primaryButton,
+			if canFuse then C.Evolve else C.PanelLight,
+			if canFuse then C.Text else C.Muted
+		)
+	elseif not owned then
 		local canAfford = data.scrap >= def.Price
 		primaryButton.Text = if canAfford
 			then `UNLOCK  🔩 {Theme.formatNumber(def.Price)}`
@@ -370,6 +409,16 @@ local function onPrimary()
 		return
 	elseif data.owned[def.Id] then
 		request("equip", def)
+	elseif def.Fusion then
+		local canFuse, reason = CarCatalog.canFuse(def, data.owned, data.scrap)
+		if not canFuse then
+			showToast(reason or "You can't fuse this car yet.", false)
+			return
+		end
+		local result = request("fuse", def)
+		if result and result.fused then
+			celebrate(def, 1, "🧬 FUSED! 🧬")
+		end
 	elseif data.scrap >= def.Price then
 		local result = request("unlock", def)
 		if result and result.ok then

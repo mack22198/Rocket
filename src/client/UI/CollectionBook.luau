@@ -72,8 +72,9 @@ local function carEntries(): { Entry }
 				key = `car:{def.Id}:{stage}`,
 				name = CarCatalog.stageName(def, stage),
 				owned = have,
-				hint = if not owned
-					then `🔒 Unlock for 🔩{Theme.formatNumber(def.Price)}`
+				hint = if not owned and def.Fusion
+					then "🧬 Fuse in the Garage"
+					elseif not owned then `🔒 Unlock for 🔩{Theme.formatNumber(def.Price)}`
 					else "✨ Evolve to reveal",
 				color = CarCatalog.Rarities[def.Rarity].Color,
 				model = function(): Model

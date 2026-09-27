@@ -42,7 +42,7 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   Shark a **Shark Dive** that makes it untouchable, the Monster Truck a **Ground Pound** shockwave, the UFO a
   **Tractor Beam** that lifts the ball up for the perfect shot, the Taco Truck **Hot Sauce** (your next hit is a
   Mega Shot), the Rubber Duck a **Quack Attack** that spins out everyone nearby, and the Hot Dog a **Ketchup
-  Slick** trail.
+  Slick** trail. Fused cars get a **combo** of both their parents' powers (with a longer recharge).
 - **Mega Shot:** touching the ball, making saves and doing style moves fills a meter. When it's full, press
   F to arm it and your next hit blasts the ball on fire. It's earned in the match, never bought.
 - **Style and combos:** air hits, wall hits, passes and Mega Shots chain into combo goals ("🔥 3X COMBO!").
@@ -62,12 +62,18 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   duck, a shark supercar, a taco food truck (with a giant taco on the roof), a monster truck, a hot dog and a
   UFO. They're proper little battle-cars - spoked wheels that roll and steer, light bars and spoilers - each with
   real strengths and weaknesses. Rarity never means "better".
+- **Car fusion:** own two cars that go together and you can fuse them into a new one for 🔩1,000 (you keep both):
+  🦈 **Pizza Shark** (Neon Shark + Pizza Car: a cheese shark covered in pepperoni with a pizza-slice fin, whose
+  **Cheesy Dive** dives and drops a Cheese Trap), 🛸 **Duck Saucer** (UFO + Rubber Duck: a rubber duck flying the
+  saucer, with a **Quack Beam**) and 🛻 **Monster Taco** (Monster Truck + Taco Truck: a giant taco in the back,
+  and a **Spicy Pound**). Fused cars sit halfway between their parents' stats and evolve like any other car.
 - **Car evolutions:** every car earns XP while you drive it (as much as the Scrap you win) and evolves through
   four looks, e.g. Pizza Car → Burnt Pizza Car → Lava Pizza Car → Galaxy Pizza Car. Evolving is earned by playing,
   never bought, and only changes looks. You can switch back to any look you've unlocked, and bots sometimes
   drive evolved cars to show what's possible.
 - **Garage:** your cars on the left, the chosen car big on the showroom turntable (drag to spin it), and its stats,
-  price and evolution track on the right, with an EVOLVE! button that sets off a light show. The menu's "saving
+  price and evolution track on the right, with an EVOLVE! button that sets off a light show (and a 🧬 FUSE
+  button for fused cars). The menu's "saving
   up for" card and the results screen keep the next goal in sight.
 - **Works on computer, gamepad and phone/tablet** (on-screen stick and buttons).
 - **Progress saves** with DataStores (once the game is published).
@@ -120,7 +126,7 @@ Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
 
 - [`GameConfig.luau`](src/shared/Config/GameConfig.luau): match length, arena size, ball bounciness, car speed,
   boost, jump height, gravity, bot skill, Mega Shot, boost pads and Studio shortcuts.
-- [`CarCatalog.luau`](src/shared/Config/CarCatalog.luau): the cars, prices and stats.
+- [`CarCatalog.luau`](src/shared/Config/CarCatalog.luau): the cars, prices and stats, and the fusion recipes.
 - [`Rewards.luau`](src/shared/Config/Rewards.luau): how much Scrap each thing is worth.
 - [`Powers.luau`](src/shared/Config/Powers.luau): the items and car powers, how often each item turns up
   (and how much that depends on the score), and how strong they all are.
@@ -239,12 +245,9 @@ tools/      Offline previews of the 3D world and the UI
 
 Ideas from the design, roughly in order:
 
-1. Daily missions with a "pick 1 of 3" reward chest (predictable, not gambling).
-2. Collectible goal celebrations ("Show Off").
-3. Short, predictable arena events such as low gravity, ice, or a tornado.
-4. A bigger lobby hub with a practice area, mini-games and secrets.
-5. Seasons (Spaceball, Dinosaurs, Pirates, Candy...) with new arenas and cars.
-6. Car fusion (Shark + Lightning = Storm Shark).
+1. A bigger lobby hub with a practice area, mini-games and secrets.
+2. Seasons (Spaceball, Dinosaurs, Pirates, Candy...) with new arenas and cars.
+3. More fusions (Shark + Banana, Kart + Hot Dog...).
 
 ## Known limitations
 

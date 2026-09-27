@@ -182,6 +182,9 @@ GameConfig.Bots = {
 	Skill = 0.55, -- 0 = sleepy, 1 = sweaty. Kids should be able to beat the default bots.
 	ThinkRate = 12, -- decisions per second
 	CarIds = { "pizza", "banana", "kart", "shark", "monster", "ufo", "duck", "taco", "hotdog" },
+	-- Now and then a bot turns up in a fused car, to show what's possible.
+	FusedCarIds = { "pizzashark", "ducksaucer", "monstertaco" },
+	FusedChance = 0.12,
 }
 
 GameConfig.Teams = {

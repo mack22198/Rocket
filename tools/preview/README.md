@@ -15,8 +15,8 @@ layouts and proportions from anywhere (including CI machines).
 `lobby`, `lobbyShowroom`, `lobbyFromField`, `outside`, `ball`, `cars`, `carsClose`, `items` (item boxes and traps),
 `podium` (or pass `pos=x,y,z&at=x,y,z`).
 
-UI scenarios: `menu`, `queued`, `live`, `garage`, `evolve`, `howto`, `streak`, `chest`, `collection`, `match`,
-`twist`, `pause`, `touch`, `goal`, `replay`, `podium`, `results`. Add
+UI scenarios: `menu`, `queued`, `live`, `garage`, `evolve`, `style`, `fuse`, `howto`, `streak`, `chest`,
+`collection`, `match`, `twist`, `pause`, `touch`, `goal`, `replay`, `podium`, `results`. Add
 `bg=<image>` to draw them on top of a screenshot of the game (for example a showroom render saved as `bg-menu.png`).
 
 To save PNGs of any of these with headless Chromium:
