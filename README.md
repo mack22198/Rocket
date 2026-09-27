@@ -148,6 +148,7 @@ Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
   boost, jump height, gravity, bot skill, Mega Shot, boost pads and Studio shortcuts.
 - [`CarCatalog.luau`](src/shared/Config/CarCatalog.luau): the cars, prices and stats, and the fusion recipes.
 - [`Rewards.luau`](src/shared/Config/Rewards.luau): how much Scrap each thing is worth.
+- [`Sounds.luau`](src/shared/Config/Sounds.luau): every sound in the game - paste Toolbox sound IDs here.
 - [`Season.luau`](src/shared/Config/Season.luau): when seasons start, how much XP a tier takes, and each season's
   rewards.
 - [`Powers.luau`](src/shared/Config/Powers.luau): the items and car powers, how often each item turns up
@@ -215,7 +216,7 @@ src/
   shared/   (ReplicatedStorage.Shared: used by both server and client)
     Config/       GameConfig, CarCatalog, Rewards, Evolution, Powers (items and car powers), Daily (streaks,
                   quests, daily chest), Twists (match twists and weekend events), Cosmetics (hats, horns,
-                  goal parties), Season (the free season reward track)
+                  goal parties), Season (the free season reward track), Sounds (every sound, for Toolbox IDs)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay timing)
@@ -238,7 +239,8 @@ src/
     Controllers/  GameFlow (menu / garage / match), ReplayController (goal replays), PodiumController,
                   TwistController (twist rules and the Neon Night sky on this screen),
                   LocalHide (hides real cars behind replays), InputController, CarController, CarVisuals (wheels,
-                  trails), BallView, CameraController, EffectsController, PowerVisuals (item boxes,
+                  trails), BallView, CameraController, EffectsController, SoundController (effects, music,
+                  crowd, whistle), PowerVisuals (item boxes,
                   shields, ice, beams), ShowroomController, StadiumController (live scoreboards, LED boards,
                   cheering crowd)
     UI/           MainMenu, Garage, PauseMenu, HowToPlay, HUD, Announcer, ResultsScreen, ReplayScreen,
@@ -283,7 +285,9 @@ Ideas from the design, roughly in order:
   a Rojo build, and the offline previews above. It hasn't been play-tested in Studio yet, so expect some tuning
   (car feel, bot difficulty, UI sizes, lighting) after the first real session.
 - Other players' hits reach you after a short network delay (standard for online games). Your own hits are instant.
-- Sounds are Roblox's built-in placeholders.
+- Sounds are Roblox's built-in placeholders, and there's no music yet. Every sound has a slot in
+  [`Sounds.luau`](src/shared/Config/Sounds.luau): paste a Toolbox sound's ID there (menu music, match music, a
+  crowd, a goal horn, a whistle, a cheer...) and the game uses it.
 - Apart from the optional smooth car bodies (above), everything is built from Roblox's basic parts, which is why
   the stadium has a clean "low-poly" look. The next visual steps would be more Blender meshes (wheels, the
   stadium, the ball) and textures. Also: Roblox shows its best lighting, shadows and glow only at high graphics

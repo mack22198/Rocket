@@ -34,6 +34,7 @@ local PlayerDataClient = require(script.Parent.PlayerDataClient)
 local PodiumController = require(script.Parent.PodiumController)
 local ReplayController = require(script.Parent.ReplayController)
 local ShowroomController = require(script.Parent.ShowroomController)
+local SoundController = require(script.Parent.SoundController)
 local TwistController = require(script.Parent.TwistController)
 
 local GameFlow = {}
@@ -101,6 +102,7 @@ local function apply(target: Screen)
 		ShowroomController.setActive(true)
 	end
 	setMatchOverlay(inMatch)
+	SoundController.setScene(if inMatch then "match" else "menu")
 	if inMatch then
 		garageWanted = false
 		MainMenu.hide()

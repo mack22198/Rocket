@@ -8,7 +8,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -21,6 +20,7 @@ local Remotes = require(Shared.Net.Remotes)
 local Signal = require(Shared.Util.Signal)
 
 local PlayerDataClient = require(script.Parent.Parent.Controllers.PlayerDataClient)
+local SoundController = require(script.Parent.Parent.Controllers.SoundController)
 local ShowroomController = require(script.Parent.Parent.Controllers.ShowroomController)
 local StylePanel = require(script.Parent.StylePanel)
 local Theme = require(script.Parent.Theme)
@@ -102,17 +102,6 @@ local function shortStageName(def: CarCatalog.CarDef, stage: number): string
 		return "Classic"
 	end
 	return string.match(CarCatalog.stageName(def, stage), "^(%S+)") or `Stage {stage}`
-end
-
-local function playSound(id: string, volume: number)
-	local sound = Instance.new("Sound")
-	sound.SoundId = id
-	sound.Volume = volume
-	sound.Parent = SoundService
-	sound:Play()
-	task.delay(4, function()
-		sound:Destroy()
-	end)
 end
 
 local function showToast(text: string, good: boolean)
@@ -212,7 +201,7 @@ local function celebrate(def: CarCatalog.CarDef, stage: number, title: string?)
 		end)
 	end
 	ShowroomController.celebrate()
-	playSound("rbxasset://sounds/electronicpingshort.wav", 0.8)
+	SoundController.play("Fanfare", 0.8)
 	task.delay(2.6, function()
 		TweenService:Create(celebrationTitle, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()
 		TweenService:Create(celebrationName, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()

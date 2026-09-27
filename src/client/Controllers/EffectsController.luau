@@ -2,13 +2,11 @@
 -- The juice: boost flames, name tags over cars, sparks and thumps on hits, screen shake, and a proper party
 -- for every goal - a shockwave and fireball in the net, confetti over the goal and fireworks above the stands.
 --
--- Sounds use sounds that ship with Roblox. For a proper goal horn or crowd cheer, find one in the Creator Store
--- (Toolbox > Audio), copy its ID and paste it into SOUNDS below as "rbxassetid://<number>".
+-- Every sound is listed in Sounds (paste Toolbox sound IDs there).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -21,16 +19,9 @@ local BallView = require(script.Parent.BallView)
 local CameraController = require(script.Parent.CameraController)
 local CarController = require(script.Parent.CarController)
 local LocalHide = require(script.Parent.LocalHide)
+local SoundController = require(script.Parent.SoundController)
 
 local EffectsController = {}
-
-local SOUNDS = {
-	Jump = "rbxasset://sounds/action_jump.mp3",
-	Hit = "rbxasset://sounds/action_jump_land.mp3",
-	Goal = "rbxasset://sounds/electronicpingshort.wav",
-	Click = "rbxasset://sounds/button.wav",
-	Whoosh = "rbxasset://sounds/swoosh.wav",
-}
 
 local localPlayer = Players.LocalPlayer
 local A = MatchState.CarAttr
@@ -48,25 +39,9 @@ local CONFETTI_COLORS = {
 	rgb(255, 255, 255),
 }
 
+-- Plays one of the sounds in Sounds (see SoundController).
 function EffectsController.play(name: string, volume: number?, speed: number?)
-	local id = (SOUNDS :: { [string]: string })[name]
-	if not id then
-		return
-	end
-	local sound = Instance.new("Sound")
-	sound.SoundId = id
-	sound.Volume = volume or 0.6
-	sound.PlaybackSpeed = speed or 1
-	sound.Parent = SoundService
-	sound:Play()
-	sound.Ended:Once(function()
-		sound:Destroy()
-	end)
-	task.delay(6, function()
-		if sound.Parent then
-			sound:Destroy()
-		end
-	end)
+	SoundController.play(name, volume, speed)
 end
 
 -- An invisible anchored part to hang effects on; it tidies itself away after `lifetime` seconds.
