@@ -21,6 +21,7 @@ local Signal = require(Shared.Util.Signal)
 
 local PlayerDataClient = require(script.Parent.Parent.Controllers.PlayerDataClient)
 local ShowroomController = require(script.Parent.Parent.Controllers.ShowroomController)
+local StylePanel = require(script.Parent.StylePanel)
 local Theme = require(script.Parent.Theme)
 
 local Garage = {}
@@ -47,6 +48,12 @@ type Node = { circle: TextButton, name: TextLabel }
 local gui: ScreenGui
 local leftGroup: Frame
 local rightGroup: Frame
+local carsCaption: TextLabel
+local carsScroller: ScrollingFrame
+local detailsPanel: Frame
+local carsTab: TextButton
+local styleTab: TextButton
+local mode = "cars" -- "cars" or "style"
 local backButton: TextButton
 local scrapPill: TextLabel
 local countLabel: TextLabel
@@ -261,8 +268,8 @@ local function refresh()
 	local progress = Evolution.progress(def, xp, stage)
 	local rarity = CarCatalog.Rarities[def.Rarity]
 
-	if gui.Enabled then
-		ShowroomController.showCar(def, previewStage)
+	if gui.Enabled and mode == "cars" then
+		ShowroomController.showCar(def, previewStage, data.style.topper)
 	end
 	nameLabel.Text = `{def.Emoji} {CarCatalog.stageName(def, previewStage)}`
 	rarityLabel.Text = `{string.upper(def.Rarity)}  ·  {string.upper(def.Tagline)}`
@@ -451,8 +458,31 @@ local function buildLeft()
 	local list = Theme.panel(leftGroup, "Cars", UDim2.fromOffset(318, 572), UDim2.fromOffset(24, 126))
 	list.BackgroundTransparency = 0.15
 	Theme.padding(list, 12)
-	Theme.label(list, {
+	-- CARS / STYLE tabs.
+	carsTab = Theme.button(list, {
+		name = "CarsTab",
+		size = UDim2.fromOffset(143, 36),
+		text = "🚗 CARS",
+		color = C.Gold,
+	})
+	carsTab.Activated:Connect(function()
+		Garage.setMode("cars")
+	end)
+	styleTab = Theme.button(list, {
+		name = "StyleTab",
+		size = UDim2.fromOffset(143, 36),
+		position = UDim2.fromScale(1, 0),
+		anchor = Vector2.new(1, 0),
+		text = "🎩 STYLE",
+		color = C.PanelLight,
+		textColor = C.Text,
+	})
+	styleTab.Activated:Connect(function()
+		Garage.setMode("style")
+	end)
+	carsCaption = Theme.label(list, {
 		size = UDim2.fromOffset(160, 18),
+		position = UDim2.fromOffset(0, 46),
 		text = "YOUR CARS",
 		font = Theme.Caps,
 		color = C.Muted,
@@ -461,7 +491,7 @@ local function buildLeft()
 	})
 	countLabel = Theme.label(list, {
 		size = UDim2.fromOffset(130, 18),
-		position = UDim2.fromScale(1, 0),
+		position = UDim2.new(1, 0, 0, 46),
 		anchor = Vector2.new(1, 0),
 		text = "",
 		font = Theme.Caps,
@@ -470,9 +500,10 @@ local function buildLeft()
 		stroke = false,
 	})
 	local scroller = Instance.new("ScrollingFrame")
+	carsScroller = scroller
 	scroller.Name = "List"
-	scroller.Size = UDim2.new(1, 0, 1, -28)
-	scroller.Position = UDim2.fromOffset(0, 28)
+	scroller.Size = UDim2.new(1, 0, 1, -74)
+	scroller.Position = UDim2.fromOffset(0, 74)
 	scroller.BackgroundTransparency = 1
 	scroller.BorderSizePixel = 0
 	scroller.ScrollBarThickness = 5
@@ -511,6 +542,7 @@ local function buildRight()
 	local panel =
 		Theme.panel(rightGroup, "Details", UDim2.fromOffset(372, 572), UDim2.fromOffset(396, 126), Vector2.new(1, 0))
 	panel.BackgroundTransparency = 0.15
+	detailsPanel = panel
 	Theme.padding(panel, 16)
 	nameLabel = Theme.label(panel, {
 		name = "CarName",
@@ -688,6 +720,16 @@ local function build()
 	Theme.shade(gui, "RightShade", false, 0.36, 0.6)
 	buildLeft()
 	buildRight()
+	StylePanel.build(leftGroup:FindFirstChild("Cars") :: Frame, rightGroup, function(text: string, good: boolean)
+		showToast(text, good)
+	end)
+	StylePanel.PreviewChanged:Connect(function()
+		if gui.Enabled and mode == "style" then
+			local data = PlayerDataClient.get()
+			local def = CarCatalog.get(data.equipped) or (CarCatalog.get(CarCatalog.StarterId) :: CarCatalog.CarDef)
+			ShowroomController.showCar(def, data.carLook[def.Id] or 1, StylePanel.previewTopper())
+		end
+	end)
 
 	toast = Theme.pill(gui, {
 		name = "Toast",
@@ -730,11 +772,28 @@ local function build()
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
 end
 
+-- Switches between the car list ("cars") and hats, horns and goal parties ("style").
+function Garage.setMode(newMode: string)
+	mode = if newMode == "style" then "style" else "cars"
+	local cars = mode == "cars"
+	carsCaption.Visible = cars
+	countLabel.Visible = cars
+	carsScroller.Visible = cars
+	detailsPanel.Visible = cars
+	StylePanel.setVisible(not cars)
+	Theme.setButtonColor(carsTab, if cars then C.Gold else C.PanelLight, if cars then nil else C.Text)
+	Theme.setButtonColor(styleTab, if cars then C.PanelLight else C.Gold, if cars then C.Text else nil)
+	refresh()
+end
+
 -- Opens the garage, showing `carId` (or your current car).
 function Garage.open(carId: string?)
 	local data = PlayerDataClient.get()
 	local wasOpen = gui.Enabled
 	gui.Enabled = true
+	if not wasOpen then
+		Garage.setMode("cars")
+	end
 	selectCar(if carId and CarCatalog.get(carId) then carId else data.equipped)
 	if wasOpen then
 		return

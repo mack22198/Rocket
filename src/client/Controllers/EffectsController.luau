@@ -12,6 +12,7 @@ local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Cosmetics = require(Shared.Config.Cosmetics)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 local Remotes = require(Shared.Net.Remotes)
@@ -343,7 +344,237 @@ local function updateMyFlames()
 	end
 end
 
-local function onGoal(team: unknown, _scorer: unknown, _assist: unknown, position: unknown, _combo: unknown)
+---------------------------------------------------------------------------------------------------------------
+-- Horns and goal celebrations (see Cosmetics)
+---------------------------------------------------------------------------------------------------------------
+
+-- A word popping up over a car ("HONK!").
+local function wordBubble(chassis: BasePart, text: string, color: Color3)
+	local tag = Instance.new("BillboardGui")
+	tag.Name = "Word"
+	tag.Size = UDim2.fromOffset(150, 56)
+	tag.StudsOffset = Vector3.new(0, 5.5, 0)
+	tag.AlwaysOnTop = true
+	tag.LightInfluence = 0
+	tag.Adornee = chassis
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.LuckiestGuy
+	label.TextScaled = true
+	label.TextColor3 = color
+	label.TextStrokeTransparency = 0
+	label.Text = text
+	label.Parent = tag
+	tag.Parent = effectsFolder
+	TweenService:Create(tag, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = UDim2.fromOffset(240, 90),
+		StudsOffset = Vector3.new(0, 8.5, 0),
+	}):Play()
+	TweenService:Create(label, TweenInfo.new(0.8), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+	task.delay(0.9, function()
+		tag:Destroy()
+	end)
+end
+
+local function onHorn(car: unknown, hornId: unknown)
+	if typeof(car) ~= "Instance" or not car:IsA("Model") then
+		return
+	end
+	local horn = Cosmetics.get(if type(hornId) == "string" then hornId else nil)
+	local chassis = car:FindFirstChild("Chassis")
+	if not horn or horn.Kind ~= "horn" or not chassis or not chassis:IsA("BasePart") then
+		return
+	end
+	if horn.Sound then
+		local sound = Instance.new("Sound")
+		sound.SoundId = horn.Sound
+		sound.PlaybackSpeed = horn.Pitch or 1
+		sound.Volume = 1
+		sound.RollOffMaxDistance = 300
+		sound.Parent = chassis
+		sound:Play()
+		task.delay(4, function()
+			sound:Destroy()
+		end)
+	end
+	wordBubble(chassis, horn.Word or "HONK!", teamColor(car:GetAttribute(A.Team)):Lerp(rgb(255, 255, 255), 0.35))
+end
+
+-- Things raining down on the pitch in front of a goal: `make` builds one (at the origin) from anchored parts.
+local function rain(goalZ: number, side: number, count: number, make: (Folder) -> Model)
+	local holderFolder = Instance.new("Folder")
+	holderFolder.Name = "Rain"
+	holderFolder.Parent = effectsFolder
+	for i = 1, count do
+		task.delay(i * 0.05, function()
+			local thing = make(holderFolder)
+			local landing = Vector3.new(rng:NextNumber(-60, 60), 1.2, goalZ - side * rng:NextNumber(8, 70))
+			local spin = CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+			thing:PivotTo(CFrame.new(landing + Vector3.new(0, rng:NextNumber(60, 90), 0)) * spin)
+			local fall = rng:NextNumber(1.1, 1.8)
+			local start = os.clock()
+			local from = thing:GetPivot()
+			local to = CFrame.new(landing) * spin
+			local connection: RBXScriptConnection
+			connection = RunService.RenderStepped:Connect(function()
+				local t = math.clamp((os.clock() - start) / fall, 0, 1)
+				-- Falls, then a couple of little bounces.
+				local eased = TweenService:GetValue(t, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
+				thing:PivotTo(from:Lerp(to, eased))
+				if t >= 1 then
+					connection:Disconnect()
+				end
+			end)
+		end)
+	end
+	task.delay(6, function()
+		holderFolder:Destroy()
+	end)
+end
+
+local function part(parent: Instance, shape: Enum.PartType, size: Vector3, cframe: CFrame, color: Color3): Part
+	local p = Instance.new("Part")
+	p.Shape = shape
+	p.Size = size
+	p.CFrame = cframe
+	p.Color = color
+	p.Material = Enum.Material.SmoothPlastic
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Parent = parent
+	return p
+end
+
+local function rubberDuck(parent: Instance): Model
+	local model = Instance.new("Model")
+	local yellow = rgb(255, 216, 50)
+	local body = part(model, Enum.PartType.Ball, Vector3.new(2.2, 2.2, 2.2), CFrame.new(0, 0, 0), yellow)
+	part(model, Enum.PartType.Ball, Vector3.one * 1.4, CFrame.new(0, 1.3, -0.6), yellow)
+	part(model, Enum.PartType.Ball, Vector3.new(0.7, 0.35, 0.7), CFrame.new(0, 1.2, -1.35), rgb(255, 136, 30))
+	model.PrimaryPart = body
+	model.Parent = parent
+	return model
+end
+
+local function taco(parent: Instance): Model
+	local model = Instance.new("Model")
+	local shell =
+		part(model, Enum.PartType.Cylinder, Vector3.new(0.9, 2.8, 2.8), CFrame.new(0, 0, 0), rgb(240, 184, 72))
+	part(model, Enum.PartType.Ball, Vector3.new(0.8, 0.8, 0.8), CFrame.new(0, 1.1, 0.4), rgb(104, 190, 64))
+	part(model, Enum.PartType.Ball, Vector3.new(0.7, 0.7, 0.7), CFrame.new(0, 1.1, -0.4), rgb(230, 52, 40))
+	model.PrimaryPart = shell
+	model.Parent = parent
+	return model
+end
+
+-- A rainbow arching over the goal mouth.
+local function rainbow(goalZ: number, side: number)
+	local folder = Instance.new("Folder")
+	folder.Name = "Rainbow"
+	folder.Parent = effectsFolder
+	local colors = {
+		rgb(255, 60, 60),
+		rgb(255, 150, 40),
+		rgb(255, 230, 60),
+		rgb(80, 220, 90),
+		rgb(60, 160, 255),
+		rgb(150, 90, 255),
+	}
+	local segments = 12
+	for band, color in colors do
+		local radius = 52 - band * 2.2
+		for k = 0, segments - 1 do
+			local a0 = k / segments * math.pi
+			local a1 = (k + 1) / segments * math.pi
+			local p0 = Vector3.new(math.cos(a0) * radius, math.sin(a0) * radius, goalZ - side * 30)
+			local p1 = Vector3.new(math.cos(a1) * radius, math.sin(a1) * radius, goalZ - side * 30)
+			local piece = part(
+				folder,
+				Enum.PartType.Block,
+				Vector3.new(2.3, 1.2, (p1 - p0).Magnitude + 0.3),
+				CFrame.lookAt((p0 + p1) / 2, p1),
+				color
+			)
+			piece.Material = Enum.Material.Neon
+			piece.Transparency = 1
+			TweenService:Create(piece, TweenInfo.new(0.6), { Transparency = 0.15 }):Play()
+			task.delay(3.4, function()
+				TweenService:Create(piece, TweenInfo.new(1), { Transparency = 1 }):Play()
+			end)
+		end
+	end
+	task.delay(4.6, function()
+		folder:Destroy()
+	end)
+end
+
+-- Gold stars falling over the goal.
+local function starShower(goalZ: number, side: number)
+	local area = holder(Vector3.new(0, 75, goalZ - side * 35), Vector3.new(110, 2, 60), 6)
+	pcall(function()
+		local e = Instance.new("ParticleEmitter")
+		e.Texture = SPARKLE
+		e.Shape = Enum.ParticleEmitterShape.Box
+		e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		e.Color = ColorSequence.new(rgb(255, 236, 140), rgb(255, 190, 40))
+		e.LightEmission = 1
+		e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2.2), NumberSequenceKeypoint.new(1, 0.6) })
+		e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+		e.Lifetime = NumberRange.new(2.5, 3.5)
+		e.Speed = NumberRange.new(2, 6)
+		e.EmissionDirection = Enum.NormalId.Bottom
+		e.Acceleration = Vector3.new(0, -22, 0)
+		e.RotSpeed = NumberRange.new(-180, 180)
+		e.Rate = 0
+		e.Parent = area
+		e:Emit(260)
+	end)
+end
+
+-- The scorer's celebration (the stadium fireworks are the classic).
+local function celebration(kind: string, goalZ: number, side: number, color: Color3)
+	if kind == "confetti" then
+		confetti(Vector3.new(0, 55, goalZ - side * 50), Vector3.new(190, 4, 110), 90)
+		confetti(Vector3.new(0, 40, goalZ - side * 24), Vector3.new(80, 4, 36), 45)
+	elseif kind == "stars" then
+		starShower(goalZ, side)
+	elseif kind == "ducks" then
+		rain(goalZ, side, 28, rubberDuck)
+	elseif kind == "tacos" then
+		rain(goalZ, side, 28, taco)
+	elseif kind == "rainbow" then
+		rainbow(goalZ, side)
+		confetti(Vector3.new(0, 34, goalZ - side * 24), Vector3.new(80, 4, 36), 30)
+	else
+		-- Fireworks above the stand behind the goal.
+		for i = 1, 7 do
+			local target = Vector3.new(
+				(i - 4) * 36 + rng:NextNumber(-8, 8),
+				rng:NextNumber(128, 165),
+				goalZ + side * rng:NextNumber(70, 120)
+			)
+			local fireworkColor = if i % 3 == 0
+				then rgb(255, 214, 90)
+				elseif i % 3 == 1 then color
+				else rgb(255, 255, 255)
+			firework(target, fireworkColor, 0.2 + ((i * 5) % 7) * 0.22)
+		end
+		confetti(Vector3.new(0, 34, goalZ - side * 24), Vector3.new(80, 4, 36), 45)
+	end
+end
+
+local function onGoal(
+	team: unknown,
+	_scorer: unknown,
+	_assist: unknown,
+	position: unknown,
+	_combo: unknown,
+	celebrationId: unknown
+)
 	if typeof(position) ~= "Vector3" then
 		return
 	end
@@ -361,18 +592,9 @@ local function onGoal(team: unknown, _scorer: unknown, _assist: unknown, positio
 	fireball(position, color)
 	burst(position, color, 160, 70, 3, 2.5)
 	burst(position + Vector3.new(0, 10, 0), rgb(255, 230, 90), 80, 50, 2, 2)
-	-- Confetti over the goal mouth, and fireworks above the stand behind the goal.
+	-- Then the scorer's own celebration.
 	local goalZ = side * GameConfig.Arena.Length / 2
-	confetti(Vector3.new(0, 34, goalZ - side * 24), Vector3.new(80, 4, 36), 45)
-	for i = 1, 7 do
-		local target = Vector3.new(
-			(i - 4) * 36 + rng:NextNumber(-8, 8),
-			rng:NextNumber(128, 165),
-			goalZ + side * rng:NextNumber(70, 120)
-		)
-		local fireworkColor = if i % 3 == 0 then rgb(255, 214, 90) elseif i % 3 == 1 then color else rgb(255, 255, 255)
-		firework(target, fireworkColor, 0.2 + ((i * 5) % 7) * 0.22)
-	end
+	celebration(if type(celebrationId) == "string" then celebrationId else "fireworks", goalZ, side, color)
 	CameraController.shake(1.8, 0.9)
 	EffectsController.play("Goal", 1, 0.8)
 	EffectsController.play("Whoosh", 0.8, 0.7)
@@ -410,6 +632,7 @@ function EffectsController.start()
 	end)
 
 	Remotes.GoalScored.OnClientEvent:Connect(onGoal)
+	Remotes.HornPlayed.OnClientEvent:Connect(onHorn)
 	Remotes.Announce.OnClientEvent:Connect(function(kind: unknown)
 		if kind == "mega" then
 			BallView.setOnFire(2.5)

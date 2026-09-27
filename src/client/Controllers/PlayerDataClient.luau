@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.Config.CarCatalog)
+local Cosmetics = require(Shared.Config.Cosmetics)
 local Daily = require(Shared.Config.Daily)
 local Remotes = require(Shared.Net.Remotes)
 local Signal = require(Shared.Util.Signal)
@@ -20,6 +21,15 @@ export type Data = {
 	carLook: { [string]: number },
 	daily: Daily.State,
 	scrapBoost: number,
+	style: Style,
+}
+
+-- Hats, horns and goal celebrations (see Cosmetics).
+export type Style = {
+	owned: { [string]: boolean },
+	topper: string,
+	horn: string,
+	celebration: string,
 }
 
 local PlayerDataClient = {}
@@ -36,8 +46,40 @@ local current: Data = {
 	carLook = {},
 	daily = Daily.newState(),
 	scrapBoost = 0,
+	style = {
+		owned = Cosmetics.defaults(),
+		topper = Cosmetics.defaultFor("topper"),
+		horn = Cosmetics.defaultFor("horn"),
+		celebration = Cosmetics.defaultFor("celebration"),
+	},
 }
 local loaded = false
+
+local function readStyle(raw: any): Style
+	local style: Style = {
+		owned = Cosmetics.defaults(),
+		topper = Cosmetics.defaultFor("topper"),
+		horn = Cosmetics.defaultFor("horn"),
+		celebration = Cosmetics.defaultFor("celebration"),
+	}
+	if type(raw) ~= "table" then
+		return style
+	end
+	if type(raw.owned) == "table" then
+		for id, owned in raw.owned do
+			if owned == true and type(id) == "string" and Cosmetics.get(id) then
+				style.owned[id] = true
+			end
+		end
+	end
+	for _, kind in Cosmetics.Kinds do
+		local chosen = raw[kind]
+		if type(chosen) == "string" and Cosmetics.get(chosen) then
+			(style :: any)[kind] = chosen
+		end
+	end
+	return style
+end
 
 -- The daily progress from the server (checked, since it came over the network).
 local function readDaily(raw: any): Daily.State
@@ -80,6 +122,7 @@ local function apply(raw: any)
 		carLook = if type(raw.carLook) == "table" then raw.carLook else {},
 		daily = readDaily(raw.daily),
 		scrapBoost = if type(raw.scrapBoost) == "number" then raw.scrapBoost else 0,
+		style = readStyle(raw.style),
 	}
 	loaded = true
 	PlayerDataClient.Changed:Fire(current)

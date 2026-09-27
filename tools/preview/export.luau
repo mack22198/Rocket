@@ -97,6 +97,22 @@ local function buildStadium()
 			model.Parent = showcase
 		end
 	end
+	-- Every car wearing a hat, in a row behind the line-up.
+	local hats = CarModelBuilder.hats()
+	for i, def in CarCatalog.ordered() do
+		local model = CarModelBuilder.build(def, {
+			preview = true,
+			stage = 1,
+			teamColor = GameConfig.Teams.Orange.Color,
+			topper = hats[(i - 1) % #hats + 1],
+		})
+		pivotTo(
+			model,
+			roblox.CFrame.new((i - 1) * 12, def.Hitbox.Y / 2 + 0.9, 680) * roblox.CFrame.Angles(0, math.rad(200), 0)
+		)
+		model.Parent = showcase
+	end
+
 	-- Kickoff line-up in the arena: blue cars on their spots, orange cars on theirs.
 	local kick = { { -48, 70 }, { 48, 70 }, { 0, 125 } }
 	for t, team in { "Blue", "Orange" } do

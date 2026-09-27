@@ -1067,10 +1067,16 @@ function ShowroomBuilder.build(): Showroom
 end
 
 -- Puts a car on the turntable (tinted `glow` underneath), with its reflection and a soft shadow.
-function ShowroomBuilder.display(showroom: Showroom, def: CarCatalog.CarDef, stage: number, glow: Color3): Display
+function ShowroomBuilder.display(
+	showroom: Showroom,
+	def: CarCatalog.CarDef,
+	stage: number,
+	glow: Color3,
+	topper: string?
+): Display
 	local origin = showroom.origin
 	local rest = CarModelBuilder.restHeight(def)
-	local car = CarModelBuilder.build(def, { preview = true, stage = stage, teamColor = glow })
+	local car = CarModelBuilder.build(def, { preview = true, stage = stage, teamColor = glow, topper = topper })
 	car.Name = "ShowroomCar"
 	local mirror = car:Clone()
 	mirror.Name = "ShowroomCarReflection"

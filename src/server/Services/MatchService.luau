@@ -12,6 +12,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.Config.CarCatalog)
 local CarDriver = require(Shared.Cars.CarDriver)
+local Cosmetics = require(Shared.Config.Cosmetics)
 local Evolution = require(Shared.Config.Evolution)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
@@ -193,7 +194,7 @@ local function makeBot(team: Team, slot: number): Participant
 	local carIds = GameConfig.Bots.CarIds
 	local def = CarCatalog.get(carIds[rng:NextInteger(1, #carIds)])
 		or CarCatalog.get(CarCatalog.StarterId) :: CarCatalog.CarDef
-	return Roster.newParticipant({
+	local bot = Roster.newParticipant({
 		key = `bot:{botCounter}`,
 		player = nil,
 		name = `{names[(botCounter - 1) % #names + 1]} (bot)`,
@@ -202,11 +203,27 @@ local function makeBot(team: Team, slot: number): Participant
 		def = def,
 		stage = Evolution.botStage(rng:NextNumber()),
 	})
+	-- Bots show off some of the style you can collect.
+	local function pick(kind: Cosmetics.Kind): string
+		local choices = {}
+		for _, item in Cosmetics.ofKind(kind) do
+			if Cosmetics.forSale(item) then
+				table.insert(choices, item.Id)
+			end
+		end
+		return choices[rng:NextInteger(1, #choices)]
+	end
+	if rng:NextNumber() < 0.4 then
+		bot.topper = pick("topper")
+	end
+	bot.horn = pick("horn")
+	bot.celebration = if rng:NextNumber() < 0.5 then pick("celebration") else "fireworks"
+	return bot
 end
 
 local function makePlayerParticipant(player: Player, team: Team, slot: number): Participant
 	local def, stage = equippedCar(player)
-	return Roster.newParticipant({
+	local p = Roster.newParticipant({
 		key = `player:{player.UserId}`,
 		player = player,
 		name = player.DisplayName,
@@ -215,6 +232,13 @@ local function makePlayerParticipant(player: Player, team: Team, slot: number): 
 		def = def,
 		stage = stage,
 	})
+	local data = DataService.get(player)
+	if data then
+		p.topper = if data.style.topper ~= "none" then data.style.topper else nil
+		p.horn = data.style.horn
+		p.celebration = data.style.celebration
+	end
+	return p
 end
 
 local function isLivePhase(): boolean
@@ -424,13 +448,19 @@ local function celebrate(goal: { side: number, position: Vector3 })
 	end
 	set(Attr.BlueScore, blueScore)
 	set(Attr.OrangeScore, orangeScore)
+	local scorer = summary.scorer
 	Remotes.GoalScored:FireAllClients(
 		summary.team,
-		if summary.scorer then summary.scorer.name else "",
+		if scorer then scorer.name else "",
 		if summary.assist then summary.assist.name else "",
 		goal.position,
-		summary.comboText or ""
+		summary.comboText or "",
+		if scorer and not summary.ownGoal then scorer.celebration else "fireworks"
 	)
+	-- Bots are proud of their goals.
+	if scorer and scorer.isBot then
+		task.delay(0.6, CarService.honk, scorer)
+	end
 	setPhase(Phases.GoalScored, M.GoalCelebration)
 	task.wait(M.GoalCelebration)
 end
@@ -463,7 +493,14 @@ local function podiumEntries(mvp: Participant?): { { [string]: any } }
 	end)
 	local list = {}
 	local function add(p: Participant)
-		table.insert(list, { name = p.name, team = p.team, carId = p.def.Id, stage = p.stage, points = p.stats.points })
+		table.insert(list, {
+			name = p.name,
+			team = p.team,
+			carId = p.def.Id,
+			stage = p.stage,
+			points = p.stats.points,
+			topper = p.topper or "",
+		})
 	end
 	if mvp then
 		add(mvp)

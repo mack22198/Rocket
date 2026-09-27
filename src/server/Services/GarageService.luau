@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.Config.CarCatalog)
+local Cosmetics = require(Shared.Config.Cosmetics)
 local Evolution = require(Shared.Config.Evolution)
 local Remotes = require(Shared.Net.Remotes)
 
@@ -26,9 +27,48 @@ local function throttled(player: Player): boolean
 	return false
 end
 
+-- Buying and using hats, horns and goal celebrations (`id` is the item).
+local function handleStyle(player: Player, action: string, id: unknown): Result
+	local item = if type(id) == "string" then Cosmetics.get(id) else nil
+	local data = DataService.get(player)
+	if not item then
+		return { ok = false, message = "Unknown item." }
+	elseif not data then
+		return { ok = false, message = "Your garage is still loading..." }
+	end
+	local owned = data.style.owned[item.Id] == true
+	if action == "buyStyle" then
+		if owned then
+			return { ok = false, message = "You already have that!" }
+		elseif not Cosmetics.forSale(item) then
+			return { ok = false, message = "This one comes from the season track." }
+		elseif data.scrap < item.Price then
+			return { ok = false, message = `You need {item.Price - data.scrap} more Scrap.` }
+		end
+		DataService.update(player, function(d)
+			d.scrap -= item.Price
+			d.style.owned[item.Id] = true
+			(d.style :: any)[item.Kind] = item.Id
+		end)
+		DataService.saveNow(player)
+		return { ok = true, message = `{item.Emoji} {item.Name} is yours!` }
+	end
+	-- equipStyle
+	if not owned then
+		return { ok = false, message = "Get it first!" }
+	end
+	DataService.update(player, function(d)
+		(d.style :: any)[item.Kind] = item.Id
+	end)
+	return { ok = true, message = `{item.Emoji} {item.Name} equipped! You'll see it next match.` }
+end
+
 local function handle(player: Player, action: unknown, carId: unknown, extra: unknown): Result
 	if throttled(player) then
 		return { ok = false, message = "Slow down!" }
+	end
+	if action == "buyStyle" or action == "equipStyle" then
+		return handleStyle(player, action :: string, carId)
 	end
 	if type(carId) ~= "string" then
 		return { ok = false, message = "Unknown car." }

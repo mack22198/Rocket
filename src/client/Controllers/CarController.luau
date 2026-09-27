@@ -138,6 +138,11 @@ function CarController.start()
 	end)
 	InputController.ItemPressed:Connect(CarController.useItem)
 	InputController.PowerPressed:Connect(CarController.usePower)
+	InputController.HornPressed:Connect(function()
+		if myCar then
+			Remotes.Horn:FireServer()
+		end
+	end)
 
 	InputController.MegaPressed:Connect(function()
 		local car = myCar

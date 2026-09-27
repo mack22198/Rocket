@@ -52,8 +52,11 @@ local CARDS = {
 }
 
 local CONTROLS = {
-	{ "⌨️", "WASD drive · SPACE jump · SHIFT boost · R item · G power · F mega · C ball cam · M menu" },
-	{ "🎮", "RT / LT drive · A jump · B boost · RB item · LB power · X mega · Y ball cam · VIEW menu" },
+	{ "⌨️", "WASD drive · SPACE jump · SHIFT boost · R item · G power · F mega · H horn · C cam · M menu" },
+	{
+		"🎮",
+		"RT/LT drive · A jump · B boost · RB item · LB power · X mega · D-pad up horn · Y cam · VIEW menu",
+	},
 	{ "📱", "Stick to drive, big buttons to jump, boost, use your item and power, and Mega Shot" },
 }
 

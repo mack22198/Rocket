@@ -51,6 +51,23 @@ return function(t)
 			expect.truthy(chassis:FindFirstChild("MegaGlow"))
 		end)
 
+		t.test(`{def.Id} wears every hat`, function()
+			for _, hat in CarModelBuilder.hats() do
+				local model = CarModelBuilder.build(def, { teamColor = Color3.fromRGB(0, 0, 255), topper = hat })
+				local count = 0
+				local lowest = math.huge
+				for _, child in model:GetChildren() do
+					if child:IsA("BasePart") and string.sub(child.Name, 1, 3) == "Hat" then
+						count += 1
+						expect.truthy(child:FindFirstChildOfClass("WeldConstraint") ~= nil, `{hat} part is welded`)
+						lowest = math.min(lowest, child.CFrame.Position.Y - child.Size.Y / 2)
+					end
+				end
+				expect.atLeast(count, 2, `{def.Id} has a {hat}`)
+				expect.atMost(lowest, def.Hitbox.Y / 2 + 2.5, `{def.Id}'s {hat} sits on the car`)
+			end
+		end)
+
 		t.test(`{def.Id} builds a preview model`, function()
 			local model = CarModelBuilder.build(def, { preview = true })
 			for _, child in model:GetDescendants() do

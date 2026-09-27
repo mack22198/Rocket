@@ -7,6 +7,7 @@
 --   ActivateMega()                                                           arm a full Mega Shot
 --   UseItem()                                                                use the item you're holding
 --   UsePower()                                                               use your car's power
+--   Horn()                                                                   honk!
 --   Garage(action, carId, extra) -> result                                   unlock / equip / evolve cars
 --   Daily(action, index) -> result                                           claim streak / quest / chest prize
 --   Play()                                                                   join the next match (or a free seat now)
@@ -18,8 +19,9 @@
 --   Bumped(velocityChange)                                     your car got bumped
 --   CarEffect(effect, duration, direction)                     your car spun out / got slowed / got frozen
 --   PowerFx(kind, position, team, target)                      show an item or power going off
+--   HornPlayed(car, hornId)                                    someone honked
 --   Announce(kind, text, team, extra)                          big text popups ("AIR HIT!", "SAVE!")
---   GoalScored(team, scorerName, assistName, position, comboText)
+--   GoalScored(team, scorerName, assistName, position, comboText, celebrationId)
 --   MatchResults(payload)                                      end of match summary + rewards
 --   PlayerData(data)                                           Scrap / owned cars changed
 
@@ -77,6 +79,7 @@ local Remotes = {
 	ActivateMega = event("ActivateMega"),
 	UseItem = event("UseItem"),
 	UsePower = event("UsePower"),
+	Horn = event("Horn"),
 	Garage = func("Garage"),
 	Daily = func("Daily"),
 	Play = event("Play"),
@@ -88,6 +91,7 @@ local Remotes = {
 	Bumped = event("Bumped"),
 	CarEffect = event("CarEffect"),
 	PowerFx = event("PowerFx"),
+	HornPlayed = event("HornPlayed"),
 	Announce = event("Announce"),
 	GoalScored = event("GoalScored"),
 	MatchResults = event("MatchResults"),

@@ -34,6 +34,9 @@ export type Participant = {
 	itemReadyAt: number, -- server time the item stops spinning and can be used
 	powerReadyAt: number, -- server time the car's power has recharged
 	effects: { [string]: number }, -- effect name -> server time it wears off ("shield", "ghost", "rocket", ...)
+	topper: string?, -- the hat on the car (see Cosmetics)
+	horn: string,
+	celebration: string, -- what goes off when they score
 }
 
 local Roster = {}
@@ -135,6 +138,9 @@ function Roster.newParticipant(fields: {
 		itemReadyAt = 0,
 		powerReadyAt = 0,
 		effects = {},
+		topper = nil,
+		horn = "beep",
+		celebration = "fireworks",
 	}
 end
 

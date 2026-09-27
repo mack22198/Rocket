@@ -25,6 +25,8 @@ local CarService = {}
 local carsFolder: Folder
 local arenaFolder: Instance
 local unlimitedBoost = false -- the Turbo Mode twist
+local lastHonk: { [string]: number } = {}
+local HONK_GAP = 1.2 -- seconds between honks
 
 local A = MatchState.CarAttr
 
@@ -130,12 +132,19 @@ function CarService.init(arena: Instance)
 			CarService.activateMega(p)
 		end
 	end)
+
+	Remotes.Horn.OnServerEvent:Connect(function(player: Player)
+		local p = Roster.byPlayer(player)
+		if p then
+			CarService.honk(p)
+		end
+	end)
 end
 
 -- Builds the participant's car at `cframe`, frozen in place until release() is called.
 function CarService.spawn(p: Participant, cframe: CFrame)
 	CarService.despawn(p)
-	local model = CarModelBuilder.build(p.def, { teamColor = teamColor(p.team), stage = p.stage })
+	local model = CarModelBuilder.build(p.def, { teamColor = teamColor(p.team), stage = p.stage, topper = p.topper })
 	model.Name = p.name
 	model:SetAttribute(A.OwnerUserId, if p.player then p.player.UserId else 0)
 	model:SetAttribute(A.IsBot, p.isBot)
@@ -249,6 +258,17 @@ function CarService.tick(dt: number, live: boolean)
 		end
 		syncAttributes(p)
 	end
+end
+
+-- Honks the car's horn for everyone to hear (not too often).
+function CarService.honk(p: Participant)
+	local car = p.car
+	local now = os.clock()
+	if not car or now - (lastHonk[p.key] or -math.huge) < HONK_GAP then
+		return
+	end
+	lastHonk[p.key] = now
+	Remotes.HornPlayed:FireAllClients(car, p.horn)
 end
 
 -- Turbo Mode: boost never runs out.

@@ -2,10 +2,10 @@
 -- Reads keyboard, gamepad and touch controls and turns them into car input.
 --
 -- Keyboard: W/S or arrows = drive (and pitch in the air), A/D = steer, Space / right mouse = jump,
---           Shift / left mouse = boost, F = Mega Shot, R = use item, G = car power, C = ball cam,
---           Q/E = air roll, M = menu
+--           Shift / left mouse = boost, F = Mega Shot, R = use item, G = car power, H = horn,
+--           C = ball cam, Q/E = air roll, M = menu
 -- Gamepad:  RT/LT = drive/brake, left stick = steer + pitch, A = jump, B = boost, X = Mega Shot,
---           RB = use item, LB = car power, Y = ball cam, View/Back = menu
+--           RB = use item, LB = car power, D-pad up = horn, Y = ball cam, View/Back = menu
 -- Touch:    on-screen stick and buttons (see TouchControls)
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -21,6 +21,7 @@ local InputController = {}
 InputController.MegaPressed = Signal.new() :: Signal.Signal<>
 InputController.ItemPressed = Signal.new() :: Signal.Signal<>
 InputController.PowerPressed = Signal.new() :: Signal.Signal<>
+InputController.HornPressed = Signal.new() :: Signal.Signal<>
 InputController.BallCamToggled = Signal.new() :: Signal.Signal<>
 InputController.MenuPressed = Signal.new() :: Signal.Signal<>
 
@@ -149,6 +150,7 @@ local PRESS_ACTIONS: { { name: string, signal: Signal.Signal<>, keys: { Enum.Key
 	{ name = "TurboMega", signal = InputController.MegaPressed, keys = { Enum.KeyCode.F, Enum.KeyCode.ButtonX } },
 	{ name = "TurboItem", signal = InputController.ItemPressed, keys = { Enum.KeyCode.R, Enum.KeyCode.ButtonR1 } },
 	{ name = "TurboPower", signal = InputController.PowerPressed, keys = { Enum.KeyCode.G, Enum.KeyCode.ButtonL1 } },
+	{ name = "TurboHorn", signal = InputController.HornPressed, keys = { Enum.KeyCode.H, Enum.KeyCode.DPadUp } },
 	{
 		name = "TurboBallCam",
 		signal = InputController.BallCamToggled,

@@ -22,6 +22,7 @@ export type BuildOptions = {
 	teamColor: Color3?, -- underglow, antenna and team light colour (nil = neutral, for previews)
 	preview: boolean?, -- true = no physics setup (showroom and garage)
 	stage: number?, -- evolution stage, 1 (as unlocked) to GameConfig.Evolution.Stages
+	topper: string?, -- a hat on the roof (see Cosmetics)
 }
 
 type Shape = "Block" | "Wedge" | "Cylinder" | "Ball" | "Ellipsoid"
@@ -37,6 +38,7 @@ type PartSpec = {
 	role: string,
 	name: string?,
 	text: string?, -- painted on the part (a badge on a door, a sign)
+	look: Look?, -- a fixed look instead of the role's (hats keep their colours at every stage)
 }
 
 -- Adds one part to the car being built.
@@ -45,6 +47,7 @@ type Add = (role: string, shape: Shape, size: Vector3, cframe: CFrame, name: str
 type Design = {
 	roles: { Roles }, -- the car's own colours at stage 1 and stage 2
 	antenna: Vector3, -- where the team antenna sticks out of the body
+	topper: (h: Vector3) -> Vector3, -- where a hat sits (the middle of its brim)
 	build: (h: Vector3, stage: number, add: Add) -> (),
 }
 
@@ -568,6 +571,9 @@ designs.pizza = {
 			rim = look(rgb(255, 176, 60), METAL),
 		},
 	},
+	topper = function()
+		return Vector3.new(0, 1.94, 1.55) -- on the pizza box
+	end,
 	antenna = Vector3.new(1.55, 1.5, 2.05),
 	build = function(h, stage, add)
 		local g = groundY(h)
@@ -673,6 +679,9 @@ designs.banana = {
 			rim = look(rgb(255, 214, 90), METAL),
 		},
 	},
+	topper = function()
+		return Vector3.new(0, 1.19, 1.05)
+	end,
 	antenna = Vector3.new(1.35, 1.05, 1.9),
 	build = function(h, stage, add)
 		local g = groundY(h)
@@ -777,6 +786,9 @@ designs.kart = {
 			rim = look(rgb(255, 200, 48), METAL),
 		},
 	},
+	topper = function(h)
+		return Vector3.new(0, groundY(h) + 3.0, 0.6) -- on the driver's helmet
+	end,
 	antenna = Vector3.new(0.9, 0.5, 2.3),
 	build = function(h, stage, add)
 		local g = groundY(h)
@@ -915,6 +927,9 @@ designs.shark = {
 			rim = look(rgb(255, 214, 64), METAL),
 		},
 	},
+	topper = function()
+		return Vector3.new(0, 2.72, 1.66) -- on top of the fin
+	end,
 	antenna = Vector3.new(1.3, 1.0, 2.2),
 	build = function(h, stage, add)
 		local g = groundY(h)
@@ -1086,6 +1101,9 @@ designs.monster = {
 			rim = look(rgb(232, 234, 242), METAL, 0, 0.3),
 		},
 	},
+	topper = function()
+		return Vector3.new(0, 2.99, 0.45)
+	end,
 	antenna = Vector3.new(2.3, 2.9, 1.1),
 	build = function(h, stage, add)
 		local g = groundY(h)
@@ -1276,6 +1294,9 @@ designs.ufo = {
 			glass = look(rgb(200, 250, 255), GLASS, 0.45, 0.1),
 		},
 	},
+	topper = function()
+		return Vector3.new(0, 1.86, 0.3) -- on the alien's head
+	end,
 	antenna = Vector3.new(2.3, -0.1, 2.3),
 	build = function(h, stage, add)
 		local floor = groundY(h)
@@ -1344,6 +1365,9 @@ designs.taco = {
 			rim = look(rgb(255, 196, 70), METAL),
 		},
 	},
+	topper = function()
+		return Vector3.new(0, 2.42, -0.9)
+	end,
 	antenna = Vector3.new(-1.9, 2.3, 3.9),
 	build = function(h, stage, add)
 		local g = groundY(h)
@@ -1445,6 +1469,9 @@ designs.duck = {
 			rim = look(rgb(200, 150, 255), METAL),
 		},
 	},
+	topper = function()
+		return Vector3.new(0, 3.3, -2.2) -- on the duck's head
+	end,
 	antenna = Vector3.new(1.4, 1.0, 2.7),
 	build = function(h, stage, add)
 		local g = groundY(h)
@@ -1521,6 +1548,9 @@ designs.hotdog = {
 			rim = look(rgb(255, 200, 80), METAL),
 		},
 	},
+	topper = function()
+		return Vector3.new(0, 1.97, -2.1) -- on the canopy
+	end,
 	antenna = Vector3.new(1.35, 0.7, 3.5),
 	build = function(h, stage, add)
 		local g = groundY(h)
@@ -1589,6 +1619,122 @@ designs.hotdog = {
 		end
 	end,
 }
+
+---------------------------------------------------------------------------------------------------------------
+-- Hats (see Cosmetics). Each is built around the middle of its brim, sitting on the car's roof.
+---------------------------------------------------------------------------------------------------------------
+
+type HatAdd = (name: string, shape: Shape, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material?) -> ()
+
+-- A cone made of stacked discs, from `radius` at the bottom to a point, in `colors` from the bottom up.
+local function stackedCone(put: HatAdd, name: string, y: number, radius: number, height: number, colors: { Color3 })
+	local layers = #colors
+	local step = height / layers
+	for i, color in colors do
+		local r = radius * (1 - (i - 1) / layers) + 0.06
+		put(name, "Cylinder", Vector3.new(step, r * 2, r * 2), at(0, y + (i - 0.5) * step, 0) * CYL_ALONG_Y, color)
+	end
+end
+
+local HATS: { [string]: (put: HatAdd) -> () } = {
+	cap = function(put)
+		local red, dark = rgb(220, 40, 44), rgb(160, 24, 30)
+		put("HatCrown", "Ellipsoid", Vector3.new(1.5, 1.05, 1.5), at(0, 0.1, 0.1), red)
+		put("HatBrim", "Ellipsoid", Vector3.new(1.15, 0.12, 1.2), at(0, 0.1, -0.75), dark)
+		put("HatButton", "Ball", Vector3.one * 0.24, at(0, 0.62, 0.1), rgb(255, 255, 255))
+		put("HatBadge", "Ellipsoid", Vector3.new(0.5, 0.36, 0.1), at(0, 0.34, -0.63), rgb(255, 255, 255))
+	end,
+	party = function(put)
+		local pink, yellow = rgb(255, 92, 170), rgb(255, 214, 64)
+		stackedCone(put, "HatCone", 0, 0.62, 1.5, { pink, yellow, pink, yellow, pink })
+		put("HatPompom", "Ball", Vector3.one * 0.42, at(0, 1.62, 0), rgb(255, 255, 255))
+	end,
+	cone = function(put)
+		local orange, white = rgb(255, 120, 30), rgb(250, 250, 250)
+		put("HatBase", "Block", Vector3.new(1.4, 0.14, 1.4), at(0, 0.07, 0), rgb(30, 30, 34))
+		stackedCone(put, "HatCone", 0.14, 0.55, 1.5, { orange, white, orange, white, orange })
+	end,
+	tophat = function(put)
+		local black = rgb(26, 26, 30)
+		put("HatBrim", "Cylinder", Vector3.new(0.12, 1.9, 1.9), at(0, 0.06, 0) * CYL_ALONG_Y, black)
+		put("HatCrown", "Cylinder", Vector3.new(1.3, 1.25, 1.25), at(0, 0.75, 0) * CYL_ALONG_Y, black)
+		put("HatBand", "Cylinder", Vector3.new(0.24, 1.29, 1.29), at(0, 0.28, 0) * CYL_ALONG_Y, rgb(210, 36, 44))
+	end,
+	chick = function(put)
+		local yellow = rgb(255, 222, 70)
+		put("HatShell", "Ellipsoid", Vector3.new(1.5, 0.9, 1.5), at(0, 0.2, 0), rgb(250, 248, 240))
+		put("HatChick", "Ball", Vector3.one * 1.0, at(0, 0.72, 0.05), yellow)
+		put("HatChickHead", "Ball", Vector3.one * 0.78, at(0, 1.35, -0.1), yellow)
+		put("HatBeak", "Ellipsoid", Vector3.new(0.3, 0.18, 0.36), at(0, 1.31, -0.52), rgb(255, 140, 30))
+		for _, side in { -1, 1 } do
+			put("HatEye", "Ball", Vector3.one * 0.14, at(side * 0.17, 1.45, -0.43), rgb(20, 20, 26))
+		end
+	end,
+	unicorn = function(put)
+		put("HatRing", "Cylinder", Vector3.new(0.14, 1.1, 1.1), at(0, 0.07, 0) * CYL_ALONG_Y, rgb(255, 140, 220))
+		local tilt = at(0, 0.1, 0) * CFrame.Angles(math.rad(-18), 0, 0)
+		local colors = { rgb(255, 255, 255), rgb(255, 214, 90), rgb(255, 255, 255), rgb(255, 214, 90) }
+		for i, color in colors do
+			local r = 0.34 * (1 - (i - 1) / #colors) + 0.05
+			put(
+				"HatHorn",
+				"Cylinder",
+				Vector3.new(0.4, r * 2, r * 2),
+				tilt * at(0, (i - 0.5) * 0.4, 0) * CYL_ALONG_Y,
+				color
+			)
+		end
+		put("HatHornTip", "Ball", Vector3.one * 0.12, tilt * at(0, 1.66, 0), rgb(255, 214, 90), NEON)
+	end,
+	crown = function(put)
+		local gold = rgb(255, 196, 50)
+		for i = 0, 9 do
+			local angle = i / 10 * math.pi * 2
+			put(
+				"HatBand",
+				"Block",
+				Vector3.new(0.42, 0.5, 0.12),
+				at(math.sin(angle) * 0.62, 0.25, math.cos(angle) * 0.62) * CFrame.Angles(0, angle, 0),
+				gold,
+				METAL
+			)
+		end
+		for i = 0, 4 do
+			local angle = i / 5 * math.pi * 2
+			local x, z = math.sin(angle) * 0.62, math.cos(angle) * 0.62
+			put(
+				"HatSpike",
+				"Block",
+				Vector3.new(0.2, 0.4, 0.12),
+				at(x, 0.68, z) * CFrame.Angles(0, angle, 0),
+				gold,
+				METAL
+			)
+			put("HatSpikeBall", "Ball", Vector3.one * 0.22, at(x, 0.92, z), gold, METAL)
+		end
+		for i, color in { rgb(230, 30, 60), rgb(40, 120, 255), rgb(230, 30, 60) } do
+			local angle = math.pi + (i - 2) * 0.55
+			put(
+				"HatGem",
+				"Ball",
+				Vector3.one * 0.2,
+				at(math.sin(angle) * 0.69, 0.27, math.cos(angle) * 0.69),
+				color,
+				NEON
+			)
+		end
+	end,
+}
+
+-- Every hat that can be built (for the tests).
+function CarModelBuilder.hats(): { string }
+	local list = {}
+	for id in HATS do
+		table.insert(list, id)
+	end
+	table.sort(list)
+	return list
+end
 
 ---------------------------------------------------------------------------------------------------------------
 -- Putting a car together
@@ -1758,6 +1904,21 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 	design.build(hitbox, stage, function(role, shape, size, cframe, name, text)
 		table.insert(specs, { role = role, shape = shape, size = size, cframe = cframe, name = name, text = text })
 	end)
+	-- A hat on the roof.
+	local hat = if opts.topper then HATS[opts.topper] else nil
+	if hat then
+		local anchor = CFrame.new(design.topper(hitbox))
+		hat(function(name, shape, size, offset, color, material)
+			table.insert(specs, {
+				role = "hat",
+				shape = shape,
+				size = size,
+				cframe = anchor * offset,
+				name = name,
+				look = look(color, material),
+			})
+		end)
+	end
 
 	-- A team-coloured ball on an antenna, so teams are easy to tell apart from anywhere on the field.
 	local antennaHeight = hitbox.Y + 1.1 - design.antenna.Y
@@ -1821,7 +1982,7 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 	end
 
 	for _, spec in specs do
-		local part = makePart(spec, styleOf(spec.role))
+		local part = makePart(spec, spec.look or styleOf(spec.role))
 		if spec.text then
 			paint(part, spec, spec.text)
 		end

@@ -2,7 +2,7 @@
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
 --   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay,
---              streak, chest, collection, twist
+--              streak, chest, collection, twist, style
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -57,6 +57,7 @@ local MENU_SCENARIOS = {
 	streak = true,
 	chest = true,
 	collection = true,
+	style = true,
 }
 if MENU_SCENARIOS[scenario] and scenario ~= "queued" then
 	attrs.Phase = "Waiting"
@@ -256,6 +257,12 @@ local data = {
 		streakClaimedDay = today - 1,
 	},
 	scrapBoost = 0,
+	style = {
+		owned = { none = true, beep = true, fireworks = true, cap = true, party = true, honk = true },
+		topper = "cap",
+		horn = "beep",
+		celebration = "fireworks",
+	},
 }
 local carAttrs = {
 	Boost = 67,
@@ -400,6 +407,7 @@ for _, name in
 		"ReplayScreen",
 		"DailyRewards",
 		"CollectionBook",
+		"StylePanel",
 	}
 do
 	harness.sourceTransforms["src/client/UI/" .. name] = function(source)
@@ -441,7 +449,7 @@ local inMatch = not MENU_SCENARIOS[scenario] and scenario ~= "live"
 local overlay = inMatch and scenario ~= "podium" and scenario ~= "replay" and scenario ~= "results"
 HUD.setVisible(overlay)
 Announcer.setVisible(overlay)
-if not inMatch and scenario ~= "garage" and scenario ~= "evolve" then
+if not inMatch and scenario ~= "garage" and scenario ~= "evolve" and scenario ~= "style" then
 	MainMenu.setQueued(scenario == "queued")
 	MainMenu.show()
 end
@@ -460,6 +468,9 @@ if scenario == "goal" then
 	remotes.Announce.OnClientEvent:Fire("power", "🍌 Comet (bot) slipped on a banana!", "Blue", "Zippy (bot)")
 elseif scenario == "garage" then
 	Garage.open()
+elseif scenario == "style" then
+	Garage.open()
+	Garage.setMode("style")
 elseif scenario == "howto" then
 	HowToPlay.open()
 elseif scenario == "pause" then

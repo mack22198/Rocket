@@ -22,6 +22,7 @@ export type Entry = {
 	carId: string,
 	stage: number,
 	points: number,
+	topper: string?,
 }
 
 export type Podium = {
@@ -205,6 +206,7 @@ function PodiumBuilder.build(parent: Instance, entries: { Entry }): Podium
 			preview = true,
 			stage = entry.stage,
 			teamColor = if teamInfo then teamInfo.Color else nil,
+			topper = entry.topper,
 		})
 		local top = STAGE_TOP + step.height + PLATE
 		local position = origin + Vector3.new(step.x, top + CarModelBuilder.restHeight(def), 0)

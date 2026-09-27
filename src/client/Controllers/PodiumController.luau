@@ -39,6 +39,7 @@ local function entriesFrom(list: unknown): { PodiumBuilder.Entry }
 				carId = item.carId,
 				stage = if type(item.stage) == "number" then item.stage else 1,
 				points = if type(item.points) == "number" then item.points else 0,
+				topper = if type(item.topper) == "string" and item.topper ~= "" then item.topper else nil,
 			})
 		end
 		if #entries == 3 then

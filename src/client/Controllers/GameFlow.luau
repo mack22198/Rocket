@@ -67,7 +67,7 @@ end
 local function showEquippedCar()
 	local data = PlayerDataClient.get()
 	local def = CarCatalog.get(data.equipped) or (CarCatalog.get(CarCatalog.StarterId) :: CarCatalog.CarDef)
-	ShowroomController.showCar(def, data.carLook[def.Id] or 1)
+	ShowroomController.showCar(def, data.carLook[def.Id] or 1, data.style.topper)
 end
 
 local function wantedScreen(): Screen

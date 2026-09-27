@@ -59,6 +59,7 @@ local active = false
 local mode: Mode = "menu"
 local shownDef: CarCatalog.CarDef? = nil
 local shownStage = 1
+local shownTopper: string? = nil
 local builtKey = ""
 local yaw = math.rad(-30)
 local dropStarted = -math.huge
@@ -92,7 +93,7 @@ local function refreshDisplay()
 	if not r or not def then
 		return
 	end
-	local key = `{def.Id}:{shownStage}`
+	local key = `{def.Id}:{shownStage}:{shownTopper or ""}`
 	if key == builtKey then
 		return
 	end
@@ -102,7 +103,7 @@ local function refreshDisplay()
 	end
 	ringColor = glowFor(def)
 	setRingColor(ringColor)
-	display = ShowroomBuilder.display(r, def, shownStage, ringColor)
+	display = ShowroomBuilder.display(r, def, shownStage, ringColor, shownTopper)
 	r.screenLine.Text = string.upper(CarCatalog.stageName(def, shownStage))
 	dropStarted = os.clock()
 	local sparkles = r.sparkles
@@ -270,9 +271,11 @@ function ShowroomController.setMode(newMode: Mode)
 end
 
 -- Shows a car (at an evolution stage) on the turntable.
-function ShowroomController.showCar(def: CarCatalog.CarDef, stage: number)
+-- Puts a car on the turntable (wearing a hat, if `topper` is given).
+function ShowroomController.showCar(def: CarCatalog.CarDef, stage: number, topper: string?)
 	shownDef = def
 	shownStage = stage
+	shownTopper = if topper == "none" then nil else topper
 	refreshDisplay()
 end
 

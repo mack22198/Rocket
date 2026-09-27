@@ -53,8 +53,11 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   quests** ("Score 2 goals", "Use 5 items"...) and a **daily chest** once they're done - its three prizes are
   shown face up and you pick one (Scrap, XP for your car, or double Scrap for a few matches). Nothing is random
   or hidden.
-- **Collection book:** every car at every evolution stage, with black mystery silhouettes for the ones you
-  haven't got yet.
+- **Collectible style:** hats for your car's roof (🧢 🥳 🚧 🎩 🐣 🦄, and a 👑 from the season track), horns to
+  honk in a match (H), and goal parties that go off when YOU score - fireworks, a confetti storm, a star shower,
+  duck rain, a taco party or a rainbow. All in the garage's STYLE tab at fixed prices; only looks and sounds.
+- **Collection book:** every car at every evolution stage, plus every hat, horn and goal party, with black
+  mystery silhouettes for the ones you haven't got yet.
 - **9 collectible cars:** a pizza delivery hot hatch (the starter), a banana roadster, a go-kart, a rubber
   duck, a shark supercar, a taco food truck (with a giant taco on the roof), a monster truck, a hot dog and a
   UFO. They're proper little battle-cars - spoked wheels that roll and steer, light bars and spoilers - each with
@@ -96,6 +99,7 @@ evolutions quickly, lower the numbers in `GameConfig.Evolution.Xp`.
 | Mega Shot (when the meter is full) | F | X | MEGA |
 | Use your item | R | RB | ITEM |
 | Use your car's power | G | LB | POWER |
+| Horn | H | D-pad up | 📯 |
 | Ball cam on/off | C | Y | CAM |
 | Air roll | Q / E | | |
 | In the air: tip the nose | W / S | Left stick | Stick |
@@ -123,6 +127,7 @@ Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
 - [`Daily.luau`](src/shared/Config/Daily.luau): the streak rewards, the daily quests and the chest prizes.
 - [`Twists.luau`](src/shared/Config/Twists.luau): the match twists (what each one changes and how often it
   turns up) and the weekend event.
+- [`Cosmetics.luau`](src/shared/Config/Cosmetics.luau): hats, horns and goal parties, and their prices.
 - `GameConfig.Evolution`: how much XP each evolution stage needs.
 
 Car looks (and every evolution stage) are built from plain parts in
@@ -176,7 +181,8 @@ real building code, which is handy for checking changes to how things look from 
 src/
   shared/   (ReplicatedStorage.Shared: used by both server and client)
     Config/       GameConfig, CarCatalog, Rewards, Evolution, Powers (items and car powers), Daily (streaks,
-                  quests, daily chest), Twists (match twists and weekend events)
+                  quests, daily chest), Twists (match twists and weekend events), Cosmetics (hats, horns,
+                  goal parties)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay timing)
@@ -202,7 +208,8 @@ src/
                   shields, ice, beams), ShowroomController, StadiumController (live scoreboards, LED boards,
                   cheering crowd)
     UI/           MainMenu, Garage, PauseMenu, HowToPlay, HUD, Announcer, ResultsScreen, ReplayScreen,
-                  DailyRewards (streak and chest pop-ups), CollectionBook, TouchControls, Transition, Theme
+                  DailyRewards (streak and chest pop-ups), CollectionBook, StylePanel (the garage's STYLE tab),
+                  TouchControls, Transition, Theme
 tests/      Lune unit tests (run outside Roblox)
 tools/      Offline previews of the 3D world and the UI
 ```

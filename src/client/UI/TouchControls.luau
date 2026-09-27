@@ -204,6 +204,11 @@ local function build()
 	power.Activated:Connect(function()
 		InputController.PowerPressed:Fire()
 	end)
+	local horn = makeButton("Horn", "📯", Color3.fromRGB(90, 90, 120), 56, 300, 285)
+	horn.Activated:Connect(function()
+		InputController.HornPressed:Fire()
+	end)
+
 	-- Little names under the two new buttons (the padding makes the button's inside 50% of its height).
 	local captions: { { button: TextButton, text: string } } = {
 		{ button = item, text = "ITEM" },

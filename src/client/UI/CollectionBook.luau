@@ -10,6 +10,7 @@ local TweenService = game:GetService("TweenService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.Config.CarCatalog)
 local CarModelBuilder = require(Shared.Cars.CarModelBuilder)
+local Cosmetics = require(Shared.Config.Cosmetics)
 local GameConfig = require(Shared.Config.GameConfig)
 local Signal = require(Shared.Util.Signal)
 
@@ -82,6 +83,30 @@ local function carEntries(): { Entry }
 		end
 	end
 	return list
+end
+
+-- A page for one kind of style item (hats, horns or goal parties).
+local function styleEntries(kind: Cosmetics.Kind): () -> { Entry }
+	return function(): { Entry }
+		local owned = PlayerDataClient.get().style.owned
+		local list: { Entry } = {}
+		for _, item in Cosmetics.ofKind(kind) do
+			if item.Id == "none" then
+				continue
+			end
+			table.insert(list, {
+				key = `style:{item.Id}`,
+				name = item.Name,
+				owned = owned[item.Id] == true,
+				hint = if item.Season
+					then `🏆 Season {item.Season} reward`
+					else `🔩 {Theme.formatNumber(item.Price)} in the Garage`,
+				color = if item.Season then C.Evolve else C.Gold,
+				emoji = item.Emoji,
+			})
+		end
+		return list
+	end
 end
 
 -- Adds a page of collectibles (a tab across the top of the book).
@@ -339,6 +364,9 @@ end
 function CollectionBook.start()
 	build()
 	CollectionBook.addPage({ title = "🚗 CARS", entries = carEntries })
+	for _, kind in Cosmetics.Kinds do
+		CollectionBook.addPage({ title = Cosmetics.KindNames[kind], entries = styleEntries(kind :: Cosmetics.Kind) })
+	end
 	PlayerDataClient.Changed:Connect(function()
 		if gui.Enabled then
 			showPage(currentPage)

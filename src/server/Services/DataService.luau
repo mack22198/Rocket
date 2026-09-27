@@ -12,6 +12,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.Config.CarCatalog)
+local Cosmetics = require(Shared.Config.Cosmetics)
 local Daily = require(Shared.Config.Daily)
 local GameConfig = require(Shared.Config.GameConfig)
 local Remotes = require(Shared.Net.Remotes)
@@ -32,6 +33,14 @@ export type LifetimeStats = {
 type DailyData = Daily.State
 type QuestState = Daily.QuestState
 
+-- Hats, horns and goal celebrations: what you own and what you're using (see Cosmetics).
+export type StyleData = {
+	owned: { [string]: boolean },
+	topper: string,
+	horn: string,
+	celebration: string,
+}
+
 export type SavedData = {
 	version: number,
 	scrap: number,
@@ -43,6 +52,7 @@ export type SavedData = {
 	carLook: { [string]: number }, -- which unlocked stage each car shows off
 	daily: DailyData,
 	scrapBoost: number, -- matches left that pay double Scrap (a daily chest prize)
+	style: StyleData,
 }
 
 type Profile = {
@@ -56,7 +66,7 @@ local DataService = {}
 -- Fired once a player's data has loaded (before it's sent to them), so other services can bring it up to date.
 DataService.Loaded = Signal.new() :: Signal.Signal<Player>
 
-local DATA_VERSION = 3
+local DATA_VERSION = 4
 local LOAD_ATTEMPTS = 6
 local LOAD_RETRY_DELAY = 3
 
@@ -77,6 +87,12 @@ local function defaultData(): SavedData
 		carLook = {},
 		daily = Daily.newState(),
 		scrapBoost = 0,
+		style = {
+			owned = Cosmetics.defaults(),
+			topper = Cosmetics.defaultFor("topper"),
+			horn = Cosmetics.defaultFor("horn"),
+			celebration = Cosmetics.defaultFor("celebration"),
+		},
 	}
 end
 
@@ -151,7 +167,31 @@ local function sanitize(raw: any): SavedData
 		end
 	end
 	data.scrapBoost = math.min(number(raw.scrapBoost, 0), 10)
+	-- Style (added in version 4).
+	local style = raw.style
+	if type(style) == "table" then
+		if type(style.owned) == "table" then
+			for id, owned in style.owned do
+				if owned == true and type(id) == "string" and Cosmetics.get(id) then
+					data.style.owned[id] = true
+				end
+			end
+		end
+		for _, kind in Cosmetics.Kinds do
+			local chosen = style[kind]
+			local def = if type(chosen) == "string" then Cosmetics.get(chosen) else nil
+			if def and def.Kind == kind and data.style.owned[def.Id] then
+				(data.style :: any)[kind] = def.Id
+			end
+		end
+	end
 	return data
+end
+
+local function copyStyle(style: StyleData): StyleData
+	local copy = table.clone(style)
+	copy.owned = table.clone(style.owned)
+	return copy
 end
 
 local function copyDaily(daily: DailyData): DailyData
@@ -176,6 +216,7 @@ local function serialize(data: SavedData, withSession: boolean): { [string]: any
 		carLook = table.clone(data.carLook),
 		daily = copyDaily(data.daily),
 		scrapBoost = data.scrapBoost,
+		style = copyStyle(data.style),
 	}
 	if withSession then
 		copy.session = { jobId = game.JobId, time = os.time() }
@@ -216,6 +257,7 @@ local function clientView(data: SavedData): { [string]: any }
 		carLook = table.clone(data.carLook),
 		daily = copyDaily(data.daily),
 		scrapBoost = data.scrapBoost,
+		style = copyStyle(data.style),
 	}
 end
 
