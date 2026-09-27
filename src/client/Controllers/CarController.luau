@@ -1,6 +1,9 @@
 --!strict
 -- Finds this player's car and drives it every physics step. The server gives each player physics ownership
 -- of their own car, so steering and jumping respond instantly on their screen.
+-- Items and powers are the server's call, but the ones that launch your own car (Super Spring, Nitro Dash,
+-- Shark Dive) launch it here the moment you press the button, and the server tells this car when it has been
+-- spun out, slowed down or frozen.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,6 +15,7 @@ local CarDriver = require(Shared.Cars.CarDriver)
 local CarPhysics = require(Shared.Physics.CarPhysics)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
+local Powers = require(Shared.Config.Powers)
 local Remotes = require(Shared.Net.Remotes)
 local Signal = require(Shared.Util.Signal)
 
@@ -21,6 +25,8 @@ local CarController = {}
 
 CarController.CarChanged = Signal.new() :: Signal.Signal<Model?>
 CarController.Jumped = Signal.new() :: Signal.Signal<>
+-- Fired when the server spins out, slows down or freezes your car: (effect, seconds).
+CarController.EffectApplied = Signal.new() :: Signal.Signal<string, number>
 
 local localPlayer = Players.LocalPlayer
 local stateObject = MatchState.getObject()
@@ -29,6 +35,15 @@ local A = MatchState.CarAttr
 local myCar: Model? = nil
 local driver: CarDriver.CarDriver? = nil
 local sentBoosting = false
+local boosting = false
+-- Your own record of when you last used your item and power, so a second press can't sneak in before the
+-- server's answer arrives.
+local itemUsedAt = -math.huge
+local powerUsedAt = -math.huge
+
+local function serverNow(): number
+	return workspace:GetServerTimeNow()
+end
 
 local function numberAttribute(instance: Instance, name: string): number
 	local value = instance:GetAttribute(name)
@@ -42,6 +57,7 @@ local function setCar(model: Model?)
 	myCar = model
 	driver = nil
 	sentBoosting = false
+	boosting = false
 	if not model then
 		InputController.setDriving(false)
 		CarController.CarChanged:Fire(nil)
@@ -76,7 +92,7 @@ local function step(dt: number)
 	local input = if canDrive then InputController.read() else CarPhysics.NoInput
 	local hasBoost = numberAttribute(car, A.Boost) > 0
 	local result = d:step(dt, input, hasBoost)
-	local boosting = canDrive and input.boost and hasBoost
+	boosting = canDrive and result ~= nil and result.boosting
 	if boosting ~= sentBoosting then
 		sentBoosting = boosting
 		Remotes.SetBoosting:FireServer(boosting)
@@ -113,6 +129,15 @@ function CarController.start()
 			driver:addVelocity(change)
 		end
 	end)
+	Remotes.CarEffect.OnClientEvent:Connect(function(effect: unknown, duration: unknown, direction: unknown)
+		local d = driver
+		if d and type(effect) == "string" and type(duration) == "number" then
+			d:applyEffect(effect, math.clamp(duration, 0, 10), if type(direction) == "number" then direction else 1)
+			CarController.EffectApplied:Fire(effect, duration)
+		end
+	end)
+	InputController.ItemPressed:Connect(CarController.useItem)
+	InputController.PowerPressed:Connect(CarController.usePower)
 
 	InputController.MegaPressed:Connect(function()
 		local car = myCar
@@ -120,6 +145,74 @@ function CarController.start()
 			Remotes.ActivateMega:FireServer()
 		end
 	end)
+end
+
+-- Can your car use an item or power right now? (Returns the chassis if so.)
+local function readyToAct(): BasePart?
+	local car, d = myCar, driver
+	if not car or not d or d.chassis.Anchored or car:GetAttribute(A.Frozen) == true or d.state.freezeTimer > 0 then
+		return nil
+	end
+	if MatchState.phase(stateObject) ~= MatchState.Phases.Playing then
+		return nil
+	end
+	return d.chassis
+end
+
+-- Launches your own car straight away for the items and powers that do that.
+local function launchNow(kind: string, chassis: BasePart)
+	local change = Powers.launch(kind, chassis.CFrame, chassis.AssemblyLinearVelocity)
+	if change and driver then
+		(driver :: CarDriver.CarDriver):addVelocity(change)
+	end
+end
+
+-- Uses the item you're holding (R / RB / ITEM).
+function CarController.useItem()
+	local car = myCar
+	local chassis = readyToAct()
+	local item = if car then car:GetAttribute(A.Item) else nil
+	if not car or not chassis or type(item) ~= "string" or item == "" then
+		return
+	end
+	local now = serverNow()
+	if now < numberAttribute(car, A.ItemReadyAt) or now - itemUsedAt < 0.5 then
+		return
+	end
+	itemUsedAt = now
+	launchNow(item, chassis)
+	Remotes.UseItem:FireServer()
+end
+
+-- Uses your car's power (G / LB / POWER).
+function CarController.usePower()
+	local car = myCar
+	local chassis = readyToAct()
+	local power = if car then car:GetAttribute(A.Power) else nil
+	if not car or not chassis or type(power) ~= "string" then
+		return
+	end
+	local now = serverNow()
+	if now < numberAttribute(car, A.PowerReadyAt) or now - powerUsedAt < 1 then
+		return
+	end
+	powerUsedAt = now
+	launchNow(power, chassis)
+	Remotes.UsePower:FireServer()
+end
+
+-- Is your car boosting right now (after spin-outs and goo have had their say)?
+function CarController.isBoosting(): boolean
+	return boosting
+end
+
+-- What's happening to your car: seconds left spinning out, stuck in goo and frozen.
+function CarController.effects(): (number, number, number)
+	local d = driver
+	if not d then
+		return 0, 0, 0
+	end
+	return d.state.spinTimer, d.state.slowTimer, d.state.freezeTimer
 end
 
 -- Your car, once it's fully ready to drive (nil in the lobby).

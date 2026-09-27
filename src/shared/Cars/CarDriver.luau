@@ -51,6 +51,11 @@ function CarDriver.addVelocity(self: CarDriver, change: Vector3)
 	self.pendingVelocity += change
 end
 
+-- Spin out, get stuck in goo or freeze solid for a while (see CarPhysics.applyEffect).
+function CarDriver.applyEffect(self: CarDriver, effect: string, duration: number, direction: number?)
+	CarPhysics.applyEffect(self.state, effect, duration, direction)
+end
+
 function CarDriver.probeGround(self: CarDriver, cframe: CFrame): CarPhysics.Ground
 	local down = -cframe.UpVector * self.rayLength
 	local hits: { CarPhysics.WheelHit } = {}
@@ -71,7 +76,9 @@ end
 function CarDriver.step(self: CarDriver, dt: number, input: CarPhysics.Input, hasBoost: boolean): CarPhysics.StepResult?
 	local chassis = self.chassis
 	if chassis.Anchored or not chassis:IsDescendantOf(workspace) then
+		-- Held in place (a kickoff): whatever was happening to the car is over.
 		self.pendingVelocity = Vector3.zero
+		CarPhysics.clearEffects(self.state)
 		return nil
 	end
 	local cframe = chassis.CFrame

@@ -19,7 +19,6 @@ local Remotes = require(Shared.Net.Remotes)
 local BallView = require(script.Parent.BallView)
 local CameraController = require(script.Parent.CameraController)
 local CarController = require(script.Parent.CarController)
-local InputController = require(script.Parent.InputController)
 
 local EffectsController = {}
 
@@ -252,6 +251,12 @@ local function firework(target: Vector3, color: Color3, delay: number)
 	end)
 end
 
+-- For other effects code (items and powers) to use: burst(position, color, count, speed, size, lifetime,
+-- gravity?), shockwave(position, color, radius, duration), flash(position, color, range, brightness, duration).
+EffectsController.burst = burst
+EffectsController.shockwave = shockwave
+EffectsController.flash = flash
+
 local function teamColor(team: unknown): Color3
 	if team == "Blue" then
 		return GameConfig.Teams.Blue.Color
@@ -319,14 +324,7 @@ local function updateMyFlames()
 	local exhaust = chassis:FindFirstChild("Exhaust")
 	local flames = if exhaust then exhaust:FindFirstChild("BoostFlames") else nil
 	if flames and flames:IsA("ParticleEmitter") then
-		local boost = car:GetAttribute(A.Boost)
-		local phase = MatchState.phase(MatchState.getObject())
-		local canDrive = phase == MatchState.Phases.Playing or phase == MatchState.Phases.GoalScored
-		flames.Enabled = canDrive
-			and not chassis.Anchored
-			and InputController.read().boost
-			and type(boost) == "number"
-			and boost > 0
+		flames.Enabled = not chassis.Anchored and CarController.isBoosting()
 	end
 end
 

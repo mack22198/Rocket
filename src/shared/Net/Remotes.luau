@@ -5,6 +5,8 @@
 --   BallHit(id, time, carCFrame, carVelocity, ballPosition, ballVelocity)   "my car just touched the ball"
 --   SetBoosting(isBoosting)                                                  boost button held / released
 --   ActivateMega()                                                           arm a full Mega Shot
+--   UseItem()                                                                use the item you're holding
+--   UsePower()                                                               use your car's power
 --   Garage(action, carId, extra) -> result                                   unlock / equip / evolve cars
 --   Play()                                                                   join the next match (or a free seat now)
 --   LeaveMatch()                                                             back to the menu (a bot takes your seat)
@@ -13,6 +15,8 @@
 --   BallState(time, position, velocity, flags, lastTouchTeam)  (unreliable, ~30/s)
 --   BallHitResult(id, accepted, serverTime)                    answer to BallHit
 --   Bumped(velocityChange)                                     your car got bumped
+--   CarEffect(effect, duration, direction)                     your car spun out / got slowed / got frozen
+--   PowerFx(kind, position, team, target)                      show an item or power going off
 --   Announce(kind, text, team, extra)                          big text popups ("AIR HIT!", "SAVE!")
 --   GoalScored(team, scorerName, assistName, position, comboText)
 --   MatchResults(payload)                                      end of match summary + rewards
@@ -70,6 +74,8 @@ local Remotes = {
 	BallHit = event("BallHit"),
 	SetBoosting = event("SetBoosting"),
 	ActivateMega = event("ActivateMega"),
+	UseItem = event("UseItem"),
+	UsePower = event("UsePower"),
 	Garage = func("Garage"),
 	Play = event("Play"),
 	LeaveMatch = event("LeaveMatch"),
@@ -78,6 +84,8 @@ local Remotes = {
 	BallState = unreliable("BallState"),
 	BallHitResult = event("BallHitResult"),
 	Bumped = event("Bumped"),
+	CarEffect = event("CarEffect"),
+	PowerFx = event("PowerFx"),
 	Announce = event("Announce"),
 	GoalScored = event("GoalScored"),
 	MatchResults = event("MatchResults"),

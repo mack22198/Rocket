@@ -7,6 +7,9 @@
 --   * players: their own client spots the touch the moment it happens (so it feels instant), tells the
 --     server what it saw, and the server checks the story (HitValidation) before rewinding the ball to that
 --     moment, applying the hit and fast-forwarding back to now.
+--
+-- Magnets and Tractor Beams tug the ball toward the car using them (Powers.applyPull), here and in every
+-- client's prediction, and a Ground Pound can shove it (nudge), which counts as a touch.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -17,6 +20,7 @@ local GameConfig = require(Shared.Config.GameConfig)
 local HitModel = require(Shared.Physics.HitModel)
 local HitValidation = require(Shared.Match.HitValidation)
 local MathUtil = require(Shared.Util.MathUtil)
+local Powers = require(Shared.Config.Powers)
 local Remotes = require(Shared.Net.Remotes)
 local Signal = require(Shared.Util.Signal)
 
@@ -195,7 +199,27 @@ local function escaped(position: Vector3): boolean
 		or position.Y > arena.height + 10
 end
 
+-- Magnets and Tractor Beams pull the ball toward whoever is using them.
+local function applyPulls()
+	local now = serverNow()
+	for _, p in Roster.all() do
+		local chassis = p.chassis
+		if not chassis then
+			continue
+		end
+		local kind = if Roster.hasEffect(p, "beam", now)
+			then "beam"
+			elseif Roster.hasEffect(p, "magnet", now) then "magnet"
+			else nil
+		if kind then
+			local target = Powers.pullTarget(kind, chassis.CFrame)
+			state.velocity = Powers.applyPull(kind, state.position, state.velocity, target, cfg.Gravity, STEP)
+		end
+	end
+end
+
 local function fixedStep()
+	applyPulls()
 	BallSim.step(arena, cfg, state, STEP)
 	simTime += STEP
 	if escaped(state.position) then
@@ -321,6 +345,29 @@ function BallService.update(dt: number)
 	if snapshotTimer >= interval then
 		broadcast(false)
 	end
+end
+
+-- A power shoves the ball (a Ground Pound). It counts as `p` touching the ball, so it can score them a goal.
+function BallService.nudge(p: Participant, change: Vector3)
+	local chassis = p.chassis
+	if not live or not chassis then
+		return
+	end
+	local before = BallSim.copy(state)
+	state.velocity = MathUtil.clampMagnitude(state.velocity + change, cfg.MaxSpeed)
+	p.lastHitAt = simTime
+	lastTouchTeam = if p.team == "Blue" then 1 else 2
+	BallService.Touched:Fire({
+		participant = p,
+		time = simTime,
+		before = before,
+		after = BallSim.copy(state),
+		carCFrame = chassis.CFrame,
+		carVelocity = chassis.AssemblyLinearVelocity,
+		mega = false,
+		impactSpeed = change.Magnitude,
+	})
+	broadcast(false)
 end
 
 -- Puts the ball at `position`, still and frozen (kickoff).

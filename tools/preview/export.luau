@@ -118,6 +118,20 @@ local function buildStadium()
 	local ball = BallModelBuilder.build()
 	pivotTo(ball, roblox.CFrame.new(0, GameConfig.Ball.Radius, 0))
 	ball.Parent = showcase
+
+	-- The item boxes, plus a cheese puddle and a banana peel near the middle, as they'd look mid-match.
+	local PropBuilder = harness.require(Server.Arena.PropBuilder)
+	local Powers = harness.require(Shared.Config.Powers)
+	local props = roblox.Instance.new("Folder")
+	props.Name = "Props"
+	props.Parent = workspaceInstance
+	for i, position in Powers.Tuning.BoxPositions do
+		PropBuilder.itemBox(props, position, i)
+	end
+	local cheese = PropBuilder.hazard("cheese", roblox.CFrame.new(30, 0, -30), GameConfig.Teams.Orange.Color)
+	cheese.Parent = props
+	local peel = PropBuilder.hazard("peel", roblox.CFrame.new(16, 0, -50), GameConfig.Teams.Blue.Color)
+	peel.Parent = props
 end
 
 -- The garage showroom from the menus, with one car on the turntable (as ShowroomController shows it).

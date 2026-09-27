@@ -7,9 +7,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
 local MathUtil = require(Shared.Util.MathUtil)
-local Remotes = require(Shared.Net.Remotes)
 
 local Roster = require(script.Parent.Parent.Match.Roster)
+local CarService = require(script.Parent.CarService)
 local StatsService = require(script.Parent.StatsService)
 
 type Participant = Roster.Participant
@@ -20,11 +20,12 @@ local cfg = GameConfig.Bump
 local lastBump: { [string]: number } = {}
 
 local function push(p: Participant, change: Vector3)
-	if p.driver then
-		p.driver:addVelocity(change)
-	elseif p.player then
-		Remotes.Bumped:FireClient(p.player, change)
-	end
+	CarService.push(p, change)
+end
+
+-- Bubble Shields can't be bumped, and diving sharks pass straight through everyone.
+local function untouchable(p: Participant, now: number): boolean
+	return Roster.hasEffect(p, "shield", now) or Roster.hasEffect(p, "ghost", now)
 end
 
 local function contactDistance(a: Participant, b: Participant): number
@@ -66,10 +67,13 @@ function BumpService.update()
 			else
 				attacker, victim, speed, towardVictim = b, a, approachB, -direction
 			end
-			if speed < cfg.MinSpeed then
+			if speed < cfg.MinSpeed or Roster.hasEffect(attacker, "ghost", now) then
 				continue
 			end
 			lastBump[key] = now
+			if untouchable(victim, now) then
+				continue -- bounced off the bubble
+			end
 			local power = attacker.def.Stats.BumpPower / victim.def.Stats.Weight
 			local flat = MathUtil.safeUnit(MathUtil.flat(towardVictim), towardVictim)
 			local teammates = attacker.team == victim.team

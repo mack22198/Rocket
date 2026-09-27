@@ -1,6 +1,7 @@
 --!strict
--- The in-game HUD: the scoreboard and clock, a boost dial, the Mega Shot meter, big centre text (countdown,
--- GO!, GOAL!) and the ☰ MENU button. It's only shown during matches - the menus have their own screens.
+-- The in-game HUD: the scoreboard and clock, a boost dial, the Mega Shot meter, your item and car power, big
+-- centre text (countdown, GO!, GOAL!) and the ☰ MENU button. It's only shown during matches - the menus have
+-- their own screens.
 --
 -- Everything stays clear of Roblox's own buttons in the top corners.
 
@@ -13,6 +14,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
+local Powers = require(Shared.Config.Powers)
 local Remotes = require(Shared.Net.Remotes)
 local Signal = require(Shared.Util.Signal)
 
@@ -55,6 +57,22 @@ local megaBar: Theme.Bar
 local megaLabel: TextLabel
 local camPill: TextLabel
 local menuButton: TextButton
+-- Item and power
+type Slot = {
+	frame: Frame,
+	icon: TextLabel,
+	caption: TextLabel,
+	key: TextLabel,
+	cooldown: Frame,
+	timer: TextLabel,
+	stroke: UIStroke,
+}
+local powerPanel: Frame
+local itemSlot: Slot
+local powerSlot: Slot
+local statusPill: TextLabel
+local noticeText = ""
+local noticeUntil = 0
 
 local messageUntil = 0
 local lastPhase = ""
@@ -252,11 +270,103 @@ local function buildMenuButton()
 	end)
 end
 
+-- One square slot (the item or the power) with a big emoji, its key in the corner and its name below.
+local function buildSlot(name: string, x: number): Slot
+	local frame = Instance.new("Frame")
+	frame.Name = name
+	frame.Size = UDim2.fromOffset(92, 92)
+	frame.Position = UDim2.fromOffset(x, 8)
+	frame.BackgroundColor3 = C.Panel
+	frame.BackgroundTransparency = 0.12
+	frame.Parent = powerPanel
+	Theme.corner(frame, 20)
+	local stroke = Theme.stroke(frame, rgb(255, 255, 255), 3)
+	stroke.Transparency = 0.7
+	local icon = Theme.label(frame, {
+		name = "Icon",
+		size = UDim2.fromOffset(62, 62),
+		position = UDim2.fromScale(0.5, 0.47),
+		anchor = Vector2.new(0.5, 0.5),
+		text = "",
+		stroke = false,
+		zIndex = 2,
+	})
+	local cooldown = Instance.new("Frame")
+	cooldown.Name = "Cooldown"
+	cooldown.Size = UDim2.fromScale(1, 0)
+	cooldown.BackgroundColor3 = rgb(0, 0, 0)
+	cooldown.BackgroundTransparency = 0.45
+	cooldown.BorderSizePixel = 0
+	cooldown.ZIndex = 3
+	cooldown.Parent = frame
+	Theme.corner(cooldown, 20)
+	local timer = Theme.label(frame, {
+		name = "Timer",
+		size = UDim2.fromOffset(60, 40),
+		position = UDim2.fromScale(0.5, 0.5),
+		anchor = Vector2.new(0.5, 0.5),
+		text = "",
+		zIndex = 4,
+	})
+	local caption = Theme.label(powerPanel, {
+		name = `{name}Caption`,
+		size = UDim2.fromOffset(108, 16),
+		position = UDim2.fromOffset(x + 46, 106),
+		anchor = Vector2.new(0.5, 0),
+		text = "",
+		font = Theme.Caps,
+		stroke = false,
+	})
+	local key = Theme.pill(frame, {
+		name = "Key",
+		size = UDim2.fromOffset(38, 24),
+		position = UDim2.new(1, 8, 0, -8),
+		anchor = Vector2.new(1, 0),
+		text = "",
+		font = Theme.Caps,
+		background = C.Text,
+		color = C.Ink,
+		transparency = 0,
+	})
+	key.ZIndex = 5
+	return {
+		frame = frame,
+		icon = icon,
+		caption = caption,
+		key = key,
+		cooldown = cooldown,
+		timer = timer,
+		stroke = stroke,
+	}
+end
+
+local function buildPowerPanel()
+	powerPanel = Instance.new("Frame")
+	powerPanel.Name = "Powers"
+	powerPanel.Size = UDim2.fromOffset(222, 124)
+	powerPanel.Position = UDim2.new(0, 22, 1, -22)
+	powerPanel.AnchorPoint = Vector2.new(0, 1)
+	powerPanel.BackgroundTransparency = 1
+	powerPanel.Parent = gui
+	itemSlot = buildSlot("Item", 0)
+	powerSlot = buildSlot("Power", 122)
+	statusPill = Theme.pill(gui, {
+		name = "Status",
+		size = UDim2.fromOffset(340, 34),
+		position = UDim2.new(0.5, 0, 1, -86),
+		anchor = Vector2.new(0.5, 1),
+		text = "",
+		font = Theme.Caps,
+	})
+	statusPill.Visible = false
+end
+
 local function build()
 	gui = Theme.screen("TurboHUD", 5)
 	buildScoreboard()
 	buildBoostDial()
 	buildMegaMeter()
+	buildPowerPanel()
 	buildMenuButton()
 
 	-- Centre messages.
@@ -280,7 +390,8 @@ local function build()
 	})
 	subText.Visible = false
 
-	local scaledObjects: { GuiObject } = { scoreboard, bigText, subText, dial, camPill, megaPanel }
+	local scaledObjects: { GuiObject } =
+		{ scoreboard, bigText, subText, dial, camPill, megaPanel, powerPanel, statusPill }
 	for _, object in scaledObjects do
 		Theme.scaled(object)
 	end
@@ -290,6 +401,117 @@ end
 local function numberAttr(name: string): number
 	local value = stateObject:GetAttribute(name)
 	return if type(value) == "number" then value else 0
+end
+
+local function keyName(keyboard: string, gamepad: string): string
+	if UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled then
+		return gamepad
+	end
+	return keyboard
+end
+
+-- What's happening to your car right now, for the status pill (most important first).
+local function statusText(car: Model): (string?, Color3)
+	local spin, slow, freeze = CarController.effects()
+	if car:GetAttribute(CarAttr.Frozen) == true or freeze > 0 then
+		return "❄️ FROZEN!", rgb(170, 230, 255)
+	elseif spin > 0 then
+		return "🌀 SPUN OUT!", rgb(255, 230, 90)
+	elseif slow > 0 then
+		return "🧀 STUCK IN CHEESE!", rgb(255, 200, 60)
+	elseif car:GetAttribute(CarAttr.Shield) == true then
+		return "🛡️ BUBBLE SHIELD", rgb(140, 190, 255)
+	elseif car:GetAttribute(CarAttr.Ghost) == true then
+		return "🌊 SHARK DIVE - UNTOUCHABLE", rgb(110, 220, 255)
+	elseif car:GetAttribute(CarAttr.Rocket) == true then
+		return "🚀 ROCKET FUEL - BOOST FOREVER!", rgb(255, 180, 70)
+	elseif car:GetAttribute(CarAttr.Pull) == "magnet" then
+		return "🧲 MAGNET ON", rgb(255, 120, 130)
+	elseif car:GetAttribute(CarAttr.Pull) == "beam" then
+		return "🛸 TRACTOR BEAM", rgb(150, 255, 130)
+	end
+	return nil, C.Text
+end
+
+local function numberOf(instance: Instance, name: string): number
+	local value = instance:GetAttribute(name)
+	return if type(value) == "number" then value else 0
+end
+
+local function updatePowers(car: Model, now: number, pulse: boolean)
+	-- The item slot: empty, spinning like a slot machine, or ready to use.
+	local item = car:GetAttribute(CarAttr.Item)
+	local itemDef = if type(item) == "string" then Powers.item(item) else nil
+	local itemReadyAt = numberOf(car, CarAttr.ItemReadyAt)
+	itemSlot.key.Text = keyName("R", "RB")
+	itemSlot.cooldown.Size = UDim2.fromScale(1, 0)
+	itemSlot.timer.Text = ""
+	if not itemDef then
+		itemSlot.icon.Text = "?"
+		itemSlot.icon.TextTransparency = 0.6
+		itemSlot.caption.Text = "GRAB A ? BOX"
+		itemSlot.caption.TextColor3 = C.Muted
+		itemSlot.frame.BackgroundColor3 = C.Panel
+		itemSlot.stroke.Color = rgb(255, 255, 255)
+		itemSlot.stroke.Transparency = 0.7
+		itemSlot.key.Visible = false
+	elseif now < itemReadyAt then
+		local order = Powers.ItemOrder
+		local spinning = Powers.Items[order[math.floor(os.clock() * 14) % #order + 1]]
+		itemSlot.icon.Text = spinning.Emoji
+		itemSlot.icon.TextTransparency = 0
+		itemSlot.caption.Text = "..."
+		itemSlot.caption.TextColor3 = C.Gold
+		itemSlot.frame.BackgroundColor3 = spinning.Color:Lerp(C.Panel, 0.5)
+		itemSlot.stroke.Color = C.Gold
+		itemSlot.stroke.Transparency = 0
+		itemSlot.key.Visible = false
+	else
+		itemSlot.icon.Text = itemDef.Emoji
+		itemSlot.icon.TextTransparency = 0
+		itemSlot.caption.Text = string.upper(itemDef.Name)
+		itemSlot.caption.TextColor3 = itemDef.Color
+		itemSlot.frame.BackgroundColor3 = itemDef.Color:Lerp(C.Panel, if pulse then 0.35 else 0.5)
+		itemSlot.stroke.Color = itemDef.Color
+		itemSlot.stroke.Transparency = 0
+		itemSlot.key.Visible = true
+	end
+
+	-- The power slot: the car's own power, with a shade that drains away as it recharges.
+	local powerId = car:GetAttribute(CarAttr.Power)
+	local carId = car:GetAttribute(CarAttr.CarId)
+	local power = Powers.forCar(if type(carId) == "string" then carId else "")
+	local left = numberOf(car, CarAttr.PowerReadyAt) - now
+	powerSlot.icon.Text = power.Emoji
+	powerSlot.icon.TextTransparency = 0
+	powerSlot.caption.Text = string.upper(power.Name)
+	powerSlot.key.Text = keyName("G", "LB")
+	if type(powerId) == "string" and left > 0 then
+		powerSlot.cooldown.Size = UDim2.fromScale(1, math.clamp(left / power.Cooldown, 0, 1))
+		powerSlot.timer.Text = tostring(math.ceil(left))
+		powerSlot.caption.TextColor3 = C.Muted
+		powerSlot.frame.BackgroundColor3 = C.Panel
+		powerSlot.stroke.Color = rgb(255, 255, 255)
+		powerSlot.stroke.Transparency = 0.7
+		powerSlot.key.Visible = false
+	else
+		powerSlot.cooldown.Size = UDim2.fromScale(1, 0)
+		powerSlot.timer.Text = ""
+		powerSlot.caption.TextColor3 = power.Color
+		powerSlot.frame.BackgroundColor3 = power.Color:Lerp(C.Panel, if pulse then 0.35 else 0.5)
+		powerSlot.stroke.Color = power.Color
+		powerSlot.stroke.Transparency = 0
+		powerSlot.key.Visible = true
+	end
+
+	-- What's happening to your car (or a quick note, like "no one close enough to freeze").
+	local text, color = statusText(car)
+	if os.clock() < noticeUntil then
+		text, color = noticeText, C.Bad
+	end
+	statusPill.Visible = text ~= nil and megaPanel.Visible
+	statusPill.Text = text or ""
+	statusPill.TextColor3 = color
 end
 
 local function update()
@@ -341,6 +563,8 @@ local function update()
 	dial.Visible = showDriving and not touchOnly
 	megaPanel.Visible = showDriving
 	camPill.Visible = showDriving and not touchOnly
+	powerPanel.Visible = showDriving and not touchOnly
+	statusPill.Visible = false
 	youTag.Visible = false
 	if car then
 		local boost = car:GetAttribute(CarAttr.Boost)
@@ -376,6 +600,7 @@ local function update()
 			megaBar.fill.BackgroundColor3 = C.Mega
 		end
 		camPill.Text = if CameraController.isBallCam() then "📷 BALL CAM: ON" else "📷 BALL CAM: OFF"
+		updatePowers(car, now, pulse)
 
 		local team = car:GetAttribute(CarAttr.Team)
 		if team == "Blue" or team == "Orange" then
@@ -411,6 +636,13 @@ function HUD.start()
 	Remotes.Announce.OnClientEvent:Connect(function(kind: any, text: any)
 		if kind == "overtime" and type(text) == "string" then
 			HUD.flash("OVERTIME!", C.Gold, "Next goal wins!", 2.5)
+		end
+	end)
+	-- A quick note from the server, like "No one close enough to freeze!".
+	Remotes.PowerFx.OnClientEvent:Connect(function(kind: any, _position: any, _team: any, message: any)
+		if kind == "fizzle" and type(message) == "string" then
+			noticeText = message
+			noticeUntil = os.clock() + 1.8
 		end
 	end)
 end

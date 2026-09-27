@@ -213,7 +213,19 @@ local data = {
 	carStage = { pizza = 1, banana = 2 },
 	carLook = { banana = 2 },
 }
-local carAttrs = { Boost = 67, Mega = 100, MegaArmed = false, Team = "Blue", Stage = 2 }
+local carAttrs = {
+	Boost = 67,
+	Mega = 100,
+	MegaArmed = false,
+	Team = "Blue",
+	Stage = 2,
+	CarId = "banana",
+	Power = "peel",
+	Item = "freeze",
+	ItemReadyAt = NOW - 1,
+	PowerReadyAt = NOW + 4.2,
+	Shield = scenario == "match",
+}
 local driving = attrs.Phase == "Playing" and scenario ~= "live"
 local car = {
 	Name = "Car",
@@ -247,8 +259,17 @@ harness.preload(controllers .. "CarController", {
 	end,
 	CarChanged = signal(),
 	Jumped = signal(),
+	EffectApplied = signal(),
 	start = function() end,
 	addVelocity = function() end,
+	isBoosting = function()
+		return false
+	end,
+	effects = function()
+		return 0, 0, 0
+	end,
+	useItem = function() end,
+	usePower = function() end,
 })
 harness.preload(controllers .. "CameraController", {
 	isBallCam = function()
@@ -259,6 +280,8 @@ harness.preload(controllers .. "CameraController", {
 })
 harness.preload(controllers .. "InputController", {
 	MegaPressed = signal(),
+	ItemPressed = signal(),
+	PowerPressed = signal(),
 	BallCamToggled = signal(),
 	setTouchStick = function() end,
 	setTouchButton = function() end,
@@ -376,6 +399,8 @@ if scenario == "goal" then
 	remotes.GoalScored.OnClientEvent:Fire("Blue", "Player1", "Sparky (bot)", roblox.Vector3.new(0, 10, 160), "AIR HIT")
 	remotes.Announce.OnClientEvent:Fire("style", "AIR HIT!", "Blue", "Player1")
 	remotes.Announce.OnClientEvent:Fire("save", "EPIC SAVE!", "Orange", "Bolt (bot)")
+	remotes.Announce.OnClientEvent:Fire("power", "❄️ Player1 froze Bolt (bot)!", "Blue", "Player1")
+	remotes.Announce.OnClientEvent:Fire("power", "🍌 Comet (bot) slipped on a banana!", "Blue", "Zippy (bot)")
 elseif scenario == "garage" then
 	Garage.open()
 elseif scenario == "howto" then

@@ -15,7 +15,9 @@ local BoostPadService = require(Services.BoostPadService)
 local CarService = require(Services.CarService)
 local DataService = require(Services.DataService)
 local GarageService = require(Services.GarageService)
+local ItemService = require(Services.ItemService)
 local MatchService = require(Services.MatchService)
+local PowerService = require(Services.PowerService)
 local StatsService = require(Services.StatsService)
 
 local arenaFolder, arenaShape = ArenaBuilder.build()
@@ -28,6 +30,8 @@ CarService.init(arenaFolder)
 BallService.init(arenaShape)
 StatsService.init(arenaShape)
 BoostPadService.init()
+ItemService.init()
+PowerService.init(arenaFolder)
 MatchService.start()
 
 -- The scenery outside the stadium takes a moment to fill in, and nothing in the game needs it, so it comes last.

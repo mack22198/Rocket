@@ -33,7 +33,6 @@ local MAX_STEER = math.rad(28)
 local TAU = math.pi * 2
 
 local localPlayer = Players.LocalPlayer
-local stateObject = MatchState.getObject()
 local cars: { [Model]: Car } = {}
 
 local function teamColor(team: unknown): Color3
@@ -156,10 +155,7 @@ local function isBoosting(car: Car): boolean
 		return car.model:GetAttribute(A.Boosting) == true
 	end
 	-- Your own car reacts to your key presses at once instead of waiting for the server.
-	local phase = MatchState.phase(stateObject)
-	local canDrive = phase == MatchState.Phases.Playing or phase == MatchState.Phases.GoalScored
-	local boost = car.model:GetAttribute(A.Boost)
-	return canDrive and InputController.read().boost and type(boost) == "number" and boost > 0
+	return CarController.isBoosting()
 end
 
 local function step(dt: number)

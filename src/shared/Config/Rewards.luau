@@ -13,6 +13,8 @@ export type MatchStats = {
 	styleTouches: number,
 	megaShots: number,
 	points: number,
+	items: number, -- item boxes used
+	powers: number, -- car powers used
 }
 
 export type Outcome = "Win" | "Loss" | "Draw"
@@ -50,7 +52,18 @@ Rewards.Scrap = {
 }
 
 function Rewards.emptyStats(): MatchStats
-	return { goals = 0, assists = 0, saves = 0, shots = 0, touches = 0, styleTouches = 0, megaShots = 0, points = 0 }
+	return {
+		goals = 0,
+		assists = 0,
+		saves = 0,
+		shots = 0,
+		touches = 0,
+		styleTouches = 0,
+		megaShots = 0,
+		points = 0,
+		items = 0,
+		powers = 0,
+	}
 end
 
 function Rewards.compute(stats: MatchStats, outcome: Outcome, isMvp: boolean): RewardSummary

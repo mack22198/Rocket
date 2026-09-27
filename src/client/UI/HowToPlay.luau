@@ -21,27 +21,27 @@ local CARDS = {
 	},
 	{
 		icon = "🚀",
-		title = "BOOST",
-		text = "Hold boost to go super fast. Drive over the glowing pads to fill your tank back up.",
+		title = "BOOST & JUMP",
+		text = "Boost to go super fast - pads fill it up. Jump to reach the ball, jump again to flip into it!",
 		color = C.Boost,
 	},
 	{
-		icon = "🦘",
-		title = "JUMP & FLIP",
-		text = "Jump to reach the ball in the air. Jump again while flying to flip into it for a big hit!",
-		color = C.Blue,
+		icon = "🎁",
+		title = "ITEM BOXES",
+		text = "Drive through a ? box to grab an item, like a Magnet or Freeze Ray. Losing? You get better ones!",
+		color = rgb(120, 200, 255),
+	},
+	{
+		icon = "⚡",
+		title = "CAR POWERS",
+		text = "Every car has its own power, like Cheese Trap or Ground Pound. It charges back up after each use!",
+		color = rgb(255, 214, 90),
 	},
 	{
 		icon = "💥",
 		title = "MEGA SHOT",
 		text = "Touching the ball fills your Mega meter. When it's full, press Mega and your next hit blasts the ball!",
 		color = C.Mega,
-	},
-	{
-		icon = "🛡️",
-		title = "DEFEND",
-		text = "Get between the ball and your own goal. Stopping a shot is a SAVE - and saves earn Scrap too.",
-		color = C.Orange,
 	},
 	{
 		icon = "🔩",
@@ -52,9 +52,9 @@ local CARDS = {
 }
 
 local CONTROLS = {
-	{ "⌨️", "W A S D drive · SPACE jump · SHIFT boost · F mega · C ball cam · M menu" },
-	{ "🎮", "RT / LT drive · A jump · B boost · X mega · Y ball cam · VIEW menu" },
-	{ "📱", "Stick to drive, big buttons to jump, boost and mega" },
+	{ "⌨️", "WASD drive · SPACE jump · SHIFT boost · R item · G power · F mega · C ball cam · M menu" },
+	{ "🎮", "RT / LT drive · A jump · B boost · RB item · LB power · X mega · Y ball cam · VIEW menu" },
+	{ "📱", "Stick to drive, big buttons to jump, boost, use your item and power, and Mega Shot" },
 }
 
 local gui: ScreenGui

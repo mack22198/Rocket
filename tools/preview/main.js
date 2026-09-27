@@ -224,6 +224,7 @@ const views = {
   ball: { pos: [12, 9, -14], at: [0, 6, 0], fov: 45 },
   cars: { pos: [40, 14, 560], at: [40, 2, 600], fov: 45 },
   carsClose: { pos: [8, 6, 588], at: [8, 2, 600], fov: 45 },
+  items: { pos: [62, 11, -78], at: [32, 3, -22], fov: 60 },
 };
 const cameras = data.cameras && !Array.isArray(data.cameras) ? data.cameras : {};
 const v = cameras[view] || views[view] || (showroom ? cameras.menu : views.overview);

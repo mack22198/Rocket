@@ -2,9 +2,10 @@
 -- Reads keyboard, gamepad and touch controls and turns them into car input.
 --
 -- Keyboard: W/S or arrows = drive (and pitch in the air), A/D = steer, Space / right mouse = jump,
---           Shift / left mouse = boost, F = Mega Shot, C = ball cam, Q/E = air roll, M = menu
+--           Shift / left mouse = boost, F = Mega Shot, R = use item, G = car power, C = ball cam,
+--           Q/E = air roll, M = menu
 -- Gamepad:  RT/LT = drive/brake, left stick = steer + pitch, A = jump, B = boost, X = Mega Shot,
---           Y = ball cam, LB/RB = air roll, View/Back = menu
+--           RB = use item, LB = car power, Y = ball cam, View/Back = menu
 -- Touch:    on-screen stick and buttons (see TouchControls)
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -18,6 +19,8 @@ local Signal = require(Shared.Util.Signal)
 local InputController = {}
 
 InputController.MegaPressed = Signal.new() :: Signal.Signal<>
+InputController.ItemPressed = Signal.new() :: Signal.Signal<>
+InputController.PowerPressed = Signal.new() :: Signal.Signal<>
 InputController.BallCamToggled = Signal.new() :: Signal.Signal<>
 InputController.MenuPressed = Signal.new() :: Signal.Signal<>
 
@@ -121,12 +124,6 @@ function InputController.read(): CarPhysics.Input
 		if UserInputService:IsGamepadButtonDown(pad, Enum.KeyCode.ButtonB) then
 			boost = true
 		end
-		if UserInputService:IsGamepadButtonDown(pad, Enum.KeyCode.ButtonR1) then
-			roll += 1
-		end
-		if UserInputService:IsGamepadButtonDown(pad, Enum.KeyCode.ButtonL1) then
-			roll -= 1
-		end
 	end
 
 	-- Touch.
@@ -147,28 +144,39 @@ function InputController.read(): CarPhysics.Input
 	}
 end
 
--- One-press actions (Mega Shot, ball cam) are bound only while driving, so they don't clash with anything else.
+-- One-press actions: (action name, signal, keys).
+local PRESS_ACTIONS: { { name: string, signal: Signal.Signal<>, keys: { Enum.KeyCode } } } = {
+	{ name = "TurboMega", signal = InputController.MegaPressed, keys = { Enum.KeyCode.F, Enum.KeyCode.ButtonX } },
+	{ name = "TurboItem", signal = InputController.ItemPressed, keys = { Enum.KeyCode.R, Enum.KeyCode.ButtonR1 } },
+	{ name = "TurboPower", signal = InputController.PowerPressed, keys = { Enum.KeyCode.G, Enum.KeyCode.ButtonL1 } },
+	{
+		name = "TurboBallCam",
+		signal = InputController.BallCamToggled,
+		keys = { Enum.KeyCode.C, Enum.KeyCode.ButtonY },
+	},
+}
+
+-- One-press actions (Mega Shot, items, powers, ball cam) are bound only while driving, so they don't clash with
+-- anything else.
 function InputController.setDriving(driving: boolean)
 	if driving == actionsBound then
 		return
 	end
 	actionsBound = driving
-	if driving then
-		ContextActionService:BindActionAtPriority("TurboMega", function(_, inputState)
-			if inputState == Enum.UserInputState.Begin then
-				InputController.MegaPressed:Fire()
-			end
-			return Enum.ContextActionResult.Sink
-		end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.F, Enum.KeyCode.ButtonX)
-		ContextActionService:BindActionAtPriority("TurboBallCam", function(_, inputState)
-			if inputState == Enum.UserInputState.Begin then
-				InputController.BallCamToggled:Fire()
-			end
-			return Enum.ContextActionResult.Sink
-		end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.C, Enum.KeyCode.ButtonY)
-	else
-		ContextActionService:UnbindAction("TurboMega")
-		ContextActionService:UnbindAction("TurboBallCam")
+	for _, action in PRESS_ACTIONS do
+		if driving then
+			local signal = action.signal
+			ContextActionService:BindActionAtPriority(action.name, function(_, inputState)
+				if inputState == Enum.UserInputState.Begin and not blocked then
+					signal:Fire()
+				end
+				return Enum.ContextActionResult.Sink
+			end, false, Enum.ContextActionPriority.High.Value, table.unpack(action.keys))
+		else
+			ContextActionService:UnbindAction(action.name)
+		end
+	end
+	if not driving then
 		touchStick = Vector2.zero
 		table.clear(touchHeld)
 	end

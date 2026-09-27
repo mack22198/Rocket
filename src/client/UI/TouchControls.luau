@@ -6,7 +6,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
-local MatchState = require(ReplicatedStorage:WaitForChild("Shared").Match.MatchState)
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local MatchState = require(Shared.Match.MatchState)
+local Powers = require(Shared.Config.Powers)
 
 local CameraController = require(script.Parent.Parent.Controllers.CameraController)
 local CarController = require(script.Parent.Parent.Controllers.CarController)
@@ -189,6 +191,52 @@ local function build()
 	local cam = makeButton("BallCam", "CAM", Color3.fromRGB(90, 90, 120), 60, 190, 190)
 	cam.Activated:Connect(function()
 		CameraController.toggleBallCam()
+	end)
+
+	-- ITEM shows the item you're holding; POWER shows your car's power and counts down while it recharges.
+	local item = makeButton("Item", "?", Color3.fromRGB(70, 80, 120), 84, 200, 300)
+	item.Activated:Connect(function()
+		InputController.ItemPressed:Fire()
+	end)
+	local power = makeButton("Power", "", Color3.fromRGB(70, 80, 120), 84, 320, 175)
+	power.Activated:Connect(function()
+		InputController.PowerPressed:Fire()
+	end)
+	-- Little names under the two new buttons (the padding makes the button's inside 50% of its height).
+	local captions: { { button: TextButton, text: string } } = {
+		{ button = item, text = "ITEM" },
+		{ button = power, text = "POWER" },
+	}
+	for _, entry in captions do
+		local caption = Theme.label(entry.button, {
+			name = "Caption",
+			size = UDim2.fromScale(1.5, 0.42),
+			position = UDim2.fromScale(0.5, 1.58),
+			anchor = Vector2.new(0.5, 0),
+			text = entry.text,
+			font = Enum.Font.GothamBlack,
+		})
+		caption.ZIndex = 2
+	end
+	local A = MatchState.CarAttr
+	RunService.RenderStepped:Connect(function()
+		local car = CarController.getCar()
+		if not car then
+			return
+		end
+		local now = workspace:GetServerTimeNow()
+		local held = car:GetAttribute(A.Item)
+		local itemDef = if type(held) == "string" then Powers.item(held) else nil
+		local readyAt = car:GetAttribute(A.ItemReadyAt)
+		local spinning = itemDef ~= nil and type(readyAt) == "number" and now < readyAt
+		item.Text = if itemDef and not spinning then itemDef.Emoji elseif spinning then "…" else "?"
+		item.BackgroundColor3 = if itemDef and not spinning then itemDef.Color else Color3.fromRGB(70, 80, 120)
+		local carId = car:GetAttribute(A.CarId)
+		local powerDef = Powers.forCar(if type(carId) == "string" then carId else "")
+		local powerReadyAt = car:GetAttribute(A.PowerReadyAt)
+		local left = if type(powerReadyAt) == "number" then powerReadyAt - now else 0
+		power.Text = if left > 0 then tostring(math.ceil(left)) else powerDef.Emoji
+		power.BackgroundColor3 = if left > 0 then Color3.fromRGB(70, 80, 120) else powerDef.Color
 	end)
 	placeAll(Theme.getScale())
 	Theme.onScaleChanged(placeAll)

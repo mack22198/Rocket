@@ -26,6 +26,14 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   and the camera widens as you go faster.
 - **Arcade driving:** boost, jump, double jump, flips (dodges), air control and air roll, driving up the curved
   walls, and bumping other cars.
+- **Item boxes:** spinning "?" boxes on the pitch give you a random item to use whenever you like (R): a
+  **Magnet** that pulls the ball to your car, a **Freeze Ray** that freezes the closest opponent, a **Super
+  Spring**, **Rocket Fuel** (boost that doesn't run out), a **Bubble Shield** and a **Mega Charge**. A team
+  that's behind gets the comeback items more often, so matches stay close.
+- **Every car has its own power** (G), which recharges after each use: the Pizza Car drops a gooey **Cheese
+  Trap**, the Banana Car a **Banana Peel** that spins cars out, the Tiny Kart has a **Nitro Dash**, the Neon
+  Shark a **Shark Dive** that makes it untouchable, the Monster Truck a **Ground Pound** shockwave and the UFO a
+  **Tractor Beam** that lifts the ball up for the perfect shot.
 - **Mega Shot:** touching the ball, making saves and doing style moves fills a meter. When it's full, press
   F to arm it and your next hit blasts the ball on fire. It's earned in the match, never bought.
 - **Style and combos:** air hits, wall hits, passes and Mega Shots chain into combo goals ("🔥 3X COMBO!").
@@ -70,8 +78,10 @@ evolutions quickly, lower the numbers in `GameConfig.Evolution.Xp`.
 | Jump (twice to double jump, jump + direction to flip) | Space or right mouse | A | JUMP |
 | Boost | Shift or left mouse | B | BOOST |
 | Mega Shot (when the meter is full) | F | X | MEGA |
+| Use your item | R | RB | ITEM |
+| Use your car's power | G | LB | POWER |
 | Ball cam on/off | C | Y | CAM |
-| Air roll | Q / E | LB / RB | |
+| Air roll | Q / E | | |
 | In the air: tip the nose | W / S | Left stick | Stick |
 | Match menu (leave the match) | M | View / Back | ☰ MENU |
 
@@ -92,6 +102,8 @@ Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
   boost, jump height, gravity, bot skill, Mega Shot, boost pads and Studio shortcuts.
 - [`CarCatalog.luau`](src/shared/Config/CarCatalog.luau): the cars, prices and stats.
 - [`Rewards.luau`](src/shared/Config/Rewards.luau): how much Scrap each thing is worth.
+- [`Powers.luau`](src/shared/Config/Powers.luau): the items and car powers, how often each item turns up
+  (and how much that depends on the score), and how strong they all are.
 - `GameConfig.Evolution`: how much XP each evolution stage needs.
 
 Car looks (and every evolution stage) are built from plain parts in
@@ -144,7 +156,7 @@ real building code, which is handy for checking changes to how things look from 
 ```
 src/
   shared/   (ReplicatedStorage.Shared: used by both server and client)
-    Config/       GameConfig, CarCatalog, Rewards, Evolution
+    Config/       GameConfig, CarCatalog, Rewards, Evolution, Powers (items and car powers)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits)
@@ -157,12 +169,14 @@ src/
     Arena/        ArenaBuilder (pitch, walls, goals), StadiumBuilder (stands, crowd, roof, screens),
                   LobbyBuilder (VIP deck), EnvironmentBuilder (terrain, trees)
     Services/     MatchService (menu -> queue -> match loop), BallService, CarService, BotService,
-                  StatsService, BoostPadService, BumpService, DataService (saving), GarageService
+                  StatsService, BoostPadService, BumpService, ItemService (item boxes), PowerService
+                  (using items and powers, cheese and banana traps), DataService (saving), GarageService
   client/   (StarterPlayerScripts.Client)
     Showroom/     ShowroomBuilder (the menu's garage showroom and its mirror-floor reflection)
     Controllers/  GameFlow (menu / garage / match), InputController, CarController, CarVisuals (wheels,
-                  trails), BallView, CameraController, EffectsController, ShowroomController,
-                  StadiumController (live scoreboards, LED boards, cheering crowd)
+                  trails), BallView, CameraController, EffectsController, PowerVisuals (item boxes,
+                  shields, ice, beams), ShowroomController, StadiumController (live scoreboards, LED boards,
+                  cheering crowd)
     UI/           MainMenu, Garage, PauseMenu, HowToPlay, HUD, Announcer, ResultsScreen, TouchControls,
                   Transition, Theme
 tests/      Lune unit tests (run outside Roblox)
@@ -177,6 +191,9 @@ tools/      Offline previews of the 3D world and the UI
   are handled on the server.
 - **Cars** use arcade raycast suspension (`CarPhysics`). Each player's client drives their own car. Bots run
   the same code on the server.
+- **Items and powers are decided by the server** (`PowerService`), which then tells each car's driver what
+  happened to it (spun out, slowed, frozen). Magnets and Tractor Beams pull the ball with the same maths on the
+  server and in every client's prediction of it, so the ball stays smooth.
 - **Saving** uses a session lock so two servers can't overwrite each other.
 - **Menus and matches:** each player has a `Status` attribute (`Menu`, `Queued` or `Playing`) set by
   `MatchService`; the client's `GameFlow` shows the menu, the garage or the match to match it, fading through

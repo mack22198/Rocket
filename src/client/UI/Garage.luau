@@ -1,8 +1,8 @@
 --!strict
 -- The garage, laid over the 3D showroom: your cars on the left, the chosen car big on the turntable in the
--- middle, and on the right its strengths and weaknesses, its evolution track and the button for the next step
--- (unlock, drive it, EVOLVE, or pick one of the looks it has earned). Prices are fixed and shown up front;
--- evolving is earned by driving the car. Changes apply from your next match.
+-- middle, and on the right its special power, its strengths and weaknesses, its evolution track and the button
+-- for the next step (unlock, drive it, EVOLVE, or pick one of the looks it has earned). Prices are fixed and
+-- shown up front; evolving is earned by driving the car. Changes apply from your next match.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,6 +15,7 @@ local CarCatalog = require(Shared.Config.CarCatalog)
 local CarModelBuilder = require(Shared.Cars.CarModelBuilder)
 local Evolution = require(Shared.Config.Evolution)
 local GameConfig = require(Shared.Config.GameConfig)
+local Powers = require(Shared.Config.Powers)
 local Remotes = require(Shared.Net.Remotes)
 local Signal = require(Shared.Util.Signal)
 
@@ -53,6 +54,10 @@ local toast: TextLabel
 local tiles: { Tile } = {}
 local nameLabel: TextLabel
 local rarityLabel: TextLabel
+local powerIcon: TextLabel
+local powerName: TextLabel
+local powerText: TextLabel
+local powerStroke: UIStroke
 local descriptionLabel: TextLabel
 local statBars: { { key: string, bar: Theme.Bar } } = {}
 local nodes: { Node } = {}
@@ -263,6 +268,13 @@ local function refresh()
 	rarityLabel.Text = `{string.upper(def.Rarity)}  ·  {string.upper(def.Tagline)}`
 	rarityLabel.TextColor3 = rarity.Color
 	descriptionLabel.Text = def.Description
+	local power = Powers.forCar(def.Id)
+	powerIcon.Text = power.Emoji
+	powerIcon.BackgroundColor3 = power.Color
+	powerName.Text = `POWER: {string.upper(power.Name)}`
+	powerName.TextColor3 = power.Color
+	powerText.Text = power.Description
+	powerStroke.Color = power.Color
 	for _, row in statBars do
 		local value = (def.Stats :: any)[row.key] :: number
 		-- 0.6 .. 1.4 maps across the bar, so every car looks good at something.
@@ -515,10 +527,48 @@ local function buildRight()
 		align = Enum.TextXAlignment.Left,
 		stroke = false,
 	})
+	-- The car's special power.
+	local powerCard = Instance.new("Frame")
+	powerCard.Name = "Power"
+	powerCard.Size = UDim2.new(1, 0, 0, 50)
+	powerCard.Position = UDim2.fromOffset(0, 62)
+	powerCard.BackgroundColor3 = C.PanelDark
+	powerCard.BackgroundTransparency = 0.2
+	powerCard.Parent = panel
+	Theme.corner(powerCard, 12)
+	powerStroke = Theme.stroke(powerCard, C.Gold, 2)
+	powerIcon = Theme.label(powerCard, {
+		name = "Icon",
+		size = UDim2.fromOffset(40, 40),
+		position = UDim2.fromOffset(5, 5),
+		text = "",
+		stroke = false,
+	})
+	powerIcon.BackgroundTransparency = 0.55
+	Theme.corner(powerIcon, 20)
+	powerName = Theme.label(powerCard, {
+		name = "PowerName",
+		size = UDim2.new(1, -60, 0, 18),
+		position = UDim2.fromOffset(54, 5),
+		text = "",
+		font = Theme.Caps,
+		align = Enum.TextXAlignment.Left,
+		stroke = false,
+	})
+	powerText = Theme.label(powerCard, {
+		name = "PowerText",
+		size = UDim2.new(1, -60, 0, 24),
+		position = UDim2.fromOffset(54, 23),
+		text = "",
+		font = Theme.Body,
+		color = C.Text,
+		align = Enum.TextXAlignment.Left,
+		stroke = false,
+	})
 	descriptionLabel = Theme.label(panel, {
 		name = "Description",
-		size = UDim2.new(1, 0, 0, 36),
-		position = UDim2.fromOffset(1, 60),
+		size = UDim2.new(1, 0, 0, 34),
+		position = UDim2.fromOffset(1, 118),
 		text = "",
 		font = Theme.Body,
 		color = C.Muted,
@@ -526,7 +576,7 @@ local function buildRight()
 		stroke = false,
 	})
 	for i, row in STAT_ROWS do
-		local y = 106 + (i - 1) * 23
+		local y = 158 + (i - 1) * 20
 		Theme.label(panel, {
 			size = UDim2.fromOffset(70, 16),
 			position = UDim2.fromOffset(0, y),
@@ -546,7 +596,7 @@ local function buildRight()
 	-- that look on the turntable.
 	Theme.label(panel, {
 		size = UDim2.fromOffset(200, 16),
-		position = UDim2.fromOffset(0, 230),
+		position = UDim2.fromOffset(0, 264),
 		text = "✨ EVOLUTION",
 		font = Theme.Caps,
 		color = C.Evolve,
@@ -557,7 +607,7 @@ local function buildRight()
 	local track = Instance.new("Frame")
 	track.Name = "Track"
 	track.Size = UDim2.fromOffset(span, 6)
-	track.Position = UDim2.fromOffset(trackLeft, 273)
+	track.Position = UDim2.fromOffset(trackLeft, 301)
 	track.BackgroundColor3 = C.PanelDark
 	track.BorderSizePixel = 0
 	track.Parent = panel
@@ -573,7 +623,7 @@ local function buildRight()
 		circle.Name = `Stage{i}`
 		circle.Size = UDim2.fromOffset(40, 40)
 		circle.AnchorPoint = Vector2.new(0.5, 0.5)
-		circle.Position = UDim2.fromOffset(x, 276)
+		circle.Position = UDim2.fromOffset(x, 304)
 		circle.BackgroundColor3 = C.PanelDark
 		circle.Text = tostring(i)
 		circle.Font = Theme.Title
@@ -591,7 +641,7 @@ local function buildRight()
 		padding.Parent = circle
 		local name = Theme.label(panel, {
 			size = UDim2.fromOffset(84, 15),
-			position = UDim2.fromOffset(x, 300),
+			position = UDim2.fromOffset(x, 327),
 			anchor = Vector2.new(0.5, 0),
 			text = "",
 			font = Theme.Body,
@@ -604,10 +654,10 @@ local function buildRight()
 		table.insert(nodes, { circle = circle, name = name })
 	end
 
-	xpBar = Theme.bar(panel, UDim2.new(1, 0, 0, 14), UDim2.fromOffset(0, 330), C.Evolve)
+	xpBar = Theme.bar(panel, UDim2.new(1, 0, 0, 14), UDim2.fromOffset(0, 352), C.Evolve)
 	xpLabel = Theme.label(panel, {
 		size = UDim2.new(1, 0, 0, 16),
-		position = UDim2.fromOffset(0, 350),
+		position = UDim2.fromOffset(0, 371),
 		text = "",
 		font = Theme.Body,
 		stroke = false,

@@ -25,6 +25,8 @@ local BoostPadService = require(script.Parent.BoostPadService)
 local BumpService = require(script.Parent.BumpService)
 local CarService = require(script.Parent.CarService)
 local DataService = require(script.Parent.DataService)
+local ItemService = require(script.Parent.ItemService)
+local PowerService = require(script.Parent.PowerService)
 local StatsService = require(script.Parent.StatsService)
 
 type Participant = Roster.Participant
@@ -349,11 +351,13 @@ local function kickoff()
 	pendingGoal = nil
 	BallService.reset(Vector3.new(0, GameConfig.Ball.Radius, 0))
 	BoostPadService.resetAll()
+	ItemService.resetAll()
 	BumpService.reset()
 	for _, p in Roster.all() do
 		CarService.freezeAt(p, kickoffCFrame(p))
 		CarService.resetForKickoff(p)
 	end
+	PowerService.resetForKickoff()
 	setPhase(Phases.Countdown, M.CountdownLength)
 	task.wait(M.CountdownLength)
 	for _, p in Roster.all() do
@@ -437,6 +441,7 @@ end
 local function finishMatch(aborted: boolean)
 	matchRunning = false
 	BallService.hide()
+	PowerService.clear()
 	local winner: Team? = if blueScore > orangeScore then "Blue" elseif orangeScore > blueScore then "Orange" else nil
 	local mvp: Participant? = nil
 	for _, p in Roster.all() do
@@ -659,6 +664,8 @@ function MatchService.start()
 		CarService.tick(dt, live or phase == Phases.GoalScored)
 		if live then
 			BoostPadService.update()
+			ItemService.update()
+			PowerService.update()
 			BumpService.update()
 		end
 	end)
@@ -675,6 +682,7 @@ function MatchService.start()
 				if not ok then
 					warn(`[Match] The match crashed: {err}`)
 					matchRunning = false
+					PowerService.clear()
 					for _, p in Roster.all() do
 						CarService.despawn(p)
 						if p.player and MatchState.statusOf(p.player) == Status.Playing then

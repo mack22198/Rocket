@@ -111,6 +111,11 @@ GameConfig.Car = {
 	AirSpinDamping = 1.5,
 	MaxAngularSpeed = 12,
 	AutoRightDelay = 0.8, -- stuck on the roof this long -> hop back onto the wheels
+	-- Item and power effects on a car.
+	SlowFactor = 0.45, -- top speed while stuck in cheese
+	SpinRate = 11, -- radians per second while spinning out on a banana
+	SpinGrip = 0.15, -- tyre grip while spinning out (the car slides)
+	FreezeDamping = 4, -- how quickly a frozen car skids to a stop
 }
 
 GameConfig.Bump = {

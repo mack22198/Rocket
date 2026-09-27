@@ -1,7 +1,10 @@
 --!strict
 -- Spawns and removes cars, hands players physics ownership of their own car, and runs the server side of
 -- boost and Mega Shot (the server decides how much boost you have; your client just asks to use it).
+-- It also keeps each car's attributes in step with the match (boost, Mega, item, power, active effects), which
+-- is how every client knows what to draw.
 
+local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -10,6 +13,7 @@ local CarDriver = require(Shared.Cars.CarDriver)
 local CarModelBuilder = require(Shared.Cars.CarModelBuilder)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
+local Powers = require(Shared.Config.Powers)
 local Remotes = require(Shared.Net.Remotes)
 
 local Roster = require(script.Parent.Parent.Match.Roster)
@@ -23,8 +27,18 @@ local arenaFolder: Instance
 
 local A = MatchState.CarAttr
 
+-- Cars bump into each other, except a car that's diving like a ghost (Shark Dive), which passes through.
+local CAR_GROUP = "TurboCars"
+local GHOST_GROUP = "TurboGhosts"
+
 local function teamColor(team: Roster.Team): Color3
 	return GameConfig.Teams[team].Color
+end
+
+local function setIfChanged(car: Model, name: string, value: any)
+	if car:GetAttribute(name) ~= value then
+		car:SetAttribute(name, value)
+	end
 end
 
 local function syncAttributes(p: Participant)
@@ -47,10 +61,46 @@ local function syncAttributes(p: Participant)
 	if car:GetAttribute(A.Boosting) ~= boosting then
 		car:SetAttribute(A.Boosting, boosting)
 	end
+
+	local now = workspace:GetServerTimeNow()
+	setIfChanged(car, A.Item, p.item or "")
+	setIfChanged(car, A.ItemReadyAt, p.itemReadyAt)
+	setIfChanged(car, A.PowerReadyAt, p.powerReadyAt)
+	setIfChanged(car, A.Shield, Roster.hasEffect(p, "shield", now))
+	setIfChanged(car, A.Frozen, Roster.hasEffect(p, "frozen", now))
+	setIfChanged(car, A.Rocket, Roster.hasEffect(p, "rocket", now))
+	local ghost = Roster.hasEffect(p, "ghost", now)
+	setIfChanged(car, A.Ghost, ghost)
+	local pull = if Roster.hasEffect(p, "beam", now)
+		then "beam"
+		elseif Roster.hasEffect(p, "magnet", now) then "magnet"
+		else ""
+	setIfChanged(car, A.Pull, pull)
+	local chassis = p.chassis
+	local group = if ghost then GHOST_GROUP else CAR_GROUP
+	if chassis and chassis.CollisionGroup ~= group then
+		chassis.CollisionGroup = group
+	end
+end
+
+local function registerCollisionGroups()
+	local ok, err = pcall(function()
+		for _, name in { CAR_GROUP, GHOST_GROUP } do
+			if not PhysicsService:IsCollisionGroupRegistered(name) then
+				PhysicsService:RegisterCollisionGroup(name)
+			end
+		end
+		PhysicsService:CollisionGroupSetCollidable(GHOST_GROUP, CAR_GROUP, false)
+		PhysicsService:CollisionGroupSetCollidable(GHOST_GROUP, GHOST_GROUP, false)
+	end)
+	if not ok then
+		warn(`[Cars] Couldn't set up collision groups: {err}`)
+	end
 end
 
 function CarService.init(arena: Instance)
 	arenaFolder = arena
+	registerCollisionGroups()
 	local matchFolder = workspace:FindFirstChild(MatchState.Folders.Match)
 	if not matchFolder then
 		local created = Instance.new("Folder")
@@ -89,7 +139,9 @@ function CarService.spawn(p: Participant, cframe: CFrame)
 	model:SetAttribute(A.DriverName, p.name)
 	model:SetAttribute(A.Team, p.team)
 	model:SetAttribute(A.CarId, p.def.Id)
+	model:SetAttribute(A.Power, Powers.forCar(p.def.Id).Id)
 	local chassis = model.PrimaryPart :: BasePart
+	chassis.CollisionGroup = CAR_GROUP
 	chassis.Anchored = true
 	model:PivotTo(cframe)
 	model.Parent = carsFolder
@@ -179,17 +231,43 @@ function CarService.resetForKickoff(p: Participant)
 	syncAttributes(p)
 end
 
--- Drains boost for anyone holding the boost button, and times out unused Mega Shots.
+-- Drains boost for anyone holding the boost button (unless they're on Rocket Fuel), and times out unused
+-- Mega Shots.
 function CarService.tick(dt: number, live: boolean)
 	local now = workspace:GetServerTimeNow()
 	for _, p in Roster.all() do
-		if live and p.boosting and p.boost > 0 then
+		if Roster.hasEffect(p, "rocket", now) then
+			p.boost = 100
+		elseif live and p.boosting and p.boost > 0 then
 			p.boost = math.max(0, p.boost - GameConfig.Car.BoostDrainPerSecond * dt)
 		end
 		if p.megaArmed and now > p.megaArmedUntil then
 			p.megaArmed = false -- fizzled, but the meter stays full so it can be armed again
 		end
 		syncAttributes(p)
+	end
+end
+
+-- Pushes this car's attributes out now (after an item or power changed something).
+function CarService.sync(p: Participant)
+	syncAttributes(p)
+end
+
+-- Gives a car a sudden change of speed. Players' cars are driven by their own client, so it's sent there.
+function CarService.push(p: Participant, change: Vector3)
+	if p.driver then
+		p.driver:addVelocity(change)
+	elseif p.player then
+		Remotes.Bumped:FireClient(p.player, change)
+	end
+end
+
+-- Spins a car out, slows it down or freezes it (see CarPhysics.applyEffect), wherever it's being driven.
+function CarService.applyEffect(p: Participant, effect: string, duration: number, direction: number?)
+	if p.driver then
+		p.driver:applyEffect(effect, duration, direction)
+	elseif p.player then
+		Remotes.CarEffect:FireClient(p.player, effect, duration, direction or 1)
 	end
 end
 

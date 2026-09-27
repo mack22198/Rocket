@@ -1,5 +1,6 @@
 --!strict
 -- Drives the bot cars on the server. Bots "think" a dozen times a second (BotBrain) and drive every frame.
+-- They use their items and car powers too (PowerService.botThink).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -8,10 +9,13 @@ local BallSim = require(Shared.Physics.BallSim)
 local BotBrain = require(Shared.Bots.BotBrain)
 local CarPhysics = require(Shared.Physics.CarPhysics)
 local GameConfig = require(Shared.Config.GameConfig)
+local MathUtil = require(Shared.Util.MathUtil)
+local Powers = require(Shared.Config.Powers)
 
 local Roster = require(script.Parent.Parent.Match.Roster)
 local BallService = require(script.Parent.BallService)
 local CarService = require(script.Parent.CarService)
+local PowerService = require(script.Parent.PowerService)
 
 type Participant = Roster.Participant
 
@@ -71,6 +75,45 @@ local function forecast(): (number) -> Vector3
 	end
 end
 
+-- What a bot can see when deciding on its item and power.
+local function botView(
+	p: Participant,
+	chassis: BasePart,
+	role: string,
+	ball: Vector3,
+	enemyGoal: Vector3
+): Powers.BotView
+	local cframe = chassis.CFrame
+	local position = cframe.Position
+	local look = MathUtil.safeUnit(MathUtil.flat(cframe.LookVector), Vector3.new(0, 0, -1))
+	local toBall = MathUtil.flat(ball - position)
+	local ballDirection = MathUtil.safeUnit(toBall, look)
+	local goalDirection = MathUtil.safeUnit(MathUtil.flat(enemyGoal - ball), look)
+	local nearest = math.huge
+	local behind = false
+	for _, other in Roster.all() do
+		local otherChassis = other.chassis
+		if other.team ~= p.team and otherChassis then
+			local offset = otherChassis.CFrame.Position - position
+			local distance = offset.Magnitude
+			nearest = math.min(nearest, distance)
+			if distance < 32 and MathUtil.flat(offset):Dot(look) < -distance * 0.5 then
+				behind = true
+			end
+		end
+	end
+	return {
+		role = role,
+		ballDistance = toBall.Magnitude,
+		ballHeight = ball.Y,
+		ballInFront = look:Dot(ballDirection) > 0.7,
+		shotLinedUp = ballDirection:Dot(goalDirection) > 0.6,
+		nearestEnemy = nearest,
+		enemyBehind = behind,
+		heldFor = if p.item then workspace:GetServerTimeNow() - p.itemReadyAt else 0,
+	}
+end
+
 local function think()
 	local arena = BallService.arena()
 	local ball = BallService.getState()
@@ -124,6 +167,8 @@ local function think()
 			if wantsMega then
 				CarService.activateMega(p)
 			end
+			local enemyGoal = Vector3.new(0, 0, -defendsSide * arena.halfLength)
+			PowerService.botThink(p, botView(p, chassis, mind.role, ball.position, enemyGoal))
 		end
 	end
 end

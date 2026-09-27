@@ -44,6 +44,10 @@ export type Config = {
 	AirSpinDamping: number,
 	MaxAngularSpeed: number,
 	AutoRightDelay: number,
+	SlowFactor: number,
+	SpinRate: number,
+	SpinGrip: number,
+	FreezeDamping: number,
 }
 
 export type Stats = {
@@ -77,6 +81,11 @@ export type State = {
 	dodgeTimer: number,
 	suspensionPause: number,
 	stuckTimer: number,
+	-- Item and power effects (seconds left): spun out on a banana, stuck in cheese, frozen solid.
+	spinTimer: number,
+	spinDirection: number,
+	slowTimer: number,
+	freezeTimer: number,
 }
 
 export type StepParams = {
@@ -147,7 +156,33 @@ function CarPhysics.newState(): State
 		dodgeTimer = 0,
 		suspensionPause = 0,
 		stuckTimer = 0,
+		spinTimer = 0,
+		spinDirection = 1,
+		slowTimer = 0,
+		freezeTimer = 0,
 	}
+end
+
+export type Effect = "spin" | "slow" | "freeze"
+
+-- Starts (or extends) an effect on a car: "spin" = spun out and sliding, "slow" = stuck in goo, "freeze" =
+-- frozen in a block of ice. None of them take away more than a couple of seconds of driving.
+function CarPhysics.applyEffect(state: State, effect: string, duration: number, direction: number?)
+	if effect == "spin" then
+		state.spinTimer = math.max(state.spinTimer, duration)
+		state.spinDirection = if direction and direction < 0 then -1 else 1
+	elseif effect == "slow" then
+		state.slowTimer = math.max(state.slowTimer, duration)
+	elseif effect == "freeze" then
+		state.freezeTimer = math.max(state.freezeTimer, duration)
+	end
+end
+
+-- Clears every effect (kickoffs).
+function CarPhysics.clearEffects(state: State)
+	state.spinTimer = 0
+	state.slowTimer = 0
+	state.freezeTimer = 0
 end
 
 local function pitchOf(input: Input): number
@@ -177,6 +212,15 @@ function CarPhysics.step(p: StepParams): StepResult
 	}
 
 	state.suspensionPause = math.max(0, state.suspensionPause - dt)
+	state.spinTimer = math.max(0, state.spinTimer - dt)
+	state.slowTimer = math.max(0, state.slowTimer - dt)
+	state.freezeTimer = math.max(0, state.freezeTimer - dt)
+	local spinning = state.spinTimer > 0
+	local slowed = state.slowTimer > 0
+	local frozen = state.freezeTimer > 0
+	if spinning or frozen then
+		input = CarPhysics.NoInput -- no driving while spinning out or frozen
+	end
 	local jumpPressed = input.jump and not state.jumpHeld
 	state.jumpHeld = input.jump
 
@@ -213,7 +257,7 @@ function CarPhysics.step(p: StepParams): StepResult
 		local forwardSpeed = velocity:Dot(forward)
 
 		-- Throttle, brakes and coasting.
-		local maxSpeed = config.MaxSpeed * stats.Speed
+		local maxSpeed = config.MaxSpeed * stats.Speed * (if slowed then config.SlowFactor else 1)
 		local accel = 0
 		local braking = false
 		if input.throttle > 0.05 then
@@ -238,10 +282,16 @@ function CarPhysics.step(p: StepParams): StepResult
 			accel = -forwardSpeed / dt -- stop exactly instead of rolling backwards
 		end
 		velocity += forward * (accel * dt)
+		if slowed and math.abs(forwardSpeed) > maxSpeed then
+			-- Stuck in the goo: drag the car down to the slow speed.
+			local excess = math.abs(forwardSpeed) - maxSpeed
+			velocity -= forward * (math.sign(forwardSpeed) * math.min(excess, config.BrakeDeceleration * dt))
+		end
 
-		-- Tyre grip: bleed off sideways sliding.
+		-- Tyre grip: bleed off sideways sliding (hardly any while spinning out).
+		local grip = config.Grip * (if spinning then config.SpinGrip else 1)
 		local sideSpeed = velocity:Dot(side)
-		velocity -= side * (sideSpeed * MathUtil.expDecay(config.Grip, dt))
+		velocity -= side * (sideSpeed * MathUtil.expDecay(grip, dt))
 
 		-- Steering: turn rate grows with speed, then softens at very high speed. Reversing flips it like a real car.
 		local absSpeed = math.abs(forwardSpeed)
@@ -250,7 +300,7 @@ function CarPhysics.step(p: StepParams): StepResult
 			* math.clamp(absSpeed / config.TurnSpeedRamp, 0, 1)
 			* (1 - config.HighSpeedTurnFactor * math.clamp(absSpeed / config.MaxBoostedSpeed, 0, 1))
 		local direction = if forwardSpeed >= 0 then 1 else -1
-		local targetYaw = -input.steer * turn * direction
+		local targetYaw = if spinning then config.SpinRate * state.spinDirection else -input.steer * turn * direction
 		local currentYaw = angular:Dot(normal)
 		local yaw = currentYaw + (targetYaw - currentYaw) * MathUtil.expDecay(config.SteerResponse, dt)
 
@@ -304,9 +354,16 @@ function CarPhysics.step(p: StepParams): StepResult
 		end
 	end
 
-	if input.boost and p.hasBoost then
+	if input.boost and p.hasBoost and not slowed then
 		velocity += look * (config.BoostAcceleration * dt)
 		result.boosting = true
+	end
+
+	if frozen then
+		-- Frozen solid: the car skids to a stop and can't turn (it still falls, and bumps still shove it).
+		local keep = math.exp(-config.FreezeDamping * dt)
+		velocity = Vector3.new(velocity.X * keep, velocity.Y, velocity.Z * keep)
+		angular *= keep
 	end
 
 	velocity = MathUtil.clampMagnitude(velocity, config.MaxBoostedSpeed)

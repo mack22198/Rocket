@@ -2,7 +2,8 @@
 -- The ball you see. The server sends the real ball ~30 times a second; in between, this runs the same
 -- BallSim so the ball moves smoothly, and small corrections are blended in instead of snapping.
 -- When YOUR car touches the ball, the hit is applied here immediately (so it feels instant) and sent to the
--- server to be confirmed.
+-- server to be confirmed. Magnets and Tractor Beams (a car's Pull attribute) tug the ball here too, just like
+-- on the server.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -14,6 +15,7 @@ local BallSim = require(Shared.Physics.BallSim)
 local GameConfig = require(Shared.Config.GameConfig)
 local HitModel = require(Shared.Physics.HitModel)
 local MatchState = require(Shared.Match.MatchState)
+local Powers = require(Shared.Config.Powers)
 local Remotes = require(Shared.Net.Remotes)
 local Signal = require(Shared.Util.Signal)
 
@@ -45,6 +47,7 @@ local rotation = CFrame.new()
 local spin = Vector3.zero
 local fireUntil = 0
 
+local carsFolder: Instance? = nil
 local ballModel: Model
 local ballPart: Part
 local shadow: Part
@@ -221,11 +224,35 @@ local function tryLocalHit()
 	end
 end
 
+-- The cars pulling the ball right now: (kind, chassis) pairs.
+local function activePulls(): { { kind: string, chassis: BasePart } }
+	local list = {}
+	local folder = carsFolder
+	if not folder then
+		return list
+	end
+	for _, car in folder:GetChildren() do
+		local kind = car:GetAttribute(A.Pull)
+		if kind == "magnet" or kind == "beam" then
+			local chassis = car:FindFirstChild("Chassis")
+			if chassis and chassis:IsA("BasePart") then
+				table.insert(list, { kind = kind :: string, chassis = chassis })
+			end
+		end
+	end
+	return list
+end
+
 local function update(dt: number)
 	local now = serverNow()
 	if not frozen and not hidden then
 		local steps = 0
+		local pulls = activePulls()
 		while simTime + STEP <= now and steps < 12 do
+			for _, pull in pulls do
+				local target = Powers.pullTarget(pull.kind, pull.chassis.CFrame)
+				sim.velocity = Powers.applyPull(pull.kind, sim.position, sim.velocity, target, cfg.Gravity, STEP)
+			end
 			BallSim.step(arena, cfg, sim, STEP)
 			simTime += STEP
 			steps += 1
@@ -268,6 +295,9 @@ end
 
 function BallView.start()
 	buildBall()
+	task.spawn(function()
+		carsFolder = workspace:WaitForChild(MatchState.Folders.Match):WaitForChild(MatchState.Folders.Cars)
+	end)
 	Remotes.BallState.OnClientEvent:Connect(function(t: any, position: any, velocity: any, flags: any, touchTeam: any)
 		if type(t) == "number" and typeof(position) == "Vector3" and typeof(velocity) == "Vector3" then
 			onSnapshot(
@@ -296,6 +326,11 @@ end
 -- Where the ball is drawn right now (used by the camera).
 function BallView.getPosition(): Vector3
 	return ballPart.Position
+end
+
+-- The ball's main part (effects hang beams off it).
+function BallView.getPart(): BasePart
+	return ballPart
 end
 
 function BallView.isVisible(): boolean

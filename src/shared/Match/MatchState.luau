@@ -63,6 +63,15 @@ MatchState.CarAttr = {
 	Boosting = "Boosting",
 	Mega = "Mega",
 	MegaArmed = "MegaArmed",
+	Power = "Power", -- the car's power id (see Powers.CarPowers)
+	Item = "Item", -- the item being held ("" = none)
+	ItemReadyAt = "ItemReadyAt", -- server time the item can be used (it spins in the slot until then)
+	PowerReadyAt = "PowerReadyAt", -- server time the power has recharged
+	Shield = "Shield",
+	Frozen = "Frozen",
+	Ghost = "Ghost",
+	Rocket = "Rocket",
+	Pull = "Pull", -- "magnet" / "beam" while pulling the ball, else ""
 }
 
 -- Names of the folders the server puts in Workspace.
@@ -72,6 +81,8 @@ MatchState.Folders = {
 	Match = "Match",
 	Cars = "Cars",
 	BoostPads = "BoostPads",
+	ItemBoxes = "ItemBoxes",
+	Hazards = "Hazards",
 }
 
 local OBJECT_NAME = "MatchState"

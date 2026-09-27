@@ -30,6 +30,10 @@ export type Participant = {
 	megaArmed: boolean,
 	megaArmedUntil: number,
 	lastHitAt: number, -- server time of the last accepted ball touch
+	item: string?, -- the item from an item box they're holding (see Powers)
+	itemReadyAt: number, -- server time the item stops spinning and can be used
+	powerReadyAt: number, -- server time the car's power has recharged
+	effects: { [string]: number }, -- effect name -> server time it wears off ("shield", "ghost", "rocket", ...)
 }
 
 local Roster = {}
@@ -127,7 +131,17 @@ function Roster.newParticipant(fields: {
 		megaArmed = false,
 		megaArmedUntil = 0,
 		lastHitAt = -math.huge,
+		item = nil,
+		itemReadyAt = 0,
+		powerReadyAt = 0,
+		effects = {},
 	}
+end
+
+-- Is an effect (like "shield") active on this participant at server time `now`?
+function Roster.hasEffect(p: Participant, name: string, now: number): boolean
+	local untilTime = p.effects[name]
+	return untilTime ~= nil and untilTime > now
 end
 
 return Roster

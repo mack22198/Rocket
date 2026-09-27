@@ -1,5 +1,6 @@
 --!strict
--- Hype popups for cool moments ("AIR HIT!", "EPIC SAVE!", "MEGA SHOT!") plus a small feed on the right.
+-- Hype popups for cool moments ("AIR HIT!", "EPIC SAVE!", "MEGA SHOT!") plus a small feed on the right
+-- (which also tells you who froze whom, who slipped on a banana, and so on).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -153,6 +154,17 @@ function Announcer.start()
 		local emoji = EMOJI[kind] or "⭐"
 		if kind == "join" then
 			addFeedLine(`{emoji} {text}`, color)
+			return
+		elseif kind == "power" then
+			-- Items and powers: the text says it all ("❄️ Bolt froze Sparky!"), with "You" for you. Yours get a
+			-- popup too.
+			local me = localPlayer.DisplayName
+			local at = string.find(text, me, 1, true)
+			local line = if at then string.sub(text, 1, at - 1) .. "You" .. string.sub(text, at + #me) else text
+			addFeedLine(line, color)
+			if who ~= nil and who == me then
+				Announcer.popup(line, color)
+			end
 			return
 		end
 		addFeedLine(if who then `{emoji} {text}  {who}` else `{emoji} {text}`, color)
