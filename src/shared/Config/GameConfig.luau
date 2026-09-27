@@ -181,7 +181,7 @@ GameConfig.Bots = {
 	Names = { "Sparky", "Nitro Nell", "Bolt", "Zippy", "Rusty", "Turbo Tom", "Pickles", "Dash", "Comet", "Blip" },
 	Skill = 0.55, -- 0 = sleepy, 1 = sweaty. Kids should be able to beat the default bots.
 	ThinkRate = 12, -- decisions per second
-	CarIds = { "pizza", "banana", "kart", "shark", "monster", "ufo" },
+	CarIds = { "pizza", "banana", "kart", "shark", "monster", "ufo", "duck", "taco", "hotdog" },
 }
 
 GameConfig.Teams = {

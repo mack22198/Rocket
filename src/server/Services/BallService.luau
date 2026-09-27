@@ -135,7 +135,9 @@ local function applyHit(
 	if not contact then
 		return nil
 	end
-	local mega = p.megaArmed
+	-- Hot Sauce (the Taco Truck's power) makes this hit a Mega Shot too.
+	local hotSauce = Roster.hasEffect(p, "hotsauce", serverNow())
+	local mega = p.megaArmed or hotSauce
 	local result = HitModel.resolve(
 		GameConfig.Hit,
 		carCFrame,
@@ -157,8 +159,11 @@ local function applyHit(
 
 	p.lastHitAt = atTime
 	lastTouchTeam = if p.team == "Blue" then 1 else 2
-	if mega then
+	if p.megaArmed then
 		CarService.consumeMega(p)
+	elseif hotSauce then
+		p.effects.hotsauce = 0 -- used up
+		CarService.sync(p)
 	end
 	BallService.Touched:Fire({
 		participant = p,

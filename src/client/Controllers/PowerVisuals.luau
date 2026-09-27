@@ -319,6 +319,42 @@ local function zap(from: Vector3, to: Vector3, color: Color3)
 	end)
 end
 
+-- A word bursting out over a car ("QUACK!").
+local function shout(extra: unknown, text: string, color: Color3)
+	if typeof(extra) ~= "Instance" or not extra:IsA("Model") then
+		return
+	end
+	local chassis = extra:FindFirstChild("Chassis")
+	if not chassis or not chassis:IsA("BasePart") then
+		return
+	end
+	local tag = Instance.new("BillboardGui")
+	tag.Name = "Shout"
+	tag.Size = UDim2.fromOffset(160, 60)
+	tag.StudsOffset = Vector3.new(0, 6, 0)
+	tag.AlwaysOnTop = true
+	tag.LightInfluence = 0
+	tag.Adornee = chassis
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.LuckiestGuy
+	label.TextScaled = true
+	label.TextColor3 = color
+	label.TextStrokeTransparency = 0
+	label.Text = text
+	label.Parent = tag
+	tag.Parent = folder
+	TweenService:Create(tag, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = UDim2.fromOffset(300, 110),
+		StudsOffset = Vector3.new(0, 10, 0),
+	}):Play()
+	TweenService:Create(label, TweenInfo.new(0.9), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+	task.delay(1, function()
+		tag:Destroy()
+	end)
+end
+
 local function nearMe(position: Vector3, distance: number): boolean
 	local chassis = CarController.getChassis()
 	return chassis ~= nil and (chassis.CFrame.Position - position).Magnitude < distance
@@ -365,6 +401,21 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 	elseif kind == "cheese" or kind == "peel" then
 		E.burst(position + Vector3.new(0, 1, 0), rgb(255, 214, 70), 18, 16, 1.2, 0.5, 30)
 		E.play("Hit", 0.4, 0.7)
+	elseif kind == "ketchup" then
+		E.burst(position + Vector3.new(0, 1, 0), rgb(230, 30, 30), 30, 22, 1.4, 0.6, 30)
+		E.play("Hit", 0.5, 0.6)
+	elseif kind == "hotsauce" then
+		E.burst(at, rgb(255, 80, 30), 44, 32, 1.8, 0.7)
+		E.flash(at, rgb(255, 80, 40), 40, 5, 0.5)
+		shout(extra, "🌶️ HOT!", rgb(255, 110, 40))
+		E.play("Whoosh", 0.9, 0.8)
+	elseif kind == "quack" then
+		E.shockwave(at, rgb(255, 224, 80), T.QuackRadius, 0.5)
+		shout(extra, "QUACK!", rgb(255, 220, 60))
+		E.play("Click", 1, 0.45)
+		if nearMe(at, T.QuackRadius * 1.5) then
+			CameraController.shake(0.8, 0.35)
+		end
 	elseif kind == "dive" then
 		E.burst(at, rgb(90, 210, 255), 50, 34, 1.6, 0.7, 40)
 		E.shockwave(at, rgb(120, 220, 255), 9, 0.35)

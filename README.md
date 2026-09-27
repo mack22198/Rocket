@@ -39,8 +39,10 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   twist in every match and +50% Scrap.
 - **Every car has its own power** (G), which recharges after each use: the Pizza Car drops a gooey **Cheese
   Trap**, the Banana Car a **Banana Peel** that spins cars out, the Tiny Kart has a **Nitro Dash**, the Neon
-  Shark a **Shark Dive** that makes it untouchable, the Monster Truck a **Ground Pound** shockwave and the UFO a
-  **Tractor Beam** that lifts the ball up for the perfect shot.
+  Shark a **Shark Dive** that makes it untouchable, the Monster Truck a **Ground Pound** shockwave, the UFO a
+  **Tractor Beam** that lifts the ball up for the perfect shot, the Taco Truck **Hot Sauce** (your next hit is a
+  Mega Shot), the Rubber Duck a **Quack Attack** that spins out everyone nearby, and the Hot Dog a **Ketchup
+  Slick** trail.
 - **Mega Shot:** touching the ball, making saves and doing style moves fills a meter. When it's full, press
   F to arm it and your next hit blasts the ball on fire. It's earned in the match, never bought.
 - **Style and combos:** air hits, wall hits, passes and Mega Shots chain into combo goals ("🔥 3X COMBO!").
@@ -53,9 +55,10 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   or hidden.
 - **Collection book:** every car at every evolution stage, with black mystery silhouettes for the ones you
   haven't got yet.
-- **6 collectible cars:** a pizza delivery hot hatch (the starter), a banana roadster, a go-kart, a shark
-  supercar, a monster truck and a UFO. They're proper little battle-cars - flared arches, spoked wheels that
-  roll and steer, light bars and spoilers - each with real strengths and weaknesses. Rarity never means "better".
+- **9 collectible cars:** a pizza delivery hot hatch (the starter), a banana roadster, a go-kart, a rubber
+  duck, a shark supercar, a taco food truck (with a giant taco on the roof), a monster truck, a hot dog and a
+  UFO. They're proper little battle-cars - spoked wheels that roll and steer, light bars and spoilers - each with
+  real strengths and weaknesses. Rarity never means "better".
 - **Car evolutions:** every car earns XP while you drive it (as much as the Scrap you win) and evolves through
   four looks, e.g. Pizza Car → Burnt Pizza Car → Lava Pizza Car → Galaxy Pizza Car. Evolving is earned by playing,
   never bought, and only changes looks. You can switch back to any look you've unlocked, and bots sometimes

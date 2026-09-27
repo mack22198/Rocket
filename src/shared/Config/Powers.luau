@@ -139,6 +139,33 @@ Powers.CarPowers = {
 		Cooldown = 12,
 		Duration = 0,
 	},
+	taco = {
+		Id = "hotsauce",
+		Name = "Hot Sauce",
+		Emoji = "🌶️",
+		Color = rgb(255, 70, 40),
+		Description = "Hit the ball in the next few seconds and it's a Mega Shot!",
+		Cooldown = 16,
+		Duration = 4,
+	},
+	duck = {
+		Id = "quack",
+		Name = "Quack Attack",
+		Emoji = "🦆",
+		Color = rgb(255, 214, 46),
+		Description = "A mighty QUACK that spins out nearby cars on the other team.",
+		Cooldown = 13,
+		Duration = 0,
+	},
+	hotdog = {
+		Id = "ketchup",
+		Name = "Ketchup Slick",
+		Emoji = "🌭",
+		Color = rgb(235, 44, 40),
+		Description = "Squirts a long ketchup trail behind you. Other cars that drive through it spin out!",
+		Cooldown = 14,
+		Duration = 7,
+	},
 	ufo = {
 		Id = "beam",
 		Name = "Tractor Beam",
@@ -194,6 +221,11 @@ Powers.Tuning = {
 	BeamDamping = 2.4,
 	BeamLift = 13,
 	BeamReach = 11,
+	QuackRadius = 26,
+	QuackSpin = 1.1,
+	KetchupLength = 18,
+	KetchupWidth = 4.6,
+	KetchupSpin = 0.8,
 }
 
 function Powers.item(id: string): ItemDef?
@@ -276,15 +308,30 @@ function Powers.poundPush(centre: Vector3, position: Vector3, radius: number, st
 	return (direction * strength + Vector3.new(0, pop, 0)) * falloff
 end
 
--- Is a car at `carPosition` touching a cheese puddle or banana peel lying at `hazardPosition` on a surface
--- facing `normal` (the floor, a ramp or a wall)?
-function Powers.inHazard(kind: string, hazardPosition: Vector3, normal: Vector3, carPosition: Vector3): boolean
+-- Is a car at `carPosition` touching a cheese puddle, banana peel or ketchup slick lying at `hazardPosition`
+-- on a surface facing `normal` (the floor, a ramp or a wall)? A ketchup slick is long: `forward` is the way it
+-- points along the surface.
+function Powers.inHazard(
+	kind: string,
+	hazardPosition: Vector3,
+	normal: Vector3,
+	carPosition: Vector3,
+	forward: Vector3?
+): boolean
 	local t = Powers.Tuning
-	local radius = if kind == "cheese" then t.CheeseRadius else t.PeelRadius + 2.5
 	local offset = carPosition - hazardPosition
 	local height = offset:Dot(normal)
+	if height <= -2 or height >= 6 then
+		return false
+	end
+	if kind == "ketchup" and forward then
+		local side = forward:Cross(normal)
+		return math.abs(offset:Dot(forward)) <= t.KetchupLength / 2 + 1
+			and math.abs(offset:Dot(side)) <= t.KetchupWidth / 2 + 1.5
+	end
+	local radius = if kind == "cheese" then t.CheeseRadius else t.PeelRadius + 2.5
 	local across = (offset - normal * height).Magnitude
-	return across <= radius and height > -2 and height < 6
+	return across <= radius
 end
 
 -- Nudges a ball's velocity toward a pull's target for one step of `dt` seconds. Used by the server's ball and
@@ -350,8 +397,12 @@ end
 
 function Powers.botWantsPower(power: string, v: BotView): boolean
 	local t = Powers.Tuning
-	if power == "cheese" or power == "peel" then
+	if power == "cheese" or power == "peel" or power == "ketchup" then
 		return v.enemyBehind
+	elseif power == "hotsauce" then
+		return v.role == "attack" and v.ballInFront and v.ballDistance < 35
+	elseif power == "quack" then
+		return v.nearestEnemy < t.QuackRadius * 0.7
 	elseif power == "nitro" or power == "dive" then
 		return v.role == "attack" and v.ballInFront and v.ballDistance > 30 and v.ballDistance < 90
 	elseif power == "pound" then

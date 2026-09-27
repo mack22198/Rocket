@@ -144,6 +144,12 @@ local function buildStadium()
 	cheese.Parent = props
 	local peel = PropBuilder.hazard("peel", roblox.CFrame.new(16, 0, -50), GameConfig.Teams.Blue.Color)
 	peel.Parent = props
+	local ketchup = PropBuilder.hazard(
+		"ketchup",
+		roblox.CFrame.new(50, 0, -40) * roblox.CFrame.Angles(0, math.rad(35), 0),
+		GameConfig.Teams.Orange.Color
+	)
+	ketchup.Parent = props
 end
 
 -- The garage showroom from the menus, with one car on the turntable (as ShowroomController shows it).

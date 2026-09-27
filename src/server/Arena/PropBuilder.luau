@@ -170,14 +170,52 @@ local function buildPeel(model: Model, surface: CFrame, teamColor: Color3)
 	stem.Shape = Enum.PartType.Cylinder
 end
 
--- A cheese puddle (kind "cheese") or banana peel (kind "peel") lying on a surface. `surface` is a CFrame on the
--- surface whose UpVector points out of it.
+-- A long, glossy trail of ketchup (lying along the surface's Z axis), edged in the dropping team's colour.
+local function buildKetchup(model: Model, surface: CFrame, teamColor: Color3)
+	local length, width = T.KetchupLength, T.KetchupWidth
+	local red = rgb(214, 28, 30)
+	local slick = piece(model, "Ketchup", Vector3.new(width, 0.16, length), surface * CFrame.new(0, 0.08, 0), red)
+	slick.Reflectance = 0.25
+	for _, z in { -length / 2, length / 2 } do
+		local cap = disc(model, "KetchupEnd", surface * CFrame.new(0, 0, z), width / 2, 0.16, red)
+		cap.Reflectance = 0.25
+	end
+	for _, side in { -1, 1 } do
+		local edge = piece(
+			model,
+			"TeamEdge",
+			Vector3.new(0.18, 0.1, length),
+			surface * CFrame.new(side * (width / 2 + 0.15), 0.05, 0),
+			teamColor
+		)
+		edge.Material = Enum.Material.Neon
+	end
+	-- A few darker splats.
+	for k = 1, 5 do
+		local z = -length / 2 + k * length / 6
+		disc(
+			model,
+			"Splat",
+			surface * CFrame.new((k % 2 - 0.5) * 1.6, 0.02, z),
+			0.6 + (k % 3) * 0.2,
+			0.2,
+			rgb(150, 14, 20)
+		)
+	end
+end
+
+-- A cheese puddle ("cheese"), banana peel ("peel") or ketchup slick ("ketchup") lying on a surface. `surface`
+-- is a CFrame on the surface whose UpVector points out of it (and whose Z axis a ketchup slick runs along).
 function PropBuilder.hazard(kind: string, surface: CFrame, teamColor: Color3): Model
 	local model = Instance.new("Model")
-	model.Name = if kind == "cheese" then "CheesePuddle" else "BananaPeel"
 	if kind == "cheese" then
+		model.Name = "CheesePuddle"
 		buildCheese(model, surface, teamColor)
+	elseif kind == "ketchup" then
+		model.Name = "KetchupSlick"
+		buildKetchup(model, surface, teamColor)
 	else
+		model.Name = "BananaPeel"
 		buildPeel(model, surface, teamColor)
 	end
 	return model

@@ -1320,6 +1320,276 @@ designs.ufo = {
 	end,
 }
 
+-- A taco food truck: a tall teal van with a serving hatch under a striped awning, a menu board, and a giant taco
+-- on the roof.
+designs.taco = {
+	roles = {
+		{
+			body = look(rgb(38, 184, 168)),
+			body2 = look(rgb(26, 124, 116)),
+			accent = look(rgb(255, 96, 64)),
+			stripe = look(rgb(255, 204, 64)),
+			light = look(rgb(255, 246, 222)),
+			shell = look(rgb(240, 184, 72)),
+			leaf = look(rgb(104, 190, 64)),
+			tomato = look(rgb(230, 52, 40)),
+			meat = look(rgb(132, 72, 40)),
+		},
+		{ -- Spicy: hot sauce red with chilli peppers on the roof
+			body = look(rgb(214, 56, 34)),
+			body2 = look(rgb(140, 32, 22)),
+			accent = look(rgb(255, 176, 40)),
+			stripe = look(rgb(255, 150, 30), NEON),
+			light = look(rgb(255, 238, 200)),
+			rim = look(rgb(255, 196, 70), METAL),
+		},
+	},
+	antenna = Vector3.new(-1.9, 2.3, 3.9),
+	build = function(h, stage, add)
+		local g = groundY(h)
+		local bottom = g + 0.75
+		local roof = 2.3
+		-- The van: a tall box behind a short cab with a big sloping windscreen.
+		box(add, "body2", Vector3.new(-2.45, bottom, -4.5), Vector3.new(2.45, bottom + 0.45, 4.5), "LowerBody")
+		box(add, "body", Vector3.new(-2.45, bottom + 0.45, -1.9), Vector3.new(2.45, roof, 4.5), "Van")
+		box(add, "body", Vector3.new(-2.45, bottom + 0.45, -4.5), Vector3.new(2.45, 0.35, -1.9), "Cab")
+		box(add, "cabin", Vector3.new(-2.0, 0.35, -3.2), Vector3.new(2.0, roof - 0.3, -1.95), "Interior")
+		rampUp(add, "glass", Vector3.new(-2.25, 0.35, -3.4), Vector3.new(2.25, roof, -1.9), "Windscreen")
+		box(add, "body", Vector3.new(-2.5, roof - 0.12, -2.05), Vector3.new(2.5, roof + 0.12, 4.55), "RoofRail")
+		-- A yellow band all the way round.
+		for _, side in { -1, 1 } do
+			box(add, "stripe", Vector3.new(side * 2.44, 0.05, -4.45), Vector3.new(side * 2.5, 0.45, 4.45), "Stripe")
+		end
+		-- Face: grille, round-ish headlights, a chunky bumper.
+		box(add, "dark", Vector3.new(-1.3, bottom + 0.55, -4.56), Vector3.new(1.3, 0.2, -4.45), "Grille")
+		for k = 0, 2 do
+			local y = bottom + 0.72 + k * 0.28
+			box(add, "trim", Vector3.new(-1.25, y - 0.04, -4.62), Vector3.new(1.25, y + 0.04, -4.55), "GrilleBar")
+		end
+		headlights(add, 1.85, 0.0, -4.5, 0.7, 0.45)
+		box(add, "trim", Vector3.new(-2.5, bottom - 0.1, -4.8), Vector3.new(2.5, bottom + 0.4, -4.45), "Bumper")
+		box(add, "trim", Vector3.new(-2.5, bottom - 0.1, 4.45), Vector3.new(2.5, bottom + 0.4, 4.8), "RearBumper")
+		taillights(add, 1.95, 0.2, 4.5, 0.55, 0.5)
+		exhausts(add, 1.0, bottom + 0.1, 4.75, 0.4)
+		mirrors(add, 2.45, 0.8, -3.1)
+		-- The serving hatch on the right, with a counter and a scalloped awning propped over it.
+		box(add, "dark", Vector3.new(2.44, 0.75, -0.9), Vector3.new(2.5, 1.95, 2.8), "Hatch")
+		box(add, "trim", Vector3.new(2.45, 0.6, -0.95), Vector3.new(2.95, 0.72, 2.85), "Counter")
+		add(
+			"accent",
+			"Block",
+			Vector3.new(1.4, 0.1, 3.9),
+			at(3.1, 2.05, 0.95) * CFrame.Angles(0, 0, math.rad(-18)),
+			"Awning"
+		)
+		for k = 0, 5 do
+			add("white", "Ball", Vector3.one * 0.5, at(3.72, 1.78, -0.7 + k * 0.66), "AwningScallop")
+		end
+		-- The menu board on the left.
+		add(
+			"light",
+			"Block",
+			Vector3.new(2.8, 0.85, 0.1),
+			at(-2.52, 1.35, 1.2) * CFrame.Angles(0, math.rad(90), 0),
+			"MenuBoard",
+			"🌮 TACOS"
+		)
+		wheelSet(add, { g = g, x = 2.45, front = -3.0, rear = 2.9, radius = 1.1, width = 1.0, spokes = 6 })
+		-- The giant taco on the roof: two halves of a crunchy shell with the filling between them.
+		for _, side in { -1, 1 } do
+			add("shell", "Cylinder", Vector3.new(0.24, 3.6, 3.6), at(side * 0.58, roof, 1.3), "TacoShell")
+		end
+		add("meat", "Ellipsoid", Vector3.new(0.95, 0.9, 3.0), at(0, roof + 1.25, 1.3), "TacoMeat")
+		add("leaf", "Ellipsoid", Vector3.new(1.05, 0.55, 3.2), at(0, roof + 1.6, 1.3), "TacoLettuce")
+		for k = 0, 3 do
+			add(
+				"tomato",
+				"Ball",
+				Vector3.one * 0.42,
+				at(if k % 2 == 0 then -0.22 else 0.22, roof + 1.78, 0.2 + k * 0.75),
+				"TacoTomato"
+			)
+		end
+		box(add, "team", Vector3.new(-2.2, roof + 0.12, -2.02), Vector3.new(2.2, roof + 0.22, -1.88), "TeamLight")
+		if stage >= 2 then
+			-- Chilli peppers on the front corners of the roof.
+			for _, side in { -1, 1 } do
+				add(
+					"tomato",
+					"Ellipsoid",
+					Vector3.new(0.5, 0.5, 1.5),
+					at(side * 1.9, roof + 0.35, -1.2) * CFrame.Angles(math.rad(-15), 0, math.rad(side * 10)),
+					"Chilli"
+				)
+				add("leaf", "Cylinder", Vector3.new(0.35, 0.18, 0.18), at(side * 1.9, roof + 0.5, -0.45), "ChilliStem")
+			end
+		end
+	end,
+}
+
+-- A rubber duck car: a round yellow body with its tail up, little wings, a big head with an orange beak and
+-- googly eyes, on small open wheels.
+designs.duck = {
+	roles = {
+		{
+			body = look(rgb(255, 214, 46)),
+			body2 = look(rgb(246, 188, 30)),
+			beak = look(rgb(255, 134, 30)),
+			light = look(rgb(255, 250, 230)),
+		},
+		{ -- Disco: purple wings, shades and a glowing collar
+			body = look(rgb(255, 210, 56)),
+			body2 = look(rgb(170, 100, 255)),
+			beak = look(rgb(255, 120, 40)),
+			light = look(rgb(255, 120, 230), NEON),
+			rim = look(rgb(200, 150, 255), METAL),
+		},
+	},
+	antenna = Vector3.new(1.4, 1.0, 2.7),
+	build = function(h, stage, add)
+		local g = groundY(h)
+		wheelSet(add, {
+			g = g,
+			x = 2.0,
+			front = -2.5,
+			rear = 2.6,
+			radius = 0.85,
+			width = 0.8,
+			spokes = 5,
+			open = true,
+		})
+		add("body", "Ellipsoid", Vector3.new(5.2, 2.8, 7.8), at(0, -0.05, 0.5), "DuckBody")
+		add(
+			"body",
+			"Ellipsoid",
+			Vector3.new(2.6, 1.8, 2.3),
+			at(0, 1.0, 4.0) * CFrame.Angles(math.rad(-32), 0, 0),
+			"Tail"
+		)
+		for _, side in { -1, 1 } do
+			add(
+				"body2",
+				"Ellipsoid",
+				Vector3.new(0.7, 1.5, 3.5),
+				at(side * 2.5, 0.35, 0.9) * CFrame.Angles(math.rad(12), 0, 0),
+				"Wing"
+			)
+		end
+		-- The head, beak and googly eyes.
+		add("body", "Ellipsoid", Vector3.new(3.2, 3.0, 3.0), at(0, 1.85, -2.2), "DuckHead")
+		add("beak", "Ellipsoid", Vector3.new(2.0, 0.75, 1.7), at(0, 1.5, -3.7), "Beak")
+		add("dark", "Block", Vector3.new(1.5, 0.05, 1.0), at(0, 1.47, -3.9), "BeakLine")
+		for _, side in { -1, 1 } do
+			local eye = at(side * 0.78, 2.3, -3.45) * CFrame.Angles(0, math.rad(side * 22), 0)
+			add("eye", "Ellipsoid", Vector3.new(0.95, 1.15, 0.5), eye, "Eye")
+			add("pupil", "Ball", Vector3.one * 0.5, eye * CFrame.new(0, -0.08, -0.2), "Pupil")
+			add("shine", "Ball", Vector3.one * 0.16, eye * CFrame.new(0.1, 0.1, -0.4), "EyeShine")
+		end
+		-- Headlights on its chest, tail lights either side of the tail.
+		for _, side in { -1, 1 } do
+			add("lamp", "Ellipsoid", Vector3.new(0.8, 0.45, 0.3), at(side * 1.15, 0.25, -3.25), "Headlight")
+			add("tail", "Ball", Vector3.one * 0.45, at(side * 1.25, 0.35, 4.15), "TailLight")
+		end
+		exhausts(add, 0.55, g + 1.05, 4.25, 0.34)
+		-- A team-coloured collar around its neck.
+		add("team", "Cylinder", Vector3.new(0.25, 2.9, 2.9), at(0, 0.62, -2.2) * CYL_ALONG_Y, "TeamLight")
+		if stage >= 2 then
+			-- Disco shades.
+			add("dark", "Block", Vector3.new(2.2, 0.5, 0.2), at(0, 2.35, -3.72), "Shades")
+			add("light", "Block", Vector3.new(2.3, 0.08, 0.22), at(0, 2.62, -3.7), "ShadesRim")
+		end
+	end,
+}
+
+-- A hot dog: a long bun on four wheels, the sausage running the full length with a mustard zigzag, and a
+-- bubble canopy for the driver.
+designs.hotdog = {
+	roles = {
+		{
+			body = look(rgb(226, 168, 96)),
+			body2 = look(rgb(196, 134, 72)),
+			accent = look(rgb(182, 64, 46)),
+			stripe = look(rgb(255, 214, 40)),
+			light = look(rgb(255, 245, 230)),
+			chilli = look(rgb(122, 44, 26)),
+		},
+		{ -- Chili dog: a spoonful of chili and melted cheese
+			body = look(rgb(214, 150, 80)),
+			body2 = look(rgb(170, 108, 56)),
+			accent = look(rgb(160, 50, 36)),
+			stripe = look(rgb(255, 196, 40), NEON),
+			rim = look(rgb(255, 200, 80), METAL),
+		},
+	},
+	antenna = Vector3.new(1.35, 0.7, 3.5),
+	build = function(h, stage, add)
+		local g = groundY(h)
+		wheelSet(add, {
+			g = g,
+			x = 2.2,
+			front = -3.1,
+			rear = 3.1,
+			radius = 1.0,
+			width = 0.85,
+			spokes = 5,
+			archRole = "body2",
+		})
+		-- The bun: a flat base with a soft half on each side.
+		add("body2", "Ellipsoid", Vector3.new(4.8, 1.5, 9.8), at(0, -0.75, 0), "BunBase")
+		for _, side in { -1, 1 } do
+			add("body", "Ellipsoid", Vector3.new(1.9, 1.9, 9.4), at(side * 1.45, 0.05, 0), "Bun")
+		end
+		-- The sausage, poking out of both ends.
+		local sausageY = 0.45
+		local halfLength = 5.4
+		add("accent", "Ellipsoid", Vector3.new(2.0, 1.9, halfLength * 2), at(0, sausageY, 0), "Sausage")
+		local function topOfSausage(z: number): number
+			return sausageY + 0.95 * math.sqrt(math.max(0, 1 - (z / halfLength) ^ 2))
+		end
+		-- A mustard zigzag behind the canopy.
+		for k = 0, 5 do
+			local z = -0.3 + k * 0.85
+			add(
+				"stripe",
+				"Block",
+				Vector3.new(0.26, 0.1, 1.15),
+				at(0, topOfSausage(z) + 0.02, z) * CFrame.Angles(0, math.rad(if k % 2 == 0 then 38 else -38), 0),
+				"Mustard"
+			)
+		end
+		add("glass", "Ellipsoid", Vector3.new(1.7, 1.1, 2.3), at(0, topOfSausage(-2.1) + 0.1, -2.1), "Canopy")
+		add(
+			"trim",
+			"Cylinder",
+			Vector3.new(0.12, 1.8, 2.4),
+			at(0, topOfSausage(-2.1) - 0.2, -2.1) * CYL_ALONG_Y,
+			"CanopyRing"
+		)
+		for _, side in { -1, 1 } do
+			add("lamp", "Ellipsoid", Vector3.new(0.85, 0.45, 0.3), at(side * 1.5, -0.35, -4.62), "Headlight")
+			add("tail", "Ellipsoid", Vector3.new(0.85, 0.45, 0.3), at(side * 1.5, -0.35, 4.62), "TailLight")
+			add("team", "Block", Vector3.new(0.1, 0.14, 5.5), at(side * 2.25, -0.95, 0), "TeamLight")
+		end
+		exhausts(add, 0.7, g + 0.75, 4.95, 0.36)
+		if stage >= 2 then
+			-- Chili on top, with cheese dripping over it.
+			for k = 0, 6 do
+				local z = 0.2 + k * 0.62
+				add(
+					"chilli",
+					"Ball",
+					Vector3.one * (0.55 + (k % 3) * 0.12),
+					at(if k % 2 == 0 then -0.3 else 0.3, topOfSausage(z) + 0.12, z),
+					"Chili"
+				)
+			end
+			for _, side in { -1, 1 } do
+				add("stripe", "Block", Vector3.new(0.14, 0.6, 0.2), at(side * 0.9, sausageY + 0.55, 1.4), "CheeseDrip")
+			end
+		end
+	end,
+}
+
 ---------------------------------------------------------------------------------------------------------------
 -- Putting a car together
 ---------------------------------------------------------------------------------------------------------------

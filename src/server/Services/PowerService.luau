@@ -24,14 +24,16 @@ type Participant = Roster.Participant
 type Team = Roster.Team
 
 type Hazard = {
-	kind: string, -- "cheese" or "peel"
+	kind: string, -- "cheese", "peel" or "ketchup"
 	ownerKey: string,
 	ownerName: string,
 	team: Team,
 	position: Vector3,
 	normal: Vector3,
+	forward: Vector3, -- the way a ketchup slick runs along the surface
 	expiresAt: number,
 	model: Model,
+	hit: { [string]: number }, -- participant key -> when this hazard last got them
 }
 
 local PowerService = {}
@@ -46,6 +48,7 @@ local hazardsFolder: Folder
 local rayParams = RaycastParams.new()
 local hazards: { Hazard } = {}
 local slowedAt: { [Participant]: number } = {}
+local KETCHUP_REHIT = 1.4 -- a car stays in a ketchup slick a while; it spins again only after this long
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
@@ -102,10 +105,10 @@ local function clearHazards()
 	table.clear(slowedAt)
 end
 
--- Where something dropped behind `chassis` lands: on whatever surface is under the back of the car.
-local function dropSpot(chassis: BasePart): (Vector3?, Vector3?)
+-- Where something dropped behind `chassis` lands (`back` studs behind it): on whatever surface is under there.
+local function dropSpot(chassis: BasePart, back: number): (Vector3?, Vector3?)
 	local cframe = chassis.CFrame
-	local origin = cframe:PointToWorldSpace(Vector3.new(0, 0, T.HazardDrop))
+	local origin = cframe:PointToWorldSpace(Vector3.new(0, 0, back))
 	local hit = workspace:Raycast(origin, -cframe.UpVector * 12, rayParams)
 		or workspace:Raycast(origin, Vector3.new(0, -80, 0), rayParams)
 	if hit then
@@ -115,7 +118,9 @@ local function dropSpot(chassis: BasePart): (Vector3?, Vector3?)
 end
 
 local function dropHazard(p: Participant, kind: string, chassis: BasePart, duration: number, now: number)
-	local position, normal = dropSpot(chassis)
+	-- A ketchup slick starts just behind the car and runs back from there.
+	local back = if kind == "ketchup" then T.HazardDrop + T.KetchupLength / 2 - 3 else T.HazardDrop
+	local position, normal = dropSpot(chassis, back)
 	if not position or not normal then
 		return
 	end
@@ -140,6 +145,7 @@ local function dropHazard(p: Participant, kind: string, chassis: BasePart, durat
 		right = normal:Cross(if math.abs(normal.Z) < 0.9 then Vector3.zAxis else Vector3.xAxis)
 	end
 	local surface = CFrame.fromMatrix(position, right.Unit, normal)
+	local forward = surface.ZVector
 	local model = PropBuilder.hazard(kind, surface, GameConfig.Teams[p.team].Color)
 	model:SetAttribute("Kind", kind)
 	model:SetAttribute("Team", p.team)
@@ -151,8 +157,10 @@ local function dropHazard(p: Participant, kind: string, chassis: BasePart, durat
 		team = p.team,
 		position = position,
 		normal = normal,
+		forward = forward,
 		expiresAt = now + duration,
 		model = model,
+		hit = {},
 	})
 	fx(kind, position, p.team)
 end
@@ -261,6 +269,27 @@ local function groundPound(p: Participant, chassis: BasePart, now: number)
 	end
 end
 
+-- Quack Attack: every car on the other team close enough spins out.
+local function quack(p: Participant, chassis: BasePart, now: number)
+	local centre = chassis.CFrame.Position
+	local hits = 0
+	for _, other in Roster.all() do
+		local otherChassis = other.chassis
+		if other.team == p.team or not otherChassis or otherChassis.Anchored or protected(other, now) then
+			continue
+		end
+		if (otherChassis.CFrame.Position - centre).Magnitude <= T.QuackRadius then
+			CarService.applyEffect(other, "spin", T.QuackSpin, if rng:NextNumber() < 0.5 then -1 else 1)
+			fx("slip", otherChassis.CFrame.Position, p.team, other.car)
+			hits += 1
+		end
+	end
+	if hits > 0 then
+		local cars = if hits == 1 then "a car" else `{hits} cars`
+		StatsService.announce("power", `🦆 {p.name} quacked {cars} into a spin!`, p.team, p.name)
+	end
+end
+
 function PowerService.usePower(p: Participant)
 	local now = serverNow()
 	local chassis = readyChassis(p, now)
@@ -271,8 +300,12 @@ function PowerService.usePower(p: Participant)
 	p.powerReadyAt = now + power.Cooldown
 	p.stats.powers += 1
 	local id = power.Id
-	if id == "cheese" or id == "peel" then
+	if id == "cheese" or id == "peel" or id == "ketchup" then
 		dropHazard(p, id, chassis, power.Duration, now)
+	elseif id == "hotsauce" then
+		setEffect(p, "hotsauce", power.Duration, now)
+	elseif id == "quack" then
+		quack(p, chassis, now)
 	elseif id == "nitro" then
 		launch(p, "nitro", chassis)
 	elseif id == "dive" then
@@ -284,7 +317,7 @@ function PowerService.usePower(p: Participant)
 		setEffect(p, "beam", power.Duration, now)
 	end
 	CarService.sync(p)
-	if id ~= "cheese" and id ~= "peel" then
+	if id ~= "cheese" and id ~= "peel" and id ~= "ketchup" then
 		fx(id, chassis.CFrame.Position, p.team, p.car)
 	end
 end
@@ -324,13 +357,30 @@ function PowerService.update()
 			if p.team == hazard.team or not chassis or chassis.Anchored or protected(p, now) then
 				continue
 			end
-			if not Powers.inHazard(hazard.kind, hazard.position, hazard.normal, chassis.CFrame.Position) then
+			local position = chassis.CFrame.Position
+			if not Powers.inHazard(hazard.kind, hazard.position, hazard.normal, position, hazard.forward) then
 				continue
 			end
 			if hazard.kind == "cheese" then
 				if now - (slowedAt[p] or -math.huge) >= SLOW_RESEND then
 					slowedAt[p] = now
 					CarService.applyEffect(p, "slow", T.CheeseSlowTime)
+				end
+			elseif hazard.kind == "ketchup" then
+				-- A slick stays down and can catch several cars (each one only every so often).
+				local last = hazard.hit[p.key]
+				if not last or now - last >= KETCHUP_REHIT then
+					hazard.hit[p.key] = now
+					CarService.applyEffect(p, "spin", T.KetchupSpin, if rng:NextNumber() < 0.5 then -1 else 1)
+					fx("slip", position, hazard.team, p.car)
+					if not last then
+						StatsService.announce(
+							"power",
+							`🌭 {p.name} skidded on ketchup!`,
+							hazard.team,
+							hazard.ownerName
+						)
+					end
 				end
 			else
 				CarService.applyEffect(p, "spin", T.SpinTime, if rng:NextNumber() < 0.5 then -1 else 1)

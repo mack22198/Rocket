@@ -138,6 +138,12 @@ return function(t)
 		local wall = Vector3.new(110, 20, 0)
 		expect.truthy(Powers.inHazard("peel", wall, -Vector3.xAxis, Vector3.new(108, 22, 1)))
 		expect.falsy(Powers.inHazard("peel", wall, -Vector3.xAxis, Vector3.new(80, 22, 1)))
+		-- A ketchup slick is long and thin: it catches cars along its length, not beside it.
+		local slick = Vector3.new(0, 0, 0)
+		local along = Vector3.zAxis
+		expect.truthy(Powers.inHazard("ketchup", slick, Vector3.yAxis, Vector3.new(0.5, 2.3, 8), along))
+		expect.falsy(Powers.inHazard("ketchup", slick, Vector3.yAxis, Vector3.new(6, 2.3, 0), along))
+		expect.falsy(Powers.inHazard("ketchup", slick, Vector3.yAxis, Vector3.new(0, 2.3, 14), along))
 	end)
 
 	t.test("bots use items and powers when they make sense", function()

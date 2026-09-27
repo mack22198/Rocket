@@ -55,8 +55,10 @@ local function syncAttributes(p: Participant)
 	if car:GetAttribute(A.Mega) ~= mega then
 		car:SetAttribute(A.Mega, mega)
 	end
-	if car:GetAttribute(A.MegaArmed) ~= p.megaArmed then
-		car:SetAttribute(A.MegaArmed, p.megaArmed)
+	-- Hot Sauce (the Taco Truck's power) arms a Mega Shot for a few seconds too.
+	local armed = p.megaArmed or Roster.hasEffect(p, "hotsauce", workspace:GetServerTimeNow())
+	if car:GetAttribute(A.MegaArmed) ~= armed then
+		car:SetAttribute(A.MegaArmed, armed)
 	end
 	local boosting = p.boosting and p.boost > 0
 	if car:GetAttribute(A.Boosting) ~= boosting then
