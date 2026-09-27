@@ -8,6 +8,7 @@
 --   UseItem()                                                                use the item you're holding
 --   UsePower()                                                               use your car's power
 --   Garage(action, carId, extra) -> result                                   unlock / equip / evolve cars
+--   Daily(action, index) -> result                                           claim streak / quest / chest prize
 --   Play()                                                                   join the next match (or a free seat now)
 --   LeaveMatch()                                                             back to the menu (a bot takes your seat)
 --   GetPlayerData() -> data                                                  initial profile snapshot
@@ -77,6 +78,7 @@ local Remotes = {
 	UseItem = event("UseItem"),
 	UsePower = event("UsePower"),
 	Garage = func("Garage"),
+	Daily = func("Daily"),
 	Play = event("Play"),
 	LeaveMatch = event("LeaveMatch"),
 	GetPlayerData = func("GetPlayerData"),

@@ -24,6 +24,7 @@ local BotService = require(script.Parent.BotService)
 local BoostPadService = require(script.Parent.BoostPadService)
 local BumpService = require(script.Parent.BumpService)
 local CarService = require(script.Parent.CarService)
+local DailyService = require(script.Parent.DailyService)
 local DataService = require(script.Parent.DataService)
 local ItemService = require(script.Parent.ItemService)
 local PowerService = require(script.Parent.PowerService)
@@ -485,6 +486,14 @@ local function finishMatch(aborted: boolean)
 			end
 			local outcome: Rewards.Outcome = if winner == nil then "Draw" elseif winner == p.team then "Win" else "Loss"
 			local summary = Rewards.compute(p.stats, outcome, mvp == p)
+			-- A daily chest prize: double Scrap for a few matches.
+			local saved = DataService.get(player)
+			local boosted = saved ~= nil and saved.scrapBoost > 0
+			if boosted then
+				table.insert(summary.lines, { label = "🚀 Double Scrap!", amount = summary.total })
+				summary.total *= 2
+			end
+			local questsDone = DailyService.recordMatch(player, p.stats, outcome)
 			local scrap: number? = nil
 			local owned: { [string]: boolean } = {}
 			local carXp, carStage = 0, 1
@@ -492,6 +501,9 @@ local function finishMatch(aborted: boolean)
 				-- The car they drove earns as much XP as the Scrap they won.
 				carXp = (data.carXp[p.def.Id] or 0) + summary.total
 				data.carXp[p.def.Id] = carXp
+				if boosted then
+					data.scrapBoost = math.max(0, data.scrapBoost - 1)
+				end
 				carStage = data.carStage[p.def.Id] or 1
 				data.scrap += summary.total
 				data.stats.matches += 1
@@ -516,6 +528,7 @@ local function finishMatch(aborted: boolean)
 				youAreMvp = mvp == p,
 				winner = winner or "",
 				podium = podium,
+				questsDone = questsDone,
 				lines = summary.lines,
 				total = summary.total,
 				scrap = scrap,

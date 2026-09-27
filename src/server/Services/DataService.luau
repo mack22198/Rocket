@@ -12,8 +12,10 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.Config.CarCatalog)
+local Daily = require(Shared.Config.Daily)
 local GameConfig = require(Shared.Config.GameConfig)
 local Remotes = require(Shared.Net.Remotes)
+local Signal = require(Shared.Util.Signal)
 
 export type LifetimeStats = {
 	matches: number,
@@ -26,6 +28,10 @@ export type LifetimeStats = {
 	scrapEarned: number,
 }
 
+-- The login streak, today's quests and the daily chest (see Daily).
+type DailyData = Daily.State
+type QuestState = Daily.QuestState
+
 export type SavedData = {
 	version: number,
 	scrap: number,
@@ -35,6 +41,8 @@ export type SavedData = {
 	carXp: { [string]: number }, -- XP each car has earned (see Evolution)
 	carStage: { [string]: number }, -- how far each car has evolved (1 = not yet)
 	carLook: { [string]: number }, -- which unlocked stage each car shows off
+	daily: DailyData,
+	scrapBoost: number, -- matches left that pay double Scrap (a daily chest prize)
 }
 
 type Profile = {
@@ -45,7 +53,10 @@ type Profile = {
 
 local DataService = {}
 
-local DATA_VERSION = 2
+-- Fired once a player's data has loaded (before it's sent to them), so other services can bring it up to date.
+DataService.Loaded = Signal.new() :: Signal.Signal<Player>
+
+local DATA_VERSION = 3
 local LOAD_ATTEMPTS = 6
 local LOAD_RETRY_DELAY = 3
 
@@ -64,6 +75,8 @@ local function defaultData(): SavedData
 		carXp = {},
 		carStage = {},
 		carLook = {},
+		daily = Daily.newState(),
+		scrapBoost = 0,
 	}
 end
 
@@ -114,7 +127,41 @@ local function sanitize(raw: any): SavedData
 	for id, look in data.carLook do
 		data.carLook[id] = math.clamp(look, 1, data.carStage[id] or 1)
 	end
+	-- Daily streak, quests and chest (added in version 3).
+	local daily = raw.daily
+	if type(daily) == "table" then
+		data.daily.day = number(daily.day, 0)
+		data.daily.streak = number(daily.streak, 0)
+		data.daily.lastLoginDay = number(daily.lastLoginDay, 0)
+		data.daily.streakClaimedDay = number(daily.streakClaimedDay, 0)
+		data.daily.chestPicked = daily.chestPicked == true
+		if type(daily.quests) == "table" then
+			for _, quest in daily.quests do
+				if #data.daily.quests >= Daily.QuestCount then
+					break
+				end
+				if type(quest) == "table" and type(quest.id) == "string" and Daily.quest(quest.id) then
+					table.insert(data.daily.quests, {
+						id = quest.id,
+						progress = number(quest.progress, 0),
+						claimed = quest.claimed == true,
+					})
+				end
+			end
+		end
+	end
+	data.scrapBoost = math.min(number(raw.scrapBoost, 0), 10)
 	return data
+end
+
+local function copyDaily(daily: DailyData): DailyData
+	local quests: { QuestState } = {}
+	for _, quest in daily.quests do
+		table.insert(quests, table.clone(quest))
+	end
+	local copy = table.clone(daily)
+	copy.quests = quests
+	return copy
 end
 
 local function serialize(data: SavedData, withSession: boolean): { [string]: any }
@@ -127,6 +174,8 @@ local function serialize(data: SavedData, withSession: boolean): { [string]: any
 		carXp = table.clone(data.carXp),
 		carStage = table.clone(data.carStage),
 		carLook = table.clone(data.carLook),
+		daily = copyDaily(data.daily),
+		scrapBoost = data.scrapBoost,
 	}
 	if withSession then
 		copy.session = { jobId = game.JobId, time = os.time() }
@@ -165,6 +214,8 @@ local function clientView(data: SavedData): { [string]: any }
 		carXp = table.clone(data.carXp),
 		carStage = table.clone(data.carStage),
 		carLook = table.clone(data.carLook),
+		daily = copyDaily(data.daily),
+		scrapBoost = data.scrapBoost,
 	}
 end
 
@@ -259,6 +310,7 @@ local function onPlayerAdded(player: Player)
 		data.scrap = GameConfig.Debug.StudioStartingScrap
 	end
 	profiles[player] = { data = data, persistent = persistent, dirty = false }
+	DataService.Loaded:Fire(player)
 	push(player)
 end
 

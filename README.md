@@ -43,6 +43,12 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   Saves, style moves and MVP are all announced.
 - **Rewards:** everyone earns **Scrap** every match (more for winning, goals, saves and style). Scrap is the
   only currency and there are no loot boxes.
+- **Daily reasons to come back:** a **login streak** (more Scrap every day in a row, up to day 7), **three daily
+  quests** ("Score 2 goals", "Use 5 items"...) and a **daily chest** once they're done - its three prizes are
+  shown face up and you pick one (Scrap, XP for your car, or double Scrap for a few matches). Nothing is random
+  or hidden.
+- **Collection book:** every car at every evolution stage, with black mystery silhouettes for the ones you
+  haven't got yet.
 - **6 collectible cars:** a pizza delivery hot hatch (the starter), a banana roadster, a go-kart, a shark
   supercar, a monster truck and a UFO. They're proper little battle-cars - flared arches, spoked wheels that
   roll and steer, light bars and spoilers - each with real strengths and weaknesses. Rarity never means "better".
@@ -107,6 +113,7 @@ Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
 - [`Rewards.luau`](src/shared/Config/Rewards.luau): how much Scrap each thing is worth.
 - [`Powers.luau`](src/shared/Config/Powers.luau): the items and car powers, how often each item turns up
   (and how much that depends on the score), and how strong they all are.
+- [`Daily.luau`](src/shared/Config/Daily.luau): the streak rewards, the daily quests and the chest prizes.
 - `GameConfig.Evolution`: how much XP each evolution stage needs.
 
 Car looks (and every evolution stage) are built from plain parts in
@@ -159,7 +166,8 @@ real building code, which is handy for checking changes to how things look from 
 ```
 src/
   shared/   (ReplicatedStorage.Shared: used by both server and client)
-    Config/       GameConfig, CarCatalog, Rewards, Evolution, Powers (items and car powers)
+    Config/       GameConfig, CarCatalog, Rewards, Evolution, Powers (items and car powers), Daily (streaks,
+                  quests, daily chest)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay timing)
@@ -173,7 +181,8 @@ src/
                   LobbyBuilder (VIP deck), EnvironmentBuilder (terrain, trees)
     Services/     MatchService (menu -> queue -> match loop), BallService, CarService, BotService,
                   StatsService, BoostPadService, BumpService, ItemService (item boxes), PowerService
-                  (using items and powers, cheese and banana traps), DataService (saving), GarageService
+                  (using items and powers, cheese and banana traps), DailyService (streaks, quests, chest),
+                  DataService (saving), GarageService
   client/   (StarterPlayerScripts.Client)
     Showroom/     ShowroomBuilder (the menu's garage showroom and its mirror-floor reflection),
                   PodiumBuilder (the winners' podium)
@@ -183,7 +192,7 @@ src/
                   shields, ice, beams), ShowroomController, StadiumController (live scoreboards, LED boards,
                   cheering crowd)
     UI/           MainMenu, Garage, PauseMenu, HowToPlay, HUD, Announcer, ResultsScreen, ReplayScreen,
-                  TouchControls, Transition, Theme
+                  DailyRewards (streak and chest pop-ups), CollectionBook, TouchControls, Transition, Theme
 tests/      Lune unit tests (run outside Roblox)
 tools/      Offline previews of the 3D world and the UI
 ```

@@ -104,7 +104,7 @@ ShowroomBuilder.Shots = {
 		height = 4.6,
 		focus = 2,
 		tilt = 1.8,
-		shift = 0.36,
+		shift = 0.14,
 		fov = 40,
 	} :: Shot,
 	garage = {

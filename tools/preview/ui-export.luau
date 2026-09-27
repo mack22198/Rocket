@@ -1,7 +1,8 @@
 -- Builds the game's real screens (HUD, garage, results...) in Lune with pretend services, then writes the
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
---   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay
+--   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay,
+--              streak, chest, collection
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -33,7 +34,7 @@ local function signal()
 	return s
 end
 
-local NOW = 10000
+local NOW = 1790000000 + 15 * 3600 -- an afternoon (the daily quests use the real calendar)
 local touch = scenario == "touch"
 
 -- Pretend match state.
@@ -47,8 +48,17 @@ local attrs: { [string]: any } = {
 	Overtime = false,
 	Banner = "",
 }
-local MENU_SCENARIOS = { menu = true, queued = true, garage = true, evolve = true, howto = true }
-if scenario == "menu" or scenario == "garage" or scenario == "evolve" or scenario == "howto" then
+local MENU_SCENARIOS = {
+	menu = true,
+	queued = true,
+	garage = true,
+	evolve = true,
+	howto = true,
+	streak = true,
+	chest = true,
+	collection = true,
+}
+if MENU_SCENARIOS[scenario] and scenario ~= "queued" then
 	attrs.Phase = "Waiting"
 elseif scenario == "queued" then
 	attrs.PhaseEndsAt = NOW + 3
@@ -207,6 +217,10 @@ harness.globals.TweenInfo = {
 }
 
 -- Pretend player data and car.
+local Daily = harness.require(harness.Shared.Config.Daily)
+local today = Daily.dayNumber(NOW)
+local quests = Daily.questsFor(1, today)
+local allDone = scenario == "chest"
 local data = {
 	scrap = 740,
 	owned = { pizza = true, banana = true, kart = true },
@@ -215,6 +229,23 @@ local data = {
 	carXp = { pizza = 620, banana = 1540, kart = 90 },
 	carStage = { pizza = 1, banana = 2 },
 	carLook = { banana = 2 },
+	daily = {
+		day = today,
+		quests = {
+			{ id = quests[1], progress = (Daily.quest(quests[1]) :: any).Target, claimed = true },
+			{ id = quests[2], progress = (Daily.quest(quests[2]) :: any).Target, claimed = false },
+			{
+				id = quests[3],
+				progress = if allDone then (Daily.quest(quests[3]) :: any).Target else 1,
+				claimed = false,
+			},
+		},
+		chestPicked = false,
+		streak = 4,
+		lastLoginDay = today,
+		streakClaimedDay = today - 1,
+	},
+	scrapBoost = 0,
 }
 local carAttrs = {
 	Boost = 67,
@@ -246,6 +277,9 @@ harness.preload(controllers .. "PlayerDataClient", {
 	end,
 	isLoaded = function()
 		return true
+	end,
+	today = function()
+		return today
 	end,
 	Changed = signal(),
 	start = function() end,
@@ -354,6 +388,8 @@ for _, name in
 		"PauseMenu",
 		"HowToPlay",
 		"ReplayScreen",
+		"DailyRewards",
+		"CollectionBook",
 	}
 do
 	harness.sourceTransforms["src/client/UI/" .. name] = function(source)
@@ -375,6 +411,8 @@ local MainMenu = harness.require(UI.MainMenu)
 local PauseMenu = harness.require(UI.PauseMenu)
 local HowToPlay = harness.require(UI.HowToPlay)
 local ReplayScreen = harness.require(UI.ReplayScreen)
+local DailyRewards = harness.require(UI.DailyRewards)
+local CollectionBook = harness.require(UI.CollectionBook)
 HUD.start()
 Announcer.start()
 ResultsScreen.start()
@@ -383,6 +421,8 @@ MainMenu.start()
 PauseMenu.start()
 HowToPlay.start()
 ReplayScreen.start()
+DailyRewards.start()
+CollectionBook.start()
 if touch then
 	TouchControls.start()
 end
@@ -417,6 +457,12 @@ elseif scenario == "pause" then
 elseif scenario == "evolve" then
 	data.carXp.pizza = 520
 	Garage.open("pizza")
+elseif scenario == "streak" then
+	DailyRewards.openStreak()
+elseif scenario == "chest" then
+	DailyRewards.openChest()
+elseif scenario == "collection" then
+	CollectionBook.open()
 elseif scenario == "replay" then
 	ReplayScreen.show("Player1", "Blue", "🔥 AIR COMBO!")
 elseif scenario == "results" or scenario == "podium" then

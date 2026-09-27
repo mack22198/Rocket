@@ -1,6 +1,7 @@
 --!strict
 -- The main menu: where you start, and where you come back to after a match. Your car turns on its turntable in
--- the garage showroom behind it; the big buttons are on the left - PLAY, GARAGE, HOW TO PLAY.
+-- the garage showroom behind it; the big buttons are on the left - PLAY, GARAGE, HOW TO PLAY and COLLECTION -
+-- and on the right are your Scrap, the car you're saving up for, today's quests and the daily chest.
 --
 -- After PLAY you either drop straight into a match that's already going (taking over from a bot), or wait a few
 -- seconds for the next one to start, so friends who press PLAY together end up in the same match.
@@ -12,8 +13,10 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.Config.CarCatalog)
+local Daily = require(Shared.Config.Daily)
 local Evolution = require(Shared.Config.Evolution)
 local MatchState = require(Shared.Match.MatchState)
+local Remotes = require(Shared.Net.Remotes)
 local Rewards = require(Shared.Config.Rewards)
 local Signal = require(Shared.Util.Signal)
 
@@ -26,6 +29,9 @@ MainMenu.PlayPressed = Signal.new() :: Signal.Signal<>
 MainMenu.CancelPressed = Signal.new() :: Signal.Signal<>
 MainMenu.GaragePressed = Signal.new() :: Signal.Signal<>
 MainMenu.HowToPlayPressed = Signal.new() :: Signal.Signal<>
+MainMenu.CollectionPressed = Signal.new() :: Signal.Signal<>
+MainMenu.StreakPressed = Signal.new() :: Signal.Signal<>
+MainMenu.ChestPressed = Signal.new() :: Signal.Signal<>
 
 local C = Theme.Colors
 local rgb = Color3.fromRGB
@@ -54,6 +60,24 @@ local carName: TextLabel
 local carLine: TextLabel
 local carBar: Theme.Bar
 local carXp: TextLabel
+-- Daily quests
+type QuestRow = {
+	frame: Frame,
+	icon: TextLabel,
+	text: TextLabel,
+	bar: Theme.Bar,
+	count: TextLabel,
+	reward: TextLabel,
+	claim: TextButton,
+}
+local questRows: { QuestRow } = {}
+local streakButton: TextButton
+local chestButton: TextButton
+local dailyTimer: TextLabel
+local toast: TextLabel
+local claiming = false
+local chestReady = false
+local claimReady = false
 
 local queued = false
 local evolveReady = false
@@ -201,14 +225,25 @@ local function buildLeft()
 
 	local howButton = Theme.button(left, {
 		name = "HowToPlay",
-		size = UDim2.fromOffset(400, 58),
+		size = UDim2.fromOffset(195, 58),
 		position = UDim2.fromOffset(44, 470),
-		text = "❓  HOW TO PLAY",
+		text = "❓ HOW TO PLAY",
 		color = C.PanelLight,
 		textColor = C.Text,
 	})
 	howButton.Activated:Connect(function()
 		MainMenu.HowToPlayPressed:Fire()
+	end)
+	local collectionButton = Theme.button(left, {
+		name = "Collection",
+		size = UDim2.fromOffset(195, 58),
+		position = UDim2.fromOffset(249, 470),
+		text = "📖 COLLECTION",
+		color = C.Evolve,
+		textColor = C.Text,
+	})
+	collectionButton.Activated:Connect(function()
+		MainMenu.CollectionPressed:Fire()
 	end)
 
 	statusPill = Theme.pill(left, {
@@ -302,6 +337,132 @@ local function buildRight()
 		stroke = false,
 	})
 
+	-- Today's quests and the daily chest.
+	local daily = Theme.panel(right, "Daily", UDim2.fromOffset(380, 318), UDim2.fromOffset(416, 210), Vector2.new(1, 0))
+	daily.BackgroundTransparency = 0.2
+	Theme.label(daily, {
+		size = UDim2.fromOffset(170, 16),
+		position = UDim2.fromOffset(16, 14),
+		text = "📅 DAILY QUESTS",
+		font = Theme.Caps,
+		color = C.Muted,
+		align = Enum.TextXAlignment.Left,
+		stroke = false,
+	})
+	streakButton = Theme.button(daily, {
+		name = "Streak",
+		size = UDim2.fromOffset(150, 32),
+		position = UDim2.new(1, -12, 0, 8),
+		anchor = Vector2.new(1, 0),
+		text = "🔥 DAY 1",
+		color = rgb(255, 120, 60),
+		textColor = C.Text,
+	})
+	streakButton.Activated:Connect(function()
+		MainMenu.StreakPressed:Fire()
+	end)
+	for i = 1, Daily.QuestCount do
+		local row = Instance.new("Frame")
+		row.Name = `Quest{i}`
+		row.Size = UDim2.new(1, -24, 0, 62)
+		row.Position = UDim2.fromOffset(12, 46 + (i - 1) * 68)
+		row.BackgroundColor3 = C.PanelDark
+		row.BackgroundTransparency = 0.3
+		row.Parent = daily
+		Theme.corner(row, 12)
+		local icon = Theme.label(row, {
+			name = "Icon",
+			size = UDim2.fromOffset(38, 38),
+			position = UDim2.fromOffset(8, 12),
+			text = "",
+			stroke = false,
+		})
+		local text = Theme.label(row, {
+			name = "Text",
+			size = UDim2.fromOffset(200, 20),
+			position = UDim2.fromOffset(54, 9),
+			text = "",
+			font = Theme.Body,
+			align = Enum.TextXAlignment.Left,
+			stroke = false,
+		})
+		local bar = Theme.bar(row, UDim2.fromOffset(150, 10), UDim2.fromOffset(54, 38), C.Good)
+		local count = Theme.label(row, {
+			name = "Count",
+			size = UDim2.fromOffset(46, 16),
+			position = UDim2.fromOffset(210, 35),
+			text = "",
+			font = Theme.Body,
+			color = C.Muted,
+			align = Enum.TextXAlignment.Left,
+			stroke = false,
+		})
+		local reward = Theme.label(row, {
+			name = "Reward",
+			size = UDim2.fromOffset(84, 24),
+			position = UDim2.new(1, -10, 0.5, 0),
+			anchor = Vector2.new(1, 0.5),
+			text = "",
+			color = C.Scrap,
+			align = Enum.TextXAlignment.Right,
+		})
+		local claim = Theme.button(row, {
+			name = "Claim",
+			size = UDim2.fromOffset(92, 44),
+			position = UDim2.new(1, -8, 0.5, 0),
+			anchor = Vector2.new(1, 0.5),
+			text = "",
+			color = C.Gold,
+		})
+		claim.Visible = false
+		local index = i
+		claim.Activated:Connect(function()
+			if claiming then
+				return
+			end
+			claiming = true
+			local ok, result = pcall(function()
+				return Remotes.Daily:InvokeServer("quest", index)
+			end)
+			claiming = false
+			if ok and type(result) == "table" then
+				MainMenu.toast(tostring(result.message), result.ok == true)
+			end
+		end)
+		table.insert(questRows, {
+			frame = row,
+			icon = icon,
+			text = text,
+			bar = bar,
+			count = count,
+			reward = reward,
+			claim = claim,
+		})
+	end
+	chestButton = Theme.button(daily, {
+		name = "Chest",
+		size = UDim2.new(1, -24, 0, 46),
+		position = UDim2.new(0, 12, 1, -12),
+		anchor = Vector2.new(0, 1),
+		text = "",
+		color = C.PanelLight,
+		textColor = C.Text,
+	})
+	chestButton.Activated:Connect(function()
+		MainMenu.ChestPressed:Fire()
+	end)
+	dailyTimer = Theme.label(daily, {
+		name = "Timer",
+		size = UDim2.fromOffset(200, 14),
+		position = UDim2.new(1, -16, 1, 4),
+		anchor = Vector2.new(1, 0),
+		text = "",
+		font = Theme.Body,
+		color = C.Muted,
+		align = Enum.TextXAlignment.Right,
+		stroke = false,
+	})
+
 	-- The car you're driving, and how close it is to evolving.
 	local car = Theme.panel(right, "Car", UDim2.fromOffset(380, 100), UDim2.fromOffset(416, 696), Vector2.new(1, 1))
 	car.BackgroundTransparency = 0.2
@@ -348,14 +509,86 @@ local function build()
 	gui = Theme.screen("TurboMainMenu", 8)
 	gui.Enabled = false
 	Theme.shade(gui, "Shade", true, 0.55, 0.78)
+	Theme.shade(gui, "RightShade", false, 0.36, 0.5)
 	buildLeft()
 	buildRight()
+	toast = Theme.pill(gui, {
+		name = "Toast",
+		size = UDim2.fromOffset(460, 38),
+		position = UDim2.new(0.5, 0, 1, -24),
+		anchor = Vector2.new(0.5, 1),
+		text = "",
+		background = C.PanelDark,
+		transparency = 0,
+	})
+	toast.Visible = false
+	Theme.scaled(toast)
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
+end
+
+-- A short message along the bottom of the menu.
+function MainMenu.toast(text: string, good: boolean)
+	toast.Text = text
+	toast.TextColor3 = if good then C.Good else C.Bad
+	toast.TextTransparency = 0
+	toast.Visible = true
+	task.delay(2.6, function()
+		if toast.Text == text then
+			TweenService:Create(toast, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()
+		end
+	end)
+end
+
+-- Today's quests, the streak and the chest.
+local function refreshDaily(data: PlayerDataClient.Data)
+	local daily = data.daily
+	claimReady = false
+	local done = 0
+	for i, row in questRows do
+		local quest = daily.quests[i]
+		local def = if quest then Daily.quest(quest.id) else nil
+		row.frame.Visible = def ~= nil
+		if not quest or not def then
+			continue
+		end
+		local finished = quest.progress >= def.Target
+		if finished then
+			done += 1
+		end
+		row.icon.Text = def.Emoji
+		row.text.Text = Daily.describe(def)
+		row.bar.set(quest.progress / def.Target)
+		row.bar.fill.BackgroundColor3 = if finished then C.Gold else C.Good
+		row.count.Text = `{math.min(quest.progress, def.Target)}/{def.Target}`
+		local claimable = finished and not quest.claimed
+		claimReady = claimReady or claimable
+		row.claim.Visible = claimable
+		row.claim.Text = `+{def.Reward}`
+		row.reward.Visible = not claimable
+		row.reward.Text = if quest.claimed then "✅" else `🔩{def.Reward}`
+		row.frame.BackgroundTransparency = if quest.claimed then 0.6 else 0.3
+	end
+	local streak = math.max(1, daily.streak)
+	streakButton.Text = if streak == 1 then "🔥 DAY 1" else `🔥 {streak} DAYS`
+	chestReady = Daily.allDone(daily) and not daily.chestPicked
+	if daily.chestPicked then
+		chestButton.Text = "✅ CHEST OPENED - SEE YOU TOMORROW"
+		Theme.setButtonColor(chestButton, C.PanelLight, C.Muted)
+	elseif chestReady then
+		chestButton.Text = "🎁 OPEN THE DAILY CHEST!"
+		Theme.setButtonColor(chestButton, C.Gold)
+	else
+		chestButton.Text = `🎁 DAILY CHEST · {done}/{#daily.quests} QUESTS DONE`
+		Theme.setButtonColor(chestButton, C.PanelLight, C.Text)
+	end
 end
 
 local function refreshData()
 	local data = PlayerDataClient.get()
-	scrapPill.Text = `🔩 {Theme.formatNumber(data.scrap)}`
+	refreshDaily(data)
+	scrapPill.Text = if data.scrapBoost > 0
+		then `🔩 {Theme.formatNumber(data.scrap)}  🚀x2`
+		else `🔩 {Theme.formatNumber(data.scrap)}`
 	local stats = data.stats
 	playerStats.Text = `🏆 {stats.wins or 0} wins   ⚽ {stats.goals or 0} goals   🛡️ {stats.saves or 0} saves`
 
@@ -451,6 +684,21 @@ local function update()
 	if evolveReady then
 		evolveBadge.Rotation = 4 + math.sin(os.clock() * 5) * 3
 	end
+
+	-- Things waiting to be collected pulse.
+	local pulse = math.floor(os.clock() * 3) % 2 == 0
+	if chestReady then
+		Theme.setButtonColor(chestButton, if pulse then C.Gold else rgb(255, 232, 140))
+	end
+	if claimReady then
+		for _, row in questRows do
+			if row.claim.Visible then
+				Theme.setButtonColor(row.claim, if pulse then C.Gold else rgb(255, 232, 140))
+			end
+		end
+	end
+	local untilNew = Daily.secondsUntilNextDay(math.floor(now))
+	dailyTimer.Text = `NEW QUESTS IN {untilNew // 3600}H {(untilNew % 3600) // 60}M`
 end
 
 function MainMenu.show()

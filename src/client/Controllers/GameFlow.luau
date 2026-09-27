@@ -16,6 +16,8 @@ local Remotes = require(Shared.Net.Remotes)
 
 local UI = script.Parent.Parent.UI
 local Announcer = require(UI.Announcer)
+local CollectionBook = require(UI.CollectionBook)
+local DailyRewards = require(UI.DailyRewards)
 local Garage = require(UI.Garage)
 local HowToPlay = require(UI.HowToPlay)
 local HUD = require(UI.HUD)
@@ -90,6 +92,8 @@ local function apply(target: Screen)
 		MainMenu.hide()
 		Garage.close()
 		HowToPlay.close()
+		DailyRewards.close()
+		CollectionBook.close()
 		return
 	end
 	PauseMenu.close()
@@ -102,6 +106,12 @@ local function apply(target: Screen)
 		Garage.close()
 		showEquippedCar()
 		MainMenu.show()
+		-- First visit to the menu today: here's your streak reward.
+		task.delay(0.8, function()
+			if screen == "Menu" and not HowToPlay.isOpen() and not CollectionBook.isOpen() then
+				DailyRewards.offerStreak()
+			end
+		end)
 	end
 end
 
@@ -139,6 +149,10 @@ end
 local function onMenuKey()
 	if HowToPlay.isOpen() then
 		HowToPlay.close()
+	elseif DailyRewards.isOpen() then
+		DailyRewards.close()
+	elseif CollectionBook.isOpen() then
+		CollectionBook.close()
 	elseif screen == "Match" then
 		if not ResultsScreen.isOpen() then
 			PauseMenu.toggle()
@@ -164,6 +178,15 @@ function GameFlow.start()
 	end)
 	MainMenu.HowToPlayPressed:Connect(function()
 		HowToPlay.open()
+	end)
+	MainMenu.CollectionPressed:Connect(function()
+		CollectionBook.open()
+	end)
+	MainMenu.StreakPressed:Connect(function()
+		DailyRewards.openStreak()
+	end)
+	MainMenu.ChestPressed:Connect(function()
+		DailyRewards.openChest()
 	end)
 	Garage.BackPressed:Connect(closeGarage)
 
@@ -237,6 +260,9 @@ function GameFlow.start()
 	PlayerDataClient.Changed:Connect(function()
 		if screen == "Menu" then
 			showEquippedCar()
+			if not DailyRewards.isOpen() and not HowToPlay.isOpen() and not CollectionBook.isOpen() then
+				DailyRewards.offerStreak()
+			end
 		end
 	end)
 	localPlayer:GetAttributeChangedSignal(MatchState.PlayerAttr.Status):Connect(refresh)
