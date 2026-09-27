@@ -2,8 +2,11 @@
 -- Server entry point: builds the stadium and the world around it, starts every service, then runs the match
 -- loop forever.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local Services = script:WaitForChild("Services")
 local Arena = script:WaitForChild("Arena")
+local CarModelBuilder = require(ReplicatedStorage:WaitForChild("Shared").Cars.CarModelBuilder)
 
 local ArenaBuilder = require(Arena.ArenaBuilder)
 local EnvironmentBuilder = require(Arena.EnvironmentBuilder)
@@ -21,6 +24,21 @@ local MatchService = require(Services.MatchService)
 local PowerService = require(Services.PowerService)
 local SeasonService = require(Services.SeasonService)
 local StatsService = require(Services.StatsService)
+
+-- The smooth car bodies from Blender (assets/meshes/TurboBallCars.fbx), if they've been imported in Studio. Imported
+-- into the Workspace, they're moved to ReplicatedStorage so they're out of sight and every player can use them.
+local carMeshes = ReplicatedStorage:FindFirstChild("CarMeshes") or ReplicatedStorage:FindFirstChild("TurboBallCars")
+if not carMeshes then
+	local imported = workspace:FindFirstChild("TurboBallCars") or workspace:FindFirstChild("CarMeshes")
+	if imported then
+		imported.Parent = ReplicatedStorage
+		carMeshes = imported
+	end
+end
+CarModelBuilder.setMeshLibrary(carMeshes)
+print(
+	if carMeshes then "[Turbo Ball] Smooth car meshes found." else "[Turbo Ball] No car meshes imported; using parts."
+)
 
 local arenaFolder, arenaShape = ArenaBuilder.build()
 StadiumBuilder.build()

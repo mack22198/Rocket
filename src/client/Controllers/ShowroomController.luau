@@ -270,12 +270,17 @@ function ShowroomController.setMode(newMode: Mode)
 	mode = newMode
 end
 
--- Shows a car (at an evolution stage) on the turntable.
--- Puts a car on the turntable (wearing a hat, if `topper` is given).
+-- Puts a car on the turntable (at an evolution stage, wearing a hat if `topper` is given).
 function ShowroomController.showCar(def: CarCatalog.CarDef, stage: number, topper: string?)
 	shownDef = def
 	shownStage = stage
 	shownTopper = if topper == "none" then nil else topper
+	refreshDisplay()
+end
+
+-- Builds the car on the turntable again (after the smooth car meshes turn up).
+function ShowroomController.rebuild()
+	builtKey = ""
 	refreshDisplay()
 end
 

@@ -13,8 +13,12 @@
 -- Parts are coloured by role ("body", "accent", ...) so each evolution stage can repaint the whole car:
 -- stages 1 and 2 use the car's own colours, stage 3 turns every car into glowing lava and stage 4 into
 -- deep space. Evolving is only for looks; it never changes how a car drives.
+--
+-- Smooth bodies: once the Blender meshes (see CarMeshes and tools/meshes) have been imported into the place,
+-- each car's blocky shell parts are swapped for smooth MeshParts, painted by role in exactly the same way.
 
 local CarCatalog = require(script.Parent.Parent.Config.CarCatalog)
+local CarMeshes = require(script.Parent.CarMeshes)
 local GameConfig = require(script.Parent.Parent.Config.GameConfig)
 
 type CarDef = CarCatalog.CarDef
@@ -26,7 +30,7 @@ export type BuildOptions = {
 	topper: string?, -- a hat on the roof (see Cosmetics)
 }
 
-type Shape = "Block" | "Wedge" | "Cylinder" | "Ball" | "Ellipsoid"
+type Shape = "Block" | "Wedge" | "Cylinder" | "Ball" | "Ellipsoid" | "Mesh"
 
 type Look = { color: Color3, material: Enum.Material?, transparency: number?, reflectance: number? }
 
@@ -40,6 +44,7 @@ type PartSpec = {
 	name: string?,
 	text: string?, -- painted on the part (a badge on a door, a sign)
 	look: Look?, -- a fixed look instead of the role's (hats keep their colours at every stage)
+	mesh: MeshPart?, -- for "Mesh": the imported mesh to copy
 }
 
 -- Adds one part to the car being built.
@@ -1978,7 +1983,16 @@ end
 
 local function makePart(spec: PartSpec, style: Look): BasePart
 	local part: BasePart
-	if spec.shape == "Wedge" then
+	if spec.shape == "Mesh" and spec.mesh then
+		-- A copy of the imported mesh, without whatever Studio's importer set on it (it anchors what it imports).
+		local copy = spec.mesh:Clone()
+		for _, child in copy:GetChildren() do
+			child:Destroy()
+		end
+		copy.TextureID = ""
+		copy.Anchored = false
+		part = copy
+	elseif spec.shape == "Wedge" then
 		part = Instance.new("WedgePart")
 	else
 		local p = Instance.new("Part")
@@ -2102,6 +2116,102 @@ function CarModelBuilder.restHeight(def: CarDef): number
 	return -groundY(def.Hitbox)
 end
 
+---------------------------------------------------------------------------------------------------------------
+-- Smooth meshes
+---------------------------------------------------------------------------------------------------------------
+
+-- The imported meshes, by name (empty until they've been imported and handed over with setMeshLibrary).
+local meshLibrary: { [string]: MeshPart } = {}
+
+-- Hands over the folder the Blender meshes were imported into (nil = there isn't one). Any MeshParts inside it,
+-- however deep, are used by name.
+function CarModelBuilder.setMeshLibrary(folder: Instance?)
+	local found: { [string]: MeshPart } = {}
+	if folder then
+		for _, child in folder:GetDescendants() do
+			if child:IsA("MeshPart") then
+				found[child.Name] = child
+			end
+		end
+	end
+	meshLibrary = found
+end
+
+-- The smooth meshes for a car, if every one of them has been imported (a half-imported car stays all parts).
+local function meshSetFor(def: CarDef): CarMeshes.CarMeshSet?
+	local set = CarMeshes.Cars[def.Id]
+	if not set or #set.meshes == 0 then
+		return nil
+	end
+	for _, info in set.meshes do
+		if not meshLibrary[info.name] then
+			return nil
+		end
+	end
+	return set
+end
+
+-- Is this car built with smooth meshes right now?
+function CarModelBuilder.usesMeshes(def: CarDef): boolean
+	return meshSetFor(def) ~= nil
+end
+
+---------------------------------------------------------------------------------------------------------------
+-- Building
+---------------------------------------------------------------------------------------------------------------
+
+-- Every part of a car at a stage (in car space), before any hat or antenna. `meshes` swaps the shell for the
+-- smooth meshes when they're available.
+local function collectSpecs(def: CarDef, stage: number, meshes: boolean): { PartSpec }
+	local design = designs[def.Id] or designs.pizza
+	local set = if meshes then meshSetFor(def) else nil
+	local replaced = if set then set.replaces else {}
+	local specs: { PartSpec } = {}
+	design.build(def.Hitbox, stage, function(role, shape, size, cframe, name, text)
+		if not replaced[name or ""] then
+			table.insert(specs, { role = role, shape = shape, size = size, cframe = cframe, name = name, text = text })
+		end
+	end)
+	if set then
+		for _, info in set.meshes do
+			table.insert(specs, {
+				role = info.role,
+				shape = "Mesh",
+				size = info.size,
+				cframe = CFrame.new(info.center),
+				name = info.name,
+				mesh = meshLibrary[info.name],
+			})
+		end
+	end
+	return specs
+end
+
+export type SpecData = {
+	name: string,
+	role: string,
+	shape: string,
+	size: Vector3,
+	cframe: CFrame,
+	text: string?,
+}
+
+-- A car's parts as plain data (always the plain-parts version), for the tools that make the meshes.
+function CarModelBuilder.specs(def: CarDef, stage: number?): { SpecData }
+	local list: { SpecData } = {}
+	for _, spec in collectSpecs(def, stage or 1, false) do
+		table.insert(list, {
+			name = spec.name or "Body",
+			role = spec.role,
+			shape = spec.shape :: string,
+			size = spec.size,
+			cframe = spec.cframe,
+			text = spec.text,
+		})
+	end
+	return list
+end
+
 -- Builds a car model positioned at the origin. Move it with model:PivotTo(cframe).
 function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 	local opts: BuildOptions = options or ({} :: BuildOptions)
@@ -2136,10 +2246,7 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 	local design = designs[def.Id] or designs.pizza
 	local teamColor = opts.teamColor or rgb(236, 236, 240)
 	local styleOf = rolesFor(design, stage, teamColor)
-	local specs: { PartSpec } = {}
-	design.build(hitbox, stage, function(role, shape, size, cframe, name, text)
-		table.insert(specs, { role = role, shape = shape, size = size, cframe = cframe, name = name, text = text })
-	end)
+	local specs = collectSpecs(def, stage, true)
 	-- A hat on the roof.
 	local hat = if opts.topper then HATS[opts.topper] else nil
 	if hat then

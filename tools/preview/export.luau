@@ -4,6 +4,8 @@
 --   lune run tools/preview/export <out.json>                                       the stadium
 --   lune run tools/preview/export <out.json> showroom [carId] [stage] [yawDegrees]   the garage showroom
 --   lune run tools/preview/export <out.json> podium                                the end-of-match podium
+-- The cars get their smooth Blender bodies (tools/meshes) when tools/preview/meshes/cars.glb exists; set the
+-- environment variable NO_MESHES=1 to see them built from plain parts instead.
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -58,6 +60,23 @@ local CarCatalog = harness.require(Shared.Config.CarCatalog)
 local CarModelBuilder = harness.require(Shared.Cars.CarModelBuilder)
 local GameConfig = harness.require(Shared.Config.GameConfig)
 local BallModelBuilder = harness.require(Shared.Ball.BallModelBuilder)
+local CarMeshes = harness.require(Shared.Cars.CarMeshes)
+
+-- Pretend the Blender meshes have been imported: a MeshPart for each (main.js draws them from cars.glb).
+if fs.isFile("tools/preview/meshes/cars.glb") and not process.env.NO_MESHES then
+	local library = roblox.Instance.new("Folder")
+	for _, set in CarMeshes.Cars do
+		for _, info in set.meshes do
+			if not library:FindFirstChild(info.name) then
+				local mesh = roblox.Instance.new("MeshPart")
+				mesh.Name = info.name
+				mesh.Size = info.size
+				mesh.Parent = library
+			end
+		end
+	end
+	CarModelBuilder.setMeshLibrary(library)
+end
 
 local extras: { [string]: any } = { env = which }
 
@@ -264,6 +283,8 @@ for _, d in workspaceInstance:GetDescendants() do
 			shape = "CornerWedge"
 		elseif d.ClassName == "Part" or d.ClassName == "SpawnLocation" then
 			shape = d.Shape.Name
+		elseif d.ClassName == "MeshPart" then
+			shape = "Mesh" -- drawn from meshes/cars.glb by name
 		end
 		local mesh = d:FindFirstChildWhichIsA("SpecialMesh")
 		local size = d.Size

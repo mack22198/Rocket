@@ -5,6 +5,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const params = new URLSearchParams(location.search);
 const view = params.get("view") || "overview";
@@ -86,9 +87,29 @@ function materialFor(p) {
   }
 }
 
+// The smooth Blender car bodies (tools/meshes), drawn like a Roblox MeshPart: the mesh stretched to fill the
+// part's size.
+const meshGeometries = {};
+if (data.parts.some((p) => p.s === "Mesh")) {
+  const gltf = await new GLTFLoader().loadAsync("meshes/cars.glb");
+  gltf.scene.traverse((o) => { if (o.isMesh) meshGeometries[o.name] = o.geometry; });
+}
+function meshGeometry(p) {
+  const source = meshGeometries[p.n];
+  if (!source) return new THREE.BoxGeometry(...p.sz);
+  const g = source.clone();
+  g.computeBoundingBox();
+  const centre = g.boundingBox.getCenter(new THREE.Vector3());
+  const size = g.boundingBox.getSize(new THREE.Vector3());
+  g.translate(-centre.x, -centre.y, -centre.z);
+  g.scale(p.sz[0] / size.x, p.sz[1] / size.y, p.sz[2] / size.z);
+  return g;
+}
+
 function geometryFor(p) {
   const [sx, sy, sz] = p.sz;
   switch (p.s) {
+    case "Mesh": return meshGeometry(p);
     case "Ball": return new THREE.SphereGeometry(Math.min(sx, sy, sz) / 2, 32, 20);
     case "Cylinder": {
       const g = new THREE.CylinderGeometry(Math.min(sy, sz) / 2, Math.min(sy, sz) / 2, sx, 40);

@@ -2,6 +2,7 @@
 -- Client entry point: starts every controller and screen. You begin in the main menu (see GameFlow).
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 
 local Controllers = script:WaitForChild("Controllers")
@@ -49,6 +50,22 @@ task.spawn(function()
 			break
 		end
 		task.wait(1)
+	end
+end)
+
+-- The smooth car bodies from Blender, if they've been imported (they can turn up a moment after we start).
+local CarModelBuilder = require(ReplicatedStorage:WaitForChild("Shared").Cars.CarModelBuilder)
+local function useCarMeshes()
+	CarModelBuilder.setMeshLibrary(
+		ReplicatedStorage:FindFirstChild("CarMeshes") or ReplicatedStorage:FindFirstChild("TurboBallCars")
+	)
+end
+useCarMeshes()
+ReplicatedStorage.ChildAdded:Connect(function(child)
+	if child.Name == "CarMeshes" or child.Name == "TurboBallCars" then
+		task.wait(1) -- let all of its meshes arrive
+		useCarMeshes()
+		ShowroomController.rebuild()
 	end
 end)
 

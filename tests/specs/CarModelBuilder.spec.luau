@@ -1,6 +1,7 @@
 -- Builds every car with real (Lune) Roblox instances, which rejects unknown properties or bad values.
 -- Fused cars are built from their base car's design, so they're checked here too.
 local CarCatalog = require(Shared.Config.CarCatalog)
+local CarMeshes = require(Shared.Cars.CarMeshes)
 local CarModelBuilder = require(Shared.Cars.CarModelBuilder)
 
 return function(t)
@@ -81,4 +82,69 @@ return function(t)
 			end
 		end)
 	end
+
+	t.test("the smooth meshes fit the cars they're made for", function()
+		for id, set in CarMeshes.Cars do
+			local def = CarCatalog.get(id)
+			assert(def, `{id} is a car`)
+			local names: { [string]: boolean } = {}
+			for _, spec in CarModelBuilder.specs(def, 1) do
+				names[spec.name] = true
+			end
+			for name in set.replaces do
+				expect.truthy(names[name], `{id} has parts called {name} for the meshes to replace`)
+			end
+			for _, info in set.meshes do
+				expect.truthy(info.size.X > 0.1 and info.size.Y > 0.1 and info.size.Z > 0.1, `{info.name} has a size`)
+				expect.atMost(info.center.Magnitude, def.Hitbox.Magnitude, `{info.name} sits on the car`)
+			end
+		end
+	end)
+
+	t.test("with the meshes imported, every car swaps its blocky shell for them", function()
+		local library = Instance.new("Folder")
+		for _, set in CarMeshes.Cars do
+			for _, info in set.meshes do
+				if not library:FindFirstChild(info.name) then
+					local mesh = Instance.new("MeshPart")
+					mesh.Name = info.name
+					mesh.Anchored = true -- like Studio's importer leaves them
+					mesh.Parent = library
+				end
+			end
+		end
+		CarModelBuilder.setMeshLibrary(library)
+		for id, set in CarMeshes.Cars do
+			local def = CarCatalog.get(id)
+			assert(def)
+			expect.truthy(CarModelBuilder.usesMeshes(def), `{id} uses its meshes`)
+			for stage = 1, 4 do
+				local model = CarModelBuilder.build(def, { teamColor = Color3.fromRGB(255, 0, 0), stage = stage })
+				local meshes = 0
+				for _, child in model:GetChildren() do
+					expect.falsy(set.replaces[child.Name], `{id}: the {child.Name} parts were swapped out`)
+					if child:IsA("MeshPart") then
+						meshes += 1
+						expect.truthy(child.Massless and not child.CanCollide, `{child.Name} is just for looks`)
+						expect.falsy(child.Anchored, `{child.Name} moves with the car`)
+						expect.truthy(child:FindFirstChildOfClass("WeldConstraint") ~= nil, `{child.Name} is welded`)
+					end
+				end
+				expect.equal(meshes, #set.meshes, `{id} at stage {stage} has all its meshes`)
+			end
+		end
+		-- A car whose meshes aren't all there stays built from parts.
+		local someCar = next(CarMeshes.Cars)
+		if someCar then
+			local def = CarCatalog.get(someCar)
+			assert(def)
+			local first = library:FindFirstChild(CarMeshes.Cars[someCar].meshes[1].name)
+			if first then
+				first:Destroy()
+			end
+			CarModelBuilder.setMeshLibrary(library)
+			expect.falsy(CarModelBuilder.usesMeshes(def), "half-imported cars stay parts")
+		end
+		CarModelBuilder.setMeshLibrary(nil)
+	end)
 end

@@ -29,3 +29,6 @@ tools/preview/shots/
 .DS_Store
 Thumbs.db
 tools/preview/showroom*.json
+
+# Intermediate file for tools/meshes/build_meshes.py (made by tools/meshes/export_parts)
+tools/meshes/parts.json

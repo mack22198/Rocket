@@ -99,6 +99,21 @@ When testing in Studio your progress isn't saved unless the place is published a
 To try the garage without grinding, set `StudioStartingScrap` in `GameConfig.luau`, e.g. to `5000`. To see
 evolutions quickly, lower the numbers in `GameConfig.Evolution.Xp`.
 
+### Smooth car bodies (one-time import, recommended)
+
+The cars' bodies have smooth versions made in Blender (rounded panels, curved fenders, a proper rubber duck...).
+Roblox only lets meshes into a game through Studio, so this takes one import:
+
+1. Download [`assets/meshes/TurboBallCars.fbx`](assets/meshes/TurboBallCars.fbx) from this repo.
+2. In Studio, open the place, then **Home** tab → **Import 3D** (or **File → Import 3D**) and pick the file.
+   Leave the settings as they are (don't turn on *Merge Meshes*) and click **Import**. A model called
+   `TurboBallCars` appears in the Workspace: a row of car bodies.
+3. **File → Save** (or publish). That's it - when the game starts it moves the meshes into ReplicatedStorage
+   and every car uses them. The Output window says `Smooth car meshes found.`
+
+Until then (or if something's missing) the cars are built from plain parts, exactly as before. If the meshes are
+ever remade (see [tools/meshes](tools/meshes)), delete the old `TurboBallCars` and import the new file.
+
 ## Controls
 
 | Action | Keyboard / mouse | Gamepad | Touch |
@@ -188,6 +203,11 @@ luau-lsp analyze --definitions=@roblox=roblox.d.luau --sourcemap=sourcemap.json 
 real building code, which is handy for checking changes to how things look from any computer. See its
 [README](tools/preview/README.md).
 
+### Smooth car meshes
+
+[`tools/meshes`](tools/meshes) makes the smooth car bodies with Blender (run from Python, no Blender window
+needed) straight from the car designs in `CarModelBuilder.luau`. See its [README](tools/meshes/README.md).
+
 ## How it's built
 
 ```
@@ -264,7 +284,7 @@ Ideas from the design, roughly in order:
   (car feel, bot difficulty, UI sizes, lighting) after the first real session.
 - Other players' hits reach you after a short network delay (standard for online games). Your own hits are instant.
 - Sounds are Roblox's built-in placeholders.
-- Everything is built from Roblox's basic parts (no uploaded 3D models or textures), which is why the cars and
-  stadium have a clean "low-poly" look. The next big visual step would be custom meshes and textures made in
-  Blender and uploaded to Roblox. Also: Roblox shows its best lighting, shadows and glow only at high graphics
+- Apart from the optional smooth car bodies (above), everything is built from Roblox's basic parts, which is why
+  the stadium has a clean "low-poly" look. The next visual steps would be more Blender meshes (wheels, the
+  stadium, the ball) and textures. Also: Roblox shows its best lighting, shadows and glow only at high graphics
   quality (Esc → Settings → Graphics Quality).
