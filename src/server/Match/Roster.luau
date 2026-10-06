@@ -38,6 +38,8 @@ export type Participant = {
 	horn: string,
 	celebration: string, -- what goes off when they score
 	experience: number, -- matches a player had finished before this one (bots: 0)
+	level: number, -- player level (bots get a made-up one)
+	title: string, -- the title shown under their name, e.g. "🧤 Brick Wall"
 }
 
 local Roster = {}
@@ -143,6 +145,8 @@ function Roster.newParticipant(fields: {
 		horn = "beep",
 		celebration = "fireworks",
 		experience = 0,
+		level = 1,
+		title = "",
 	}
 end
 

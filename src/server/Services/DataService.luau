@@ -11,10 +11,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Achievements = require(Shared.Config.Achievements)
 local CarCatalog = require(Shared.Config.CarCatalog)
 local Cosmetics = require(Shared.Config.Cosmetics)
 local Daily = require(Shared.Config.Daily)
 local GameConfig = require(Shared.Config.GameConfig)
+local Levels = require(Shared.Config.Levels)
 local Remotes = require(Shared.Net.Remotes)
 local Season = require(Shared.Config.Season)
 local Signal = require(Shared.Util.Signal)
@@ -28,6 +30,12 @@ export type LifetimeStats = {
 	shots: number,
 	megaShots: number,
 	scrapEarned: number,
+	demos: number,
+	mvps: number,
+	styleTouches: number,
+	items: number,
+	powers: number,
+	bestStreak: number, -- most wins in a row
 }
 
 -- The login streak, today's quests and the daily chest (see Daily).
@@ -55,6 +63,11 @@ export type SavedData = {
 	scrapBoost: number, -- matches left that pay double Scrap (a daily chest or season prize)
 	style: StyleData,
 	season: Season.State, -- this season's XP and the tiers that have paid out (see Season)
+	xp: number, -- all the level XP ever earned (see Levels)
+	levelPaid: number, -- the highest level whose reward has been paid
+	winStreak: number, -- wins in a row right now
+	achievements: { [string]: boolean }, -- the ones done (see Achievements)
+	title: string, -- the title under your name ("" = the best one your level gives)
 }
 
 type Profile = {
@@ -68,7 +81,7 @@ local DataService = {}
 -- Fired once a player's data has loaded (before it's sent to them), so other services can bring it up to date.
 DataService.Loaded = Signal.new() :: Signal.Signal<Player>
 
-local DATA_VERSION = 5
+local DATA_VERSION = 6
 local LOAD_ATTEMPTS = 6
 local LOAD_RETRY_DELAY = 3
 
@@ -83,7 +96,22 @@ local function defaultData(): SavedData
 		scrap = 0,
 		owned = { [CarCatalog.StarterId] = true },
 		equipped = CarCatalog.StarterId,
-		stats = { matches = 0, wins = 0, goals = 0, assists = 0, saves = 0, shots = 0, megaShots = 0, scrapEarned = 0 },
+		stats = {
+			matches = 0,
+			wins = 0,
+			goals = 0,
+			assists = 0,
+			saves = 0,
+			shots = 0,
+			megaShots = 0,
+			scrapEarned = 0,
+			demos = 0,
+			mvps = 0,
+			styleTouches = 0,
+			items = 0,
+			powers = 0,
+			bestStreak = 0,
+		},
 		carXp = {},
 		carStage = {},
 		carLook = {},
@@ -96,6 +124,11 @@ local function defaultData(): SavedData
 			celebration = Cosmetics.defaultFor("celebration"),
 		},
 		season = Season.newState(),
+		xp = 0,
+		levelPaid = 1,
+		winStreak = 0,
+		achievements = {},
+		title = "",
 	}
 end
 
@@ -195,6 +228,27 @@ local function sanitize(raw: any): SavedData
 		data.season.xp = number(season.xp, 0)
 		data.season.tier = math.min(number(season.tier, 0), Season.tierFor(data.season.xp))
 	end
+	-- Levels, streaks, achievements and titles (added in version 6). Older saves start with as much level XP as
+	-- all the Scrap they've ever won in matches, without paying out the levels they skip.
+	if type(raw.xp) == "number" then
+		data.xp = number(raw.xp, 0)
+		data.levelPaid = math.max(1, number(raw.levelPaid, 1))
+	else
+		data.xp = data.stats.scrapEarned
+		data.levelPaid = (Levels.levelFor(data.xp))
+	end
+	data.winStreak = number(raw.winStreak, 0)
+	if type(raw.achievements) == "table" then
+		for id, done in raw.achievements do
+			if done == true and type(id) == "string" and Achievements.get(id) then
+				data.achievements[id] = true
+			end
+		end
+	end
+	local level = Levels.levelFor(data.xp)
+	if type(raw.title) == "string" and Achievements.ownsTitle(raw.title, level, data.achievements) then
+		data.title = raw.title
+	end
 	return data
 end
 
@@ -228,6 +282,11 @@ local function serialize(data: SavedData, withSession: boolean): { [string]: any
 		scrapBoost = data.scrapBoost,
 		style = copyStyle(data.style),
 		season = table.clone(data.season),
+		xp = data.xp,
+		levelPaid = data.levelPaid,
+		winStreak = data.winStreak,
+		achievements = table.clone(data.achievements),
+		title = data.title,
 	}
 	if withSession then
 		copy.session = { jobId = game.JobId, time = os.time() }
@@ -270,6 +329,10 @@ local function clientView(data: SavedData): { [string]: any }
 		scrapBoost = data.scrapBoost,
 		style = copyStyle(data.style),
 		season = table.clone(data.season),
+		xp = data.xp,
+		winStreak = data.winStreak,
+		achievements = table.clone(data.achievements),
+		title = data.title,
 	}
 end
 

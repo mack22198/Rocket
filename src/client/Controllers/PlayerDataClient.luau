@@ -1,6 +1,6 @@
 --!strict
--- The client's copy of this player's saved data (Scrap, cars, evolutions, daily quests, style, the season),
--- kept fresh by the server.
+-- The client's copy of this player's saved data (Scrap, cars, evolutions, daily quests, style, the season,
+-- level, win streak, achievements and title), kept fresh by the server.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -24,6 +24,10 @@ export type Data = {
 	scrapBoost: number,
 	style: Style,
 	season: Season.State,
+	xp: number, -- level XP (see Levels)
+	winStreak: number,
+	achievements: { [string]: boolean },
+	title: string, -- "" = the best title the level gives
 }
 
 -- Hats, horns and goal celebrations (see Cosmetics).
@@ -55,6 +59,10 @@ local current: Data = {
 		celebration = Cosmetics.defaultFor("celebration"),
 	},
 	season = Season.newState(),
+	xp = 0,
+	winStreak = 0,
+	achievements = {},
+	title = "",
 }
 local loaded = false
 
@@ -139,6 +147,10 @@ local function apply(raw: any)
 		scrapBoost = if type(raw.scrapBoost) == "number" then raw.scrapBoost else 0,
 		style = readStyle(raw.style),
 		season = readSeason(raw.season),
+		xp = if type(raw.xp) == "number" then raw.xp else 0,
+		winStreak = if type(raw.winStreak) == "number" then raw.winStreak else 0,
+		achievements = if type(raw.achievements) == "table" then raw.achievements else {},
+		title = if type(raw.title) == "string" then raw.title else "",
 	}
 	loaded = true
 	PlayerDataClient.Changed:Fire(current)

@@ -2,7 +2,7 @@
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
 --   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay,
---              streak, chest, collection, twist, style, fuse, season, chat
+--              streak, chest, collection, twist, style, fuse, season, chat, profile, titles, toast
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -60,6 +60,9 @@ local MENU_SCENARIOS = {
 	style = true,
 	fuse = true,
 	season = true,
+	profile = true,
+	titles = true,
+	toast = true,
 }
 if MENU_SCENARIOS[scenario] and scenario ~= "queued" then
 	attrs.Phase = "Waiting"
@@ -269,6 +272,25 @@ local data = {
 		celebration = "fireworks",
 	},
 	season = { number = 1, xp = 1120, tier = 4 },
+	xp = 1830,
+	winStreak = 3,
+	achievements = { first_goal = true, first_win = true, first_mvp = true, first_demo = true, streak_3 = true },
+	title = "",
+}
+data.stats = {
+	matches = 23,
+	wins = 14,
+	goals = 31,
+	assists = 9,
+	saves = 17,
+	shots = 52,
+	megaShots = 4,
+	demos = 12,
+	mvps = 6,
+	styleTouches = 11,
+	items = 40,
+	powers = 28,
+	bestStreak = 4,
 }
 local carAttrs = {
 	Boost = 67,
@@ -432,6 +454,8 @@ for _, name in
 		"StylePanel",
 		"SeasonTrack",
 		"QuickChatPanel",
+		"ProfilePanel",
+		"Toasts",
 	}
 do
 	harness.sourceTransforms["src/client/UI/" .. name] = function(source)
@@ -459,6 +483,8 @@ local DailyRewards = harness.require(UI.DailyRewards)
 local CollectionBook = harness.require(UI.CollectionBook)
 local SeasonTrack = harness.require(UI.SeasonTrack)
 local QuickChatPanel = harness.require(UI.QuickChatPanel)
+local ProfilePanel = harness.require(UI.ProfilePanel)
+local Toasts = harness.require(UI.Toasts)
 HUD.start()
 Announcer.start()
 ResultsScreen.start()
@@ -471,6 +497,8 @@ DailyRewards.start()
 CollectionBook.start()
 SeasonTrack.start()
 QuickChatPanel.start()
+ProfilePanel.start()
+Toasts.start()
 if touch then
 	TouchControls.start()
 end
@@ -498,6 +526,21 @@ if scenario == "goal" then
 	remotes.Announce.OnClientEvent:Fire("save", "EPIC SAVE!", "Orange", "Bolt (bot)")
 	remotes.Announce.OnClientEvent:Fire("power", "❄️ Player1 froze Bolt (bot)!", "Blue", "Player1")
 	remotes.Announce.OnClientEvent:Fire("power", "🍌 Comet (bot) slipped on a banana!", "Blue", "Zippy (bot)")
+elseif scenario == "profile" then
+	ProfilePanel.open(1)
+elseif scenario == "titles" then
+	data.achievements.saves_25 = true
+	data.achievements.demos_25 = true
+	data.title = "demos_25"
+	ProfilePanel.open(2)
+elseif scenario == "toast" then
+	Toasts.achievement({
+		emoji = "🎩",
+		name = "Hat Trick",
+		text = "Score 3 goals in one match",
+		reward = 200,
+		title = "🎩 Hat Trick Hero",
+	})
 elseif scenario == "chat" then
 	fakeInput.ChatPressed:Fire(0)
 	local function chatCar(owner: number): any
@@ -556,6 +599,15 @@ elseif scenario == "results" or scenario == "podium" then
 		},
 		total = 216,
 		scrap = 956,
+		streak = 3,
+		progress = {
+			level = 8,
+			into = 96,
+			need = 400,
+			gained = 216,
+			levelUps = { { level = 8, scrap = 130 } },
+			achievements = {},
+		},
 		season = {
 			number = 1,
 			name = "Food Fight",

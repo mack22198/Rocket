@@ -13,6 +13,7 @@
 --   Play()                                                                   join the next match (or a free seat now)
 --   LeaveMatch()                                                             back to the menu (a bot takes your seat)
 --   QuickChat(phraseIndex)                                                   say one of the QuickChat phrases
+--   Profile(action, id) -> result                                            choose your title
 --   GetPlayerData() -> data                                                  initial profile snapshot
 -- Server -> Client
 --   BallState(time, position, velocity, flags, lastTouchTeam)  (unreliable, ~30/s)
@@ -22,6 +23,7 @@
 --   PowerFx(kind, position, team, target)                      show an item or power going off
 --   HornPlayed(car, hornId)                                    someone honked
 --   QuickChatShown(car, phraseIndex, name, team)               someone said a QuickChat phrase
+--   Progress(kind, info)                                       you reached a level or finished an achievement
 --   Announce(kind, text, team, extra)                          big text popups ("AIR HIT!", "SAVE!")
 --   GoalScored(team, scorerName, assistName, position, comboText, celebrationId)
 --   MatchResults(payload)                                      end of match summary + rewards
@@ -87,6 +89,7 @@ local Remotes = {
 	Play = event("Play"),
 	LeaveMatch = event("LeaveMatch"),
 	QuickChat = event("QuickChat"),
+	Profile = func("Profile"),
 	GetPlayerData = func("GetPlayerData"),
 
 	BallState = unreliable("BallState"),
@@ -96,6 +99,7 @@ local Remotes = {
 	PowerFx = event("PowerFx"),
 	HornPlayed = event("HornPlayed"),
 	QuickChatShown = event("QuickChatShown"),
+	Progress = event("Progress"),
 	Announce = event("Announce"),
 	GoalScored = event("GoalScored"),
 	MatchResults = event("MatchResults"),

@@ -53,6 +53,8 @@ Rewards.Scrap = {
 	Mvp = 20,
 	MatchCap = 350,
 	FriendBonus = 0.25, -- +25% when one of your Roblox friends is in the match too
+	StreakStep = 0.1, -- every win in a row after the first adds 10%...
+	StreakMax = 0.5, -- ...up to +50%
 }
 
 function Rewards.emptyStats(): MatchStats
@@ -107,6 +109,14 @@ function Rewards.compute(stats: MatchStats, outcome: Outcome, isMvp: boolean): R
 		total = s.MatchCap
 	end
 	return { lines = lines, total = total }
+end
+
+-- The extra Scrap (as a fraction, 0.2 = +20%) for winning `streak` matches in a row.
+function Rewards.streakBonus(streak: number): number
+	if streak < 2 then
+		return 0
+	end
+	return math.min((streak - 1) * Rewards.Scrap.StreakStep, Rewards.Scrap.StreakMax)
 end
 
 -- The car a player is saving up for: the cheapest car they don't own yet.

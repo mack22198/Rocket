@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Achievements = require(Shared.Config.Achievements)
 local CarCatalog = require(Shared.Config.CarCatalog)
 local CarDriver = require(Shared.Cars.CarDriver)
 local Cosmetics = require(Shared.Config.Cosmetics)
@@ -34,6 +35,7 @@ local DataService = require(script.Parent.DataService)
 local DemolitionService = require(script.Parent.DemolitionService)
 local ItemService = require(script.Parent.ItemService)
 local PowerService = require(script.Parent.PowerService)
+local ProgressService = require(script.Parent.ProgressService)
 local QuickChatService = require(script.Parent.QuickChatService)
 local SeasonService = require(script.Parent.SeasonService)
 local StatsService = require(script.Parent.StatsService)
@@ -52,6 +54,7 @@ local stateObject = MatchState.getObject()
 local rng = Random.new()
 
 local blueScore, orangeScore = 0, 0
+local maxDeficit: { [string]: number } = { Blue = 0, Orange = 0 } -- the most each team has been behind by
 local overtime = false
 local clockRemaining = 0
 local clockRunning = false
@@ -223,6 +226,15 @@ local function makeBot(team: Team, slot: number): Participant
 	end
 	bot.horn = pick("horn")
 	bot.celebration = if rng:NextNumber() < 0.5 then pick("celebration") else "fireworks"
+	-- ...and a level and title like a player's.
+	bot.level = rng:NextInteger(2, 40)
+	local titles = {}
+	for _, title in Achievements.Titles do
+		if (title.Level or 0) <= bot.level then
+			table.insert(titles, title.Id)
+		end
+	end
+	bot.title = Achievements.titleText(titles[rng:NextInteger(1, #titles)])
 	return bot
 end
 
@@ -240,6 +252,8 @@ local function makePlayerParticipant(player: Player, team: Team, slot: number): 
 	local data = DataService.get(player)
 	if data then
 		p.experience = data.stats.matches
+		p.level = ProgressService.level(data)
+		p.title = ProgressService.titleText(data)
 		p.topper = if data.style.topper ~= "none" then data.style.topper else nil
 		p.horn = data.style.horn
 		p.celebration = data.style.celebration
@@ -349,6 +363,7 @@ local function setupMatch()
 	StatsService.resetMatch()
 	BotService.reset()
 	blueScore, orangeScore = 0, 0
+	maxDeficit = { Blue = 0, Orange = 0 }
 	overtime = false
 	clockRemaining = matchLength()
 	clockRunning = false
@@ -463,6 +478,8 @@ local function celebrate(goal: { side: number, position: Vector3 })
 	end
 	set(Attr.BlueScore, blueScore)
 	set(Attr.OrangeScore, orangeScore)
+	maxDeficit.Blue = math.max(maxDeficit.Blue, orangeScore - blueScore)
+	maxDeficit.Orange = math.max(maxDeficit.Orange, blueScore - orangeScore)
 	local scorer = summary.scorer
 	Remotes.GoalScored:FireAllClients(
 		summary.team,
@@ -603,8 +620,21 @@ local function finishMatch(aborted: boolean)
 				table.insert(summary.lines, { label = "🤝 Playing with friends!", amount = bonus })
 				summary.total += bonus
 			end
-			-- A daily chest prize: double Scrap for a few matches.
+			-- Wins in a row pay more and more (a draw keeps the streak going; a loss starts it again).
 			local saved = DataService.get(player)
+			local streak = if saved then saved.winStreak else 0
+			if outcome == "Win" then
+				streak += 1
+			elseif outcome == "Loss" then
+				streak = 0
+			end
+			local streakBonus = if outcome == "Win" then Rewards.streakBonus(streak) else 0
+			if streakBonus > 0 then
+				local bonus = math.floor(summary.total * streakBonus)
+				table.insert(summary.lines, { label = `🔥 {streak} wins in a row!`, amount = bonus })
+				summary.total += bonus
+			end
+			-- A daily chest prize: double Scrap for a few matches.
 			local boosted = saved ~= nil and saved.scrapBoost > 0
 			if boosted then
 				table.insert(summary.lines, { label = "🚀 Double Scrap!", amount = summary.total })
@@ -633,11 +663,27 @@ local function finishMatch(aborted: boolean)
 				data.stats.shots += p.stats.shots
 				data.stats.megaShots += p.stats.megaShots
 				data.stats.scrapEarned += summary.total
+				data.stats.demos += p.stats.demos
+				data.stats.styleTouches += p.stats.styleTouches
+				data.stats.items += p.stats.items
+				data.stats.powers += p.stats.powers
+				if mvp == p then
+					data.stats.mvps += 1
+				end
+				data.winStreak = streak
+				data.stats.bestStreak = math.max(data.stats.bestStreak, streak)
 				scrap = data.scrap
 				owned = table.clone(data.owned)
 			end)
-			-- The season track moves on by as much as the Scrap they won (and pays out any tiers reached).
+			-- The season track moves on by as much as the Scrap they won (and pays out any tiers reached), and so
+			-- does their player level; then the achievements are checked.
 			local season = SeasonService.recordMatch(player, summary.total)
+			local conceded = if p.team == "Blue" then orangeScore else blueScore
+			local progress = ProgressService.recordMatch(player, summary.total, {
+				matchGoals = p.stats.goals,
+				cleanSheetWin = if outcome == "Win" and conceded == 0 then 1 else 0,
+				comebackWin = if outcome == "Win" and maxDeficit[p.team] >= 2 then 1 else 0,
+			})
 			local latest = DataService.get(player)
 			if latest then
 				scrap = latest.scrap
@@ -654,6 +700,8 @@ local function finishMatch(aborted: boolean)
 				podium = podium,
 				questsDone = questsDone,
 				season = season,
+				progress = progress,
+				streak = streak,
 				lines = summary.lines,
 				total = summary.total,
 				scrap = scrap,

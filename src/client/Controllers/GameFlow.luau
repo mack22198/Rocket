@@ -25,6 +25,7 @@ local HowToPlay = require(UI.HowToPlay)
 local HUD = require(UI.HUD)
 local MainMenu = require(UI.MainMenu)
 local PauseMenu = require(UI.PauseMenu)
+local ProfilePanel = require(UI.ProfilePanel)
 local ReplayScreen = require(UI.ReplayScreen)
 local ResultsScreen = require(UI.ResultsScreen)
 local SeasonTrack = require(UI.SeasonTrack)
@@ -63,7 +64,7 @@ end
 
 -- Is one of the menu's pop-up screens open (so the streak reward shouldn't pop up over it)?
 local function overlayOpen(): boolean
-	return HowToPlay.isOpen() or CollectionBook.isOpen() or SeasonTrack.isOpen()
+	return HowToPlay.isOpen() or CollectionBook.isOpen() or SeasonTrack.isOpen() or ProfilePanel.isOpen()
 end
 
 -- The match HUD, the announcer feed and the touch buttons, together.
@@ -115,6 +116,7 @@ local function apply(target: Screen)
 		DailyRewards.close()
 		CollectionBook.close()
 		SeasonTrack.close()
+		ProfilePanel.close()
 		return
 	end
 	PauseMenu.close()
@@ -176,6 +178,8 @@ local function onMenuKey()
 		CollectionBook.close()
 	elseif SeasonTrack.isOpen() then
 		SeasonTrack.close()
+	elseif ProfilePanel.isOpen() then
+		ProfilePanel.close()
 	elseif screen == "Match" then
 		if not ResultsScreen.isOpen() then
 			PauseMenu.toggle()
@@ -207,6 +211,9 @@ function GameFlow.start()
 	end)
 	MainMenu.SeasonPressed:Connect(function()
 		SeasonTrack.open()
+	end)
+	MainMenu.ProfilePressed:Connect(function()
+		ProfilePanel.open()
 	end)
 	MainMenu.StreakPressed:Connect(function()
 		DailyRewards.openStreak()

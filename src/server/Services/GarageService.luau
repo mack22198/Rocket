@@ -12,6 +12,7 @@ local Evolution = require(Shared.Config.Evolution)
 local Remotes = require(Shared.Net.Remotes)
 
 local DataService = require(script.Parent.DataService)
+local ProgressService = require(script.Parent.ProgressService)
 
 local GarageService = {}
 
@@ -162,7 +163,11 @@ end
 
 function GarageService.init()
 	Remotes.Garage.OnServerInvoke = function(player: Player, action: unknown, carId: unknown, extra: unknown)
-		return handle(player, action, carId, extra)
+		local result = handle(player, action, carId, extra)
+		if result.ok then
+			task.defer(ProgressService.check, player) -- e.g. "Own 5 cars"
+		end
+		return result
 	end
 	Remotes.GetPlayerData.OnServerInvoke = function(player: Player)
 		return DataService.clientView(player)

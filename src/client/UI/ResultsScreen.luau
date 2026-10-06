@@ -1,8 +1,8 @@
 --!strict
 -- End-of-match screen: first a big headline over the winners' podium (who won, who's MVP), then the panel
--- with win/lose, the scoreboard, Scrap earned line by line, and three progress bars: how close your car is to
--- its next evolution, how far along the season's reward track you are, and how close you are to unlocking the
--- next car.
+-- with win/lose, the scoreboard, Scrap earned line by line, and four progress bars: your player level, how close
+-- your car is to its next evolution, how far along the season's reward track you are, and how close you are to
+-- unlocking the next car. Levels reached and achievements finished pop up as cards (see Toasts).
 -- This is the "okay, one more match" moment, so the progress gets the spotlight - and PLAY AGAIN is the big
 -- button. GARAGE and MENU take you back to the main menu (the menus handle all three, see GameFlow).
 
@@ -16,6 +16,7 @@ local MatchState = require(Shared.Match.MatchState)
 local Signal = require(Shared.Util.Signal)
 
 local Theme = require(script.Parent.Theme)
+local Toasts = require(script.Parent.Toasts)
 
 local ResultsScreen = {}
 
@@ -38,6 +39,7 @@ local statsLine: TextLabel
 local rewardList: Frame
 local totalLabel: TextLabel
 local board: Frame
+local levelProgress: Progress
 local carProgress: Progress
 local seasonProgress: Progress
 local unlockProgress: Progress
@@ -72,14 +74,22 @@ local function section(parent: Instance, name: string, size: UDim2, position: UD
 	return frame
 end
 
--- One of the three progress cards along the bottom (`column` 0, 1 or 2).
+local CARDS = 4
+
+-- One of the progress cards along the bottom (`column` 0 to CARDS - 1).
 local function progressCard(parent: Instance, name: string, column: number, color: Color3): Progress
-	local card = section(parent, name, UDim2.new(1 / 3, -8, 0, 86), UDim2.new(column / 3, column * 4, 0, 428))
+	local card = section(
+		parent,
+		name,
+		UDim2.new(1 / CARDS, -6, 0, 86),
+		UDim2.new(column / CARDS, column * 6 / (CARDS - 1), 0, 428) -- 8px gaps, flush at both ends
+	)
 	local cardTitle = Theme.label(card, {
 		size = UDim2.new(1, 0, 0, 24),
 		text = "",
 		align = Enum.TextXAlignment.Left,
 	})
+	cardTitle.TextWrapped = false -- long car names shrink to one line
 	local bar = Theme.bar(card, UDim2.new(1, 0, 0, 16), UDim2.fromOffset(0, 32), color)
 	local note = Theme.label(card, {
 		size = UDim2.new(1, 0, 0, 16),
@@ -178,10 +188,11 @@ local function build()
 	boardLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	boardLayout.Parent = board
 
-	-- Bottom: your car's evolution, the season track and the next car to unlock.
-	carProgress = progressCard(panel, "CarProgress", 0, C.Evolve)
-	seasonProgress = progressCard(panel, "SeasonProgress", 1, C.Gold)
-	unlockProgress = progressCard(panel, "UnlockProgress", 2, C.Good)
+	-- Bottom: your level, your car's evolution, the season track and the next car to unlock.
+	levelProgress = progressCard(panel, "LevelProgress", 0, C.Blue)
+	carProgress = progressCard(panel, "CarProgress", 1, C.Evolve)
+	seasonProgress = progressCard(panel, "SeasonProgress", 2, C.Gold)
+	unlockProgress = progressCard(panel, "UnlockProgress", 3, C.Good)
 
 	local buttons = Instance.new("Frame")
 	buttons.Name = "Buttons"
@@ -400,6 +411,43 @@ function ResultsScreen.show(payload: { [string]: any })
 		end
 		totalLabel.Text = `TOTAL  +{total}`
 	end)
+
+	-- Your player level (and a card for each level reached and achievement finished).
+	local levels = payload.progress
+	if type(levels) == "table" and type(levels.level) == "number" then
+		levelProgress.title.Text = `⭐ LEVEL {levels.level}   +{levels.gained or 0} XP`
+		local need = if type(levels.need) == "number" and levels.need > 0 then levels.need else 1
+		local into = if type(levels.into) == "number" then levels.into else 0
+		levelProgress.bar.set(0)
+		TweenService:Create(levelProgress.bar.fill, TweenInfo.new(1.2, Enum.EasingStyle.Quad), {
+			Size = UDim2.fromScale(math.clamp(into / need, 0, 1), 1),
+		}):Play()
+		levelProgress.bar.fill.Visible = true
+		local ups = if type(levels.levelUps) == "table" then levels.levelUps else {}
+		if #ups > 0 then
+			levelProgress.note.Text = `🎉 Level up! +🔩{ups[#ups].scrap or 0}`
+			levelProgress.note.TextColor3 = C.Gold
+		else
+			levelProgress.note.Text = `{need - into} XP to level {levels.level + 1}`
+			levelProgress.note.TextColor3 = C.Muted
+		end
+		local achievements = if type(levels.achievements) == "table" then levels.achievements else {}
+		task.delay(1.2, function()
+			if token ~= showToken then
+				return
+			end
+			for _, up in ups do
+				Toasts.levelUp(up)
+			end
+			for _, info in achievements do
+				Toasts.achievement(info)
+			end
+		end)
+	else
+		levelProgress.title.Text = "⭐ Level"
+		levelProgress.bar.set(0)
+		levelProgress.note.Text = ""
+	end
 
 	-- Your car's evolution.
 	local car = payload.car

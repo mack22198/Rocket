@@ -13,9 +13,11 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Achievements = require(Shared.Config.Achievements)
 local CarCatalog = require(Shared.Config.CarCatalog)
 local Daily = require(Shared.Config.Daily)
 local Evolution = require(Shared.Config.Evolution)
+local Levels = require(Shared.Config.Levels)
 local MatchState = require(Shared.Match.MatchState)
 local Remotes = require(Shared.Net.Remotes)
 local Rewards = require(Shared.Config.Rewards)
@@ -36,6 +38,7 @@ MainMenu.CollectionPressed = Signal.new() :: Signal.Signal<>
 MainMenu.StreakPressed = Signal.new() :: Signal.Signal<>
 MainMenu.ChestPressed = Signal.new() :: Signal.Signal<>
 MainMenu.SeasonPressed = Signal.new() :: Signal.Signal<>
+MainMenu.ProfilePressed = Signal.new() :: Signal.Signal<>
 
 local C = Theme.Colors
 local rgb = Color3.fromRGB
@@ -56,7 +59,11 @@ local garageButton: TextButton
 local evolveBadge: TextLabel
 local statusPill: TextLabel
 local eventPill: TextLabel
-local playerStats: TextLabel
+local playerLevel: TextLabel
+local playerTitle: TextLabel
+local playerXp: Theme.Bar
+local playerXpText: TextLabel
+local playerBadges: TextLabel
 local scrapPill: TextLabel
 local nextName: TextLabel
 local nextAmount: TextLabel
@@ -285,7 +292,8 @@ local function buildLeft()
 		transparency = 0.25,
 	})
 
-	-- You: avatar, name and lifetime stats.
+	-- You: avatar, level, name, title and how far you are to the next level. Tap it for your profile (stats,
+	-- achievements and titles).
 	local card = Theme.panel(left, "Player", UDim2.fromOffset(400, 76), UDim2.fromOffset(44, 620))
 	card.BackgroundTransparency = 0.2
 	local avatar = Instance.new("ImageLabel")
@@ -297,23 +305,67 @@ local function buildLeft()
 	avatar.Parent = card
 	Theme.corner(avatar, 30)
 	Theme.stroke(avatar, C.Gold, 2)
+	playerLevel = Theme.label(card, {
+		name = "Level",
+		size = UDim2.fromOffset(30, 30),
+		position = UDim2.fromOffset(46, 44),
+		text = "1",
+		color = C.Ink,
+		stroke = false,
+		zIndex = 3,
+	})
+	playerLevel.BackgroundColor3 = C.Gold
+	playerLevel.BackgroundTransparency = 0
+	Theme.corner(playerLevel, 15)
+	Theme.stroke(playerLevel, C.Ink, 2)
 	Theme.label(card, {
 		name = "Name",
-		size = UDim2.fromOffset(300, 28),
-		position = UDim2.fromOffset(82, 10),
+		size = UDim2.fromOffset(210, 26),
+		position = UDim2.fromOffset(82, 6),
 		text = localPlayer.DisplayName,
 		align = Enum.TextXAlignment.Left,
 	})
-	playerStats = Theme.label(card, {
-		name = "Stats",
-		size = UDim2.fromOffset(300, 18),
-		position = UDim2.fromOffset(83, 44),
+	playerBadges = Theme.label(card, {
+		name = "Achievements",
+		size = UDim2.fromOffset(96, 20),
+		position = UDim2.fromOffset(294, 8),
+		text = "",
+		font = Theme.Caps,
+		color = C.Gold,
+		align = Enum.TextXAlignment.Right,
+		stroke = false,
+	})
+	playerTitle = Theme.label(card, {
+		name = "Title",
+		size = UDim2.fromOffset(306, 16),
+		position = UDim2.fromOffset(83, 34),
 		text = "",
 		font = Theme.Body,
-		color = C.Muted,
+		color = C.Gold,
 		align = Enum.TextXAlignment.Left,
 		stroke = false,
 	})
+	playerXp = Theme.bar(card, UDim2.fromOffset(212, 10), UDim2.fromOffset(83, 57), C.Gold)
+	playerXpText = Theme.label(card, {
+		name = "Xp",
+		size = UDim2.fromOffset(94, 16),
+		position = UDim2.fromOffset(300, 54),
+		text = "",
+		font = Theme.Caps,
+		color = C.Muted,
+		align = Enum.TextXAlignment.Right,
+		stroke = false,
+	})
+	local open = Instance.new("TextButton")
+	open.Name = "Open"
+	open.Size = UDim2.fromScale(1, 1)
+	open.BackgroundTransparency = 1
+	open.Text = ""
+	open.ZIndex = 5
+	open.Parent = card
+	open.Activated:Connect(function()
+		MainMenu.ProfilePressed:Fire()
+	end)
 end
 
 local function buildRight()
@@ -641,8 +693,17 @@ local function refreshData()
 	scrapPill.Text = if data.scrapBoost > 0
 		then `🔩 {Theme.formatNumber(data.scrap)}  🚀x2`
 		else `🔩 {Theme.formatNumber(data.scrap)}`
-	local stats = data.stats
-	playerStats.Text = `🏆 {stats.wins or 0} wins   ⚽ {stats.goals or 0} goals   🛡️ {stats.saves or 0} saves`
+	local level, levelXp, levelNeed = Levels.levelFor(data.xp)
+	playerLevel.Text = tostring(level)
+	local title = Achievements.titleText(if data.title ~= "" then data.title else Achievements.levelTitle(level))
+	playerTitle.Text = if data.winStreak >= 2 then `{title}   ·   🔥 {data.winStreak} WIN STREAK` else title
+	playerXp.set(levelXp / levelNeed)
+	playerXpText.Text = `{levelXp}/{levelNeed} XP`
+	local done = 0
+	for _ in data.achievements do
+		done += 1
+	end
+	playerBadges.Text = `🏅 {done}/{#Achievements.List}`
 
 	local goal = Rewards.nextGoal(data.owned, data.scrap)
 	if goal then

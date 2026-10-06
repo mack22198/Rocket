@@ -12,6 +12,7 @@ local Daily = require(Shared.Config.Daily)
 local Remotes = require(Shared.Net.Remotes)
 
 local DataService = require(script.Parent.DataService)
+local ProgressService = require(script.Parent.ProgressService)
 
 local DailyService = {}
 
@@ -142,7 +143,11 @@ end
 function DailyService.init()
 	DataService.Loaded:Connect(DailyService.refresh)
 	Remotes.Daily.OnServerInvoke = function(player: Player, action: unknown, index: unknown)
-		return handle(player, action, index)
+		local result = handle(player, action, index)
+		if result.ok then
+			task.defer(ProgressService.check, player) -- e.g. "Play 7 days in a row"
+		end
+		return result
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		lastRequest[player] = nil

@@ -336,25 +336,45 @@ local function decorateCar(model: Instance)
 	end
 	local isMine = model:GetAttribute(A.OwnerUserId) == localPlayer.UserId
 
+	-- Everyone else's name over their car: their level, their name and (smaller) their title.
 	if not isMine then
 		local tag = Instance.new("BillboardGui")
 		tag.Name = "NameTag"
-		tag.Size = UDim2.fromOffset(170, 34)
-		tag.StudsOffset = Vector3.new(0, 5.5, 0)
+		tag.Size = UDim2.fromOffset(190, 48)
+		tag.StudsOffset = Vector3.new(0, 5.8, 0)
 		tag.AlwaysOnTop = true
 		tag.MaxDistance = 260
 		tag.LightInfluence = 0
 		tag.Adornee = chassis
 		local label = Instance.new("TextLabel")
-		label.Size = UDim2.fromScale(1, 1)
+		label.Name = "Name"
+		label.Size = UDim2.fromScale(1, 0.64)
 		label.BackgroundTransparency = 1
 		label.Font = Enum.Font.FredokaOne
 		label.TextScaled = true
+		label.RichText = true
 		label.TextStrokeTransparency = 0.2
 		local name = model:GetAttribute(A.DriverName)
-		label.Text = if type(name) == "string" then name else "Driver"
+		local level = model:GetAttribute(A.Level)
+		local shown = if type(name) == "string" then name else "Driver"
+		shown = string.gsub(string.gsub(string.gsub(shown, "&", "&amp;"), "<", "&lt;"), ">", "&gt;")
+		label.Text = if type(level) == "number" then `<font color="#FFCC33">{level}</font>  {shown}` else shown
 		label.TextColor3 = teamColor(model:GetAttribute(A.Team))
 		label.Parent = tag
+		local title = model:GetAttribute(A.Title)
+		if type(title) == "string" and title ~= "" then
+			local titleLabel = Instance.new("TextLabel")
+			titleLabel.Name = "Title"
+			titleLabel.Size = UDim2.fromScale(1, 0.36)
+			titleLabel.Position = UDim2.fromScale(0, 0.64)
+			titleLabel.BackgroundTransparency = 1
+			titleLabel.Font = Enum.Font.GothamBold
+			titleLabel.TextScaled = true
+			titleLabel.TextStrokeTransparency = 0.3
+			titleLabel.TextColor3 = Color3.fromRGB(255, 226, 150)
+			titleLabel.Text = title
+			titleLabel.Parent = tag
+		end
 		tag.Parent = chassis
 	end
 

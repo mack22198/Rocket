@@ -75,6 +75,8 @@ MatchState.CarAttr = {
 	Rocket = "Rocket",
 	Pull = "Pull", -- "magnet" / "beam" while pulling the ball, else ""
 	Demolished = "Demolished", -- smashed to bits; gone until it pops back in at its goal
+	Level = "Level", -- the driver's player level
+	Title = "Title", -- the driver's title, e.g. "🧤 Brick Wall"
 }
 
 -- Names of the folders the server puts in Workspace.

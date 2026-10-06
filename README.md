@@ -52,6 +52,16 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   F to arm it and your next hit blasts the ball on fire. It's earned in the match, never bought.
 - **Style and combos:** air hits, wall hits, passes and Mega Shots chain into combo goals ("🔥 3X COMBO!").
   Saves, style moves and MVP are all announced.
+- **Player levels:** every match earns level XP (as much as the Scrap you win) and every level pays Scrap with
+  a big LEVEL UP! card. The first match takes you to level 2 and the early levels come quickly; there's no top
+  level. Your level shows over your car for everyone to see.
+- **Win streaks:** win matches in a row for more and more Scrap (+10% for 2 wins in a row, up to +50%). A draw
+  keeps the streak going.
+- **Achievements and titles:** 25 achievements ("Make 25 saves", "Score a hat trick", "Win after being 2 goals
+  behind", "Fuse a car"...) each pay Scrap once, and many unlock a **title** (🧱 Brick Wall, 💥 Wrecking Ball,
+  🎩 Hat Trick Hero...) to wear under your name - so do levels 5, 10, 20, 30 and 50. Tap your card in the menu
+  for your profile: your stats, every achievement with how close you are, and the titles to choose from. Each
+  achievement can also award a Roblox badge (see *Publishing*).
 - **Rewards:** everyone earns **Scrap** every match (more for winning, goals, saves and style, and +25% when one
   of your Roblox friends is in the match too). Scrap is the only currency and there are no loot boxes.
 - **Seasons:** a free reward track that changes every six weeks, starting with 🍔 **Season 1: Food Fight**. Every
@@ -155,6 +165,11 @@ ever remade (see [tools/meshes](tools/meshes)), delete the old `TurboBallCars` a
 3. **Game Settings → Security:** turn on *Enable Studio Access to API Services* so saving also works when
    testing in Studio.
 4. Players' Scrap, cars and stats are saved automatically in the live game.
+5. **Badges (optional):** every achievement can award a Roblox badge, which shows on players' Roblox profiles.
+   On the [Creator Dashboard](https://create.roblox.com/dashboard/creations), open the game → *Engagement →
+   Badges* → *Create a Badge* (a few a day are free), then paste the badge's ID as `Badge = <id>` on that
+   achievement in [`Achievements.luau`](src/shared/Config/Achievements.luau) (`WelcomeBadge` is given to
+   everyone the first time they play).
 
 ## Changing the game
 
@@ -233,7 +248,8 @@ src/
     Config/       GameConfig, CarCatalog, Rewards, Evolution, Powers (items and car powers), Daily (streaks,
                   quests, daily chest), Twists (match twists and weekend events), Cosmetics (hats, horns,
                   goal parties), Season (the free season reward track), Sounds (every sound, for Toolbox IDs),
-                  QuickChat (the quick chat phrases)
+                  QuickChat (the quick chat phrases), Levels (player levels), Achievements (achievements and
+                  titles)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay
@@ -250,7 +266,8 @@ src/
                   StatsService, BoostPadService, BumpService, DemolitionService, ItemService (item boxes),
                   PowerService
                   (using items and powers, cheese and banana traps), DailyService (streaks, quests, chest),
-                  SeasonService (season XP and tier rewards), QuickChatService, DataService (saving),
+                  SeasonService (season XP and tier rewards), ProgressService (levels, achievements, titles,
+                  badges), QuickChatService, DataService (saving),
                   GarageService (unlocking, fusing, evolving, style)
   client/   (StarterPlayerScripts.Client)
     Showroom/     ShowroomBuilder (the menu's garage showroom and its mirror-floor reflection),
@@ -265,7 +282,8 @@ src/
     UI/           MainMenu, Garage, PauseMenu, HowToPlay, HUD, Announcer, ResultsScreen, ReplayScreen,
                   DailyRewards (streak and chest pop-ups), CollectionBook, StylePanel (the garage's STYLE tab),
                   SeasonTrack (every tier of the season), Coach (first-match tips), QuickChatPanel (the chat
-                  button, its list and the speech bubbles), TouchControls, Transition,
+                  button, its list and the speech bubbles), ProfilePanel (stats, achievements, titles), Toasts
+                  (level-up and achievement cards), TouchControls, Transition,
                   Theme
 tests/      Lune unit tests (run outside Roblox)
 tools/      Offline previews of the 3D world and the UI
