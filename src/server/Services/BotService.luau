@@ -1,6 +1,7 @@
 --!strict
 -- Drives the bot cars on the server. Bots "think" a dozen times a second (BotBrain) and drive every frame.
--- They use their items and car powers too (PowerService.botThink).
+-- They use their items and car powers too (PowerService.botThink). Bots on a player's team play for them, and
+-- bots against players adapt to the score (see BotBrain).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -9,6 +10,7 @@ local BallSim = require(Shared.Physics.BallSim)
 local BotBrain = require(Shared.Bots.BotBrain)
 local CarPhysics = require(Shared.Physics.CarPhysics)
 local GameConfig = require(Shared.Config.GameConfig)
+local MatchState = require(Shared.Match.MatchState)
 local MathUtil = require(Shared.Util.MathUtil)
 local Powers = require(Shared.Config.Powers)
 
@@ -36,6 +38,13 @@ local PREDICTION_SAMPLES = 32
 local thinkTimer = 0
 local lastAttacker: { [Roster.Team]: string? } = {}
 local rng = Random.new()
+local stateObject = MatchState.getObject()
+
+local function score(team: Roster.Team): number
+	local value =
+		stateObject:GetAttribute(if team == "Blue" then MatchState.Attr.BlueScore else MatchState.Attr.OrangeScore)
+	return if type(value) == "number" then value else 0
+end
 
 local function mindOf(p: Participant): BotMind
 	local brain = p.brain
@@ -119,16 +128,38 @@ local function think()
 	local arena = BallService.arena()
 	local ball = BallService.getState()
 	local predict = forecast()
-	local skill = GameConfig.Bots.Skill
+
+	-- Where the players are, and whether any of them is new.
+	local players: { [Roster.Team]: number } = { Blue = 0, Orange = 0 }
+	local rookie = false
+	for _, p in Roster.all() do
+		if not p.isBot then
+			players[p.team] += 1
+			rookie = rookie or p.experience < GameConfig.Bots.RookieMatches
+		end
+	end
 
 	for _, team: Roster.Team in { "Blue", "Orange" } :: { Roster.Team } do
-		local members: { BotBrain.Member } = {}
-		for _, p in Roster.onTeam(team) do
-			if p.chassis then
-				table.insert(members, { key = p.key, position = p.chassis.Position })
-			end
+		local enemy: Roster.Team = if team == "Blue" then "Orange" else "Blue"
+		local skill = GameConfig.Bots.Skill
+		if players[team] == 0 and players[enemy] > 0 then
+			skill = BotBrain.adaptiveSkill(skill, score(enemy) - score(team), rookie)
 		end
 		local defendsSide = GameConfig.Teams[team].DefendsSide
+		local upfield = Vector3.new(0, 0, -defendsSide)
+		local members: { BotBrain.Member } = {}
+		local feed: Vector3? = nil
+		for _, p in Roster.onTeam(team) do
+			local chassis = p.chassis
+			if chassis then
+				local position = chassis.Position
+				table.insert(members, { key = p.key, position = position, human = not p.isBot })
+				-- The player furthest upfield is the one to pass to.
+				if not p.isBot and (feed == nil or position:Dot(upfield) > (feed :: Vector3):Dot(upfield)) then
+					feed = position
+				end
+			end
+		end
 		local roles = BotBrain.assignRoles(members, ball.position, defendsSide, arena.halfLength, lastAttacker[team])
 		for key, role in roles do
 			if role == "attack" then
@@ -163,6 +194,7 @@ local function think()
 				skill = skill,
 				arena = arena,
 				aimOffset = mind.aimOffset,
+				feed = feed,
 			}, mind.memory, THINK_INTERVAL)
 			mind.input = input
 			if wantsMega then

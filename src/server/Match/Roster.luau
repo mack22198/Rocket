@@ -37,6 +37,7 @@ export type Participant = {
 	topper: string?, -- the hat on the car (see Cosmetics)
 	horn: string,
 	celebration: string, -- what goes off when they score
+	experience: number, -- matches a player had finished before this one (bots: 0)
 }
 
 local Roster = {}
@@ -141,6 +142,7 @@ function Roster.newParticipant(fields: {
 		topper = nil,
 		horn = "beep",
 		celebration = "fireworks",
+		experience = 0,
 	}
 end
 

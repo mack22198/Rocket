@@ -2,9 +2,14 @@
 -- Decision making for bot drivers. Pure logic (no Roblox objects), so it's easy to test and tweak.
 -- Bots share three roles per team: one ATTACKS the ball, one DEFENDS near its own goal, the rest SUPPORT.
 -- Skill (0..1) controls aim wobble, boost use and flip attempts. Default bots are meant to be beatable.
+--
+-- Bots on a player's team are team-mates, not ball hogs: they leave the ball to the player when the player is
+-- nearly as close, and pass it up to them when they're further upfield. Bots playing against players get a
+-- little easier while the players are behind (and for new players) and a little harder while they're ahead.
 
 local ArenaShape = require(script.Parent.Parent.Arena.ArenaShape)
 local CarPhysics = require(script.Parent.Parent.Physics.CarPhysics)
+local GameConfig = require(script.Parent.Parent.Config.GameConfig)
 local MathUtil = require(script.Parent.Parent.Util.MathUtil)
 
 export type Role = "attack" | "support" | "defend"
@@ -23,6 +28,7 @@ export type Context = {
 	skill: number,
 	arena: ArenaShape.Arena,
 	aimOffset: Vector3, -- per-bot wobble so bots aren't perfect
+	feed: Vector3?, -- a player on our team to pass to (where their car is)
 }
 
 export type Memory = {
@@ -33,7 +39,10 @@ export type Memory = {
 	reverseSteer: number,
 }
 
-export type Member = { key: string, position: Vector3 }
+export type Member = { key: string, position: Vector3, human: boolean? }
+
+-- Bots leave the ball to a player on their team who's within this many studs of being as close as they are.
+local PLAYER_PRIORITY = 25
 
 local BotBrain = {}
 
@@ -64,18 +73,19 @@ function BotBrain.assignRoles(
 	if #members == 0 then
 		return roles
 	end
-	local function ballDistance(m: Member): number
-		return MathUtil.flat(m.position - ballPosition).Magnitude
+	-- How strong a claim each car has on the ball: the closer the better, and players come first.
+	local function claim(m: Member): number
+		return MathUtil.flat(m.position - ballPosition).Magnitude - (if m.human then PLAYER_PRIORITY else 0)
 	end
 	local attacker = members[1]
 	for _, m in members do
-		if ballDistance(m) < ballDistance(attacker) then
+		if claim(m) < claim(attacker) then
 			attacker = m
 		end
 	end
-	if previousAttacker and previousAttacker ~= attacker.key then
+	if previousAttacker and previousAttacker ~= attacker.key and not attacker.human then
 		for _, m in members do
-			if m.key == previousAttacker and ballDistance(m) < ballDistance(attacker) + 12 then
+			if m.key == previousAttacker and claim(m) < claim(attacker) + 12 then
 				attacker = m
 			end
 		end
@@ -120,6 +130,34 @@ local function chaseTarget(ctx: Context, aimGoal: Vector3): (Vector3, number)
 	return ctx.arena:clampInside(Vector3.new(target.X, 0, target.Z), 6), alignment
 end
 
+-- Where an attacking bot sends the ball: at the goal, or - when a player on its team is further upfield and the
+-- goal isn't close - up to that player, a little ahead of them.
+function BotBrain.aimPoint(ctx: Context, enemyGoal: Vector3): Vector3
+	local feed = ctx.feed
+	if not feed then
+		return enemyGoal
+	end
+	local upfield = Vector3.new(0, 0, -ctx.defendsSide)
+	local ahead = MathUtil.flat(feed - ctx.ballPosition):Dot(upfield)
+	local gap = MathUtil.flat(feed - ctx.ballPosition).Magnitude
+	local nearGoal = MathUtil.flat(enemyGoal - ctx.ballPosition).Magnitude < 70
+	if ahead > 15 and gap < 90 and not nearGoal then
+		return Vector3.new(feed.X, 0, feed.Z) + upfield * 12
+	end
+	return enemyGoal
+end
+
+-- How good bots playing against players are. `playersLead` is the players' team's score minus the bots';
+-- `rookie` is true while one of the players is new to the game.
+function BotBrain.adaptiveSkill(base: number, playersLead: number, rookie: boolean): number
+	local tuning = GameConfig.Bots
+	local skill = base + math.clamp(playersLead, -3, 3) * tuning.SkillPerGoal
+	if rookie then
+		skill -= tuning.RookieEase
+	end
+	return math.clamp(skill, tuning.MinSkill, tuning.MaxSkill)
+end
+
 -- Decides this frame's controls. Returns the input and whether the bot wants to fire its Mega Shot.
 function BotBrain.decide(ctx: Context, memory: Memory, dt: number): (CarPhysics.Input, boolean)
 	local carPos = ctx.carCFrame.Position
@@ -134,7 +172,7 @@ function BotBrain.decide(ctx: Context, memory: Memory, dt: number): (CarPhysics.
 	local alignment = 0
 	local urgent = false
 	if ctx.role == "attack" then
-		target, alignment = chaseTarget(ctx, enemyGoal)
+		target, alignment = chaseTarget(ctx, BotBrain.aimPoint(ctx, enemyGoal))
 		urgent = true
 	elseif ctx.role == "defend" and ballNearOurGoal then
 		-- Clear it: hit the ball away from our goal.

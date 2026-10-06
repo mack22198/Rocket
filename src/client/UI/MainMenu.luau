@@ -89,6 +89,16 @@ local claimReady = false
 local queued = false
 local evolveReady = false
 
+-- Shown under the buttons, a new one every few seconds.
+local TIPS = {
+	"💡 TIP: JUMP TWICE TO FLIP INTO THE BALL",
+	"💡 TIP: LOSING? ITEM BOXES GIVE YOU BETTER ITEMS",
+	"💡 TIP: EVERY CAR HAS ITS OWN POWER - TRY THEM ALL",
+	"💡 TIP: FRIENDS WHO PRESS PLAY JOIN YOUR TEAM",
+	"💡 TIP: DRIVE A CAR TO MAKE IT EVOLVE",
+	"💡 TIP: HIT THE BALL IN THE AIR FOR STYLE POINTS",
+}
+
 local function buildLogo(parent: Frame)
 	local logo = Instance.new("Frame")
 	logo.Name = "Logo"
@@ -714,9 +724,15 @@ local function update()
 		)} ORANGE  ·  PLAY TO JUMP IN!`
 		statusPill.TextColor3 = C.Text
 	else
+		-- With others here, invite them to team up; on your own, a tip (never "1 player online").
 		local count = #Players:GetPlayers()
-		statusPill.Text = if count == 1 then "1 PLAYER ONLINE" else `{count} PLAYERS ONLINE`
-		statusPill.TextColor3 = C.Muted
+		if count > 1 then
+			statusPill.Text = `👋 {count} PLAYERS HERE · PRESS PLAY TO TEAM UP!`
+			statusPill.TextColor3 = C.Text
+		else
+			statusPill.Text = TIPS[math.floor(os.clock() / 6) % #TIPS + 1]
+			statusPill.TextColor3 = C.Muted
+		end
 	end
 
 	local event = Twists.event(math.floor(now))

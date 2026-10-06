@@ -180,6 +180,12 @@ GameConfig.Style = {
 GameConfig.Bots = {
 	Names = { "Sparky", "Nitro Nell", "Bolt", "Zippy", "Rusty", "Turbo Tom", "Pickles", "Dash", "Comet", "Blip" },
 	Skill = 0.55, -- 0 = sleepy, 1 = sweaty. Kids should be able to beat the default bots.
+	-- Bots playing against players adjust so matches stay close (see BotBrain.adaptiveSkill).
+	SkillPerGoal = 0.08, -- harder for every goal the players are ahead, easier for every goal behind
+	MinSkill = 0.25,
+	MaxSkill = 0.8,
+	RookieMatches = 5, -- players who've finished fewer matches than this get easier bots...
+	RookieEase = 0.15, -- ...by this much
 	ThinkRate = 12, -- decisions per second
 	CarIds = { "pizza", "banana", "kart", "shark", "monster", "ufo", "duck", "taco", "hotdog" },
 	-- Now and then a bot turns up in a fused car, to show what's possible.

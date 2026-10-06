@@ -85,4 +85,46 @@ return function(t)
 		expect.equal(input.throttle, 1) -- pitch nose down
 		expect.falsy(input.boost)
 	end)
+
+	t.test("bots leave the ball to a player on their team who's nearly as close", function()
+		local ball = Vector3.new(0, 6, 0)
+		local members = {
+			{ key = "bot", position = Vector3.new(0, 2, 20) },
+			{ key = "you", position = Vector3.new(0, 2, 35), human = true },
+			{ key = "bot2", position = Vector3.new(0, 2, 120) },
+		}
+		local roles = BotBrain.assignRoles(members, ball, 1, arena.halfLength, "bot")
+		expect.equal(roles.you, "attack")
+		expect.truthy(roles.bot ~= "attack")
+		-- But not when the player is far away.
+		members[2].position = Vector3.new(0, 2, 90)
+		roles = BotBrain.assignRoles(members, ball, 1, arena.halfLength, nil)
+		expect.equal(roles.bot, "attack")
+	end)
+
+	t.test("bots pass up to a player who's further upfield", function()
+		local enemyGoal = Vector3.new(0, 0, -arena.halfLength)
+		-- Defends +Z, so upfield is -Z. The player is 40 studs ahead of the ball, off to the side.
+		local ctx = context({ ballPosition = Vector3.new(0, 6, 40), feed = Vector3.new(30, 2, 0) })
+		local aim = BotBrain.aimPoint(ctx, enemyGoal)
+		expect.truthy(aim ~= enemyGoal, "passes")
+		expect.atMost((aim - Vector3.new(30, 0, -12)).Magnitude, 0.01)
+		-- Behind the ball, or the goal's right there: shoot instead.
+		expect.equal(BotBrain.aimPoint(context({ feed = Vector3.new(0, 2, 60) }), enemyGoal), enemyGoal)
+		local nearGoal = Vector3.new(0, 6, -arena.halfLength + 40)
+		ctx = context({ ballPosition = nearGoal, feed = nearGoal + Vector3.new(10, 0, -20) })
+		expect.equal(BotBrain.aimPoint(ctx, enemyGoal), enemyGoal)
+		expect.equal(BotBrain.aimPoint(context({}), enemyGoal), enemyGoal)
+	end)
+
+	t.test("bots against players adapt to the score, and go easy on new players", function()
+		local B = GameConfig.Bots
+		local base = B.Skill
+		expect.truthy(BotBrain.adaptiveSkill(base, -2, false) < base, "players behind: easier")
+		expect.truthy(BotBrain.adaptiveSkill(base, 2, false) > base, "players ahead: harder")
+		expect.equal(BotBrain.adaptiveSkill(base, 0, false), base)
+		expect.truthy(BotBrain.adaptiveSkill(base, 0, true) < base, "rookies get easier bots")
+		expect.atLeast(BotBrain.adaptiveSkill(base, -10, true), B.MinSkill)
+		expect.atMost(BotBrain.adaptiveSkill(base, 10, false), B.MaxSkill)
+	end)
 end

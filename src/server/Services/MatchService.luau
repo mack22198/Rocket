@@ -20,6 +20,7 @@ local MathUtil = require(Shared.Util.MathUtil)
 local Powers = require(Shared.Config.Powers)
 local Remotes = require(Shared.Net.Remotes)
 local Rewards = require(Shared.Config.Rewards)
+local Teams = require(Shared.Match.Teams)
 local Twists = require(Shared.Config.Twists)
 
 local Roster = require(script.Parent.Parent.Match.Roster)
@@ -236,6 +237,7 @@ local function makePlayerParticipant(player: Player, team: Team, slot: number): 
 	})
 	local data = DataService.get(player)
 	if data then
+		p.experience = data.stats.matches
 		p.topper = if data.style.topper ~= "none" then data.style.topper else nil
 		p.horn = data.style.horn
 		p.celebration = data.style.celebration
@@ -248,7 +250,8 @@ local function isLivePhase(): boolean
 	return phase == Phases.Playing or phase == Phases.GoalScored
 end
 
--- A player joins a match that's already going: they take over a bot's seat on the team that needs them most.
+-- A player joins a match that's already going: they take over a bot's seat - on the other players' team if
+-- they're all on one side (see Teams), otherwise on the team with fewer players.
 local function joinInProgress(player: Player): boolean
 	if not matchRunning or Roster.byPlayer(player) then
 		return false
@@ -257,22 +260,19 @@ local function joinInProgress(player: Player): boolean
 	if phase == Phases.Results then
 		return false
 	end
-	local seat: Participant? = nil
-	local fewestHumans = math.huge
-	for _, team: Team in TEAMS do
-		local humans = 0
-		local bot: Participant? = nil
-		for _, p in Roster.onTeam(team) do
-			if p.isBot then
-				bot = bot or p
-			else
-				humans += 1
-			end
-		end
-		if bot and humans < fewestHumans then
-			seat, fewestHumans = bot, humans
+	local players: Teams.Counts = { Blue = 0, Orange = 0 }
+	local botSeats: Teams.Counts = { Blue = 0, Orange = 0 }
+	local bots: { [string]: Participant } = {}
+	for _, p in Roster.all() do
+		if p.isBot then
+			botSeats[p.team] += 1
+			bots[p.team] = bots[p.team] or p
+		else
+			players[p.team] += 1
 		end
 	end
+	local chosen = Teams.joinTeam(players, botSeats)
+	local seat = if chosen == "Blue" then bots.Blue elseif chosen == "Orange" then bots.Orange else nil
 	if not seat then
 		return false
 	end
@@ -367,11 +367,13 @@ local function setupMatch()
 		humans[i], humans[j] = humans[j], humans[i]
 	end
 
+	-- A few players team up against bots; more than a team's worth are split (see Teams).
 	local seats: { [Team]: number } = { Blue = 0, Orange = 0 }
-	for i, player in humans do
-		local team: Team = if i % 2 == 1 then "Blue" else "Orange"
+	local home: Team = if rng:NextNumber() < 0.5 then "Blue" else "Orange"
+	for i, side in Teams.split(#humans, M.TeamSize, home) do
+		local team: Team = if side == "Orange" then "Orange" else "Blue"
 		seats[team] += 1
-		Roster.add(makePlayerParticipant(player, team, seats[team]))
+		Roster.add(makePlayerParticipant(humans[i], team, seats[team]))
 	end
 	for _, team: Team in TEAMS do
 		while seats[team] < M.TeamSize do

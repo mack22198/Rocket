@@ -13,9 +13,11 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   turntable in a dark studio with a polished, reflective floor, spotlights and a big screen. From there: **PLAY**,
   **GARAGE** and **HOW TO PLAY**. After a match you pick **PLAY AGAIN**, **GARAGE** or **MENU**, and the ☰ MENU
   button (or M) lets you leave a match at any time.
-- **3v3 matches, 3 minutes long.** Bots fill any empty seats, so one kid alone still gets a full game. Pressing
-  PLAY while a match is on takes over a bot's seat right away; otherwise the next match starts a few seconds
-  later (so friends who press PLAY together play together).
+- **3v3 matches, 3 minutes long, fun alone.** Bots fill any empty seats, so one kid alone still gets a full game.
+  Players team up: up to three play together against bots (only more than that are split between the teams),
+  and someone pressing PLAY mid-match takes over a bot on their team. Bot team-mates play *for* you - they leave
+  the ball to you and pass it up to you - and the bots you play against ease off while you're behind (and for
+  your first few matches) and push harder while you're ahead, so matches stay close.
 - **Car soccer:** a curved-wall arena with glowing goals and nets, boost pads, kickoff countdowns, a scoreboard and
   clock, a play-on-at-0:00 rule, and golden-goal overtime.
 - **A real stadium:** team-coloured stands packed with fans (who jump when someone scores and do Mexican waves),
