@@ -1,7 +1,8 @@
 --!strict
 -- Makes the cars look alive on your screen: wheels roll as fast as the car moves and the front ones steer,
--- a team-coloured light trail streams from the back of any car that's boosting, and wind streaks rush past
--- your own car when it boosts. None of this touches the physics - it's all just for looks.
+-- a team-coloured light trail streams from the back of any car that's boosting, wind streaks rush past your
+-- own car when it boosts, tyres smoke when a car slides sideways, and dust puffs up when a car lands from a
+-- big jump. None of this touches the physics - it's all just for looks.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,6 +13,7 @@ local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 local MathUtil = require(Shared.Util.MathUtil)
 
+local CameraController = require(script.Parent.CameraController)
 local CarController = require(script.Parent.CarController)
 local InputController = require(script.Parent.InputController)
 local LocalHide = require(script.Parent.LocalHide)
@@ -25,8 +27,12 @@ type Car = {
 	wheels: { Wheel },
 	trails: { Trail },
 	streaks: { ParticleEmitter },
+	smoke: { ParticleEmitter },
 	steer: number,
 	mine: boolean,
+	grounded: boolean,
+	airTime: number, -- seconds since its wheels last touched anything
+	fallSpeed: number, -- how fast it was coming down just before landing
 }
 
 local A = MatchState.CarAttr
@@ -35,6 +41,25 @@ local TAU = math.pi * 2
 
 local localPlayer = Players.LocalPlayer
 local cars: { [Model]: Car } = {}
+local SLIDE_SPEED = 22 -- sideways speed that makes the tyres smoke
+local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+local groundRay: RaycastParams? = nil
+
+-- What counts as ground: the arena (found once it exists).
+local function groundParams(): RaycastParams?
+	if groundRay then
+		return groundRay
+	end
+	local arena = workspace:FindFirstChild(MatchState.Folders.Arena)
+	if not arena then
+		return nil
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { arena }
+	groundRay = params
+	return params
+end
 
 local function teamColor(team: unknown): Color3
 	if team == "Blue" then
@@ -116,6 +141,56 @@ local function makeStreaks(chassis: BasePart): { ParticleEmitter }
 	return list
 end
 
+-- Tyre smoke from the two back wheels, switched on while the car slides.
+local function makeSmoke(chassis: BasePart): { ParticleEmitter }
+	local size = chassis.Size
+	local list = {}
+	for _, side in { -1, 1 } do
+		local point =
+			attachment(chassis, "TyreSmoke", Vector3.new(side * (size.X / 2 - 0.4), -size.Y / 2, size.Z / 2 - 1.2))
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Name = "TyreSmoke"
+		emitter.Texture = SMOKE_TEXTURE
+		emitter.Color = ColorSequence.new(Color3.fromRGB(235, 235, 240))
+		emitter.Size = NumberSequence.new(1.2, 4)
+		emitter.Transparency = NumberSequence.new(0.55, 1)
+		emitter.Lifetime = NumberRange.new(0.5, 0.9)
+		emitter.Speed = NumberRange.new(1, 3)
+		emitter.SpreadAngle = Vector2.new(60, 60)
+		emitter.Acceleration = Vector3.new(0, 3, 0)
+		emitter.Drag = 2
+		emitter.RotSpeed = NumberRange.new(-60, 60)
+		emitter.Rate = 28
+		emitter.Enabled = false
+		emitter.Parent = point
+		table.insert(list, emitter)
+	end
+	return list
+end
+
+-- A ring of dust where a car lands from a big jump.
+local function landingDust(position: Vector3, strength: number)
+	local point = Instance.new("Attachment")
+	point.WorldPosition = position + Vector3.new(0, 0.5, 0)
+	point.Parent = workspace.Terrain
+	local dust = Instance.new("ParticleEmitter")
+	dust.Texture = SMOKE_TEXTURE
+	dust.Color = ColorSequence.new(Color3.fromRGB(226, 230, 214))
+	dust.Size = NumberSequence.new(1.5, 5)
+	dust.Transparency = NumberSequence.new(0.45, 1)
+	dust.Lifetime = NumberRange.new(0.5, 0.9)
+	dust.Speed = NumberRange.new(10 * strength, 18 * strength)
+	dust.SpreadAngle = Vector2.new(180, 8)
+	dust.EmissionDirection = Enum.NormalId.Top
+	dust.Drag = 4
+	dust.Rate = 0
+	dust.Parent = point
+	dust:Emit(math.floor(10 + 14 * strength))
+	task.delay(1.5, function()
+		point:Destroy()
+	end)
+end
+
 local function track(model: Instance)
 	if not model:IsA("Model") or cars[model] then
 		return
@@ -146,8 +221,12 @@ local function track(model: Instance)
 		wheels = wheels,
 		trails = makeTrails(chassis, teamColor(model:GetAttribute(A.Team))),
 		streaks = if mine then makeStreaks(chassis) else {},
+		smoke = makeSmoke(chassis),
 		steer = 0,
 		mine = mine,
+		grounded = true,
+		airTime = 0,
+		fallSpeed = 0,
 	}
 end
 
@@ -194,6 +273,28 @@ local function step(dt: number)
 		end
 		for _, streak in car.streaks do
 			streak.Enabled = boosting and forward > 40
+		end
+
+		-- Landing from a big jump kicks up dust; sliding sideways makes the tyres smoke.
+		local params = groundParams()
+		local hit = if params
+			then workspace:Raycast(frame.Position, -frame.UpVector * (chassis.Size.Y / 2 + 2.6), params)
+			else nil
+		local grounded = hit ~= nil
+		local hidden = LocalHide.isHidden(model)
+		if grounded and not car.grounded and car.airTime > 0.35 and car.fallSpeed > 18 and not hidden then
+			local strength = math.clamp(car.fallSpeed / 60, 0.4, 1.2)
+			landingDust((hit :: RaycastResult).Position, strength)
+			if car.mine then
+				CameraController.shake(0.25 * strength, 0.15)
+			end
+		end
+		car.airTime = if grounded then 0 else car.airTime + dt
+		car.fallSpeed = if grounded then 0 else math.max(car.fallSpeed, -velocity.Y)
+		car.grounded = grounded
+		local sliding = grounded and math.abs(velocity:Dot(frame.RightVector)) > SLIDE_SPEED and not hidden
+		for _, smoke in car.smoke do
+			smoke.Enabled = sliding
 		end
 	end
 end

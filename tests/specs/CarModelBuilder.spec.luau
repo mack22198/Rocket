@@ -1,5 +1,6 @@
 -- Builds every car with real (Lune) Roblox instances, which rejects unknown properties or bad values.
 -- Fused cars are built from their base car's design, so they're checked here too.
+local BallModelBuilder = require(Shared.Ball.BallModelBuilder)
 local CarCatalog = require(Shared.Config.CarCatalog)
 local CarMeshes = require(Shared.Cars.CarMeshes)
 local CarModelBuilder = require(Shared.Cars.CarModelBuilder)
@@ -103,15 +104,21 @@ return function(t)
 
 	t.test("with the meshes imported, every car swaps its blocky shell for them", function()
 		local library = Instance.new("Folder")
+		local function add(info: CarMeshes.MeshInfo)
+			if not library:FindFirstChild(info.name) then
+				local mesh = Instance.new("MeshPart")
+				mesh.Name = info.name
+				mesh.Anchored = true -- like Studio's importer leaves them
+				mesh.Parent = library
+			end
+		end
 		for _, set in CarMeshes.Cars do
 			for _, info in set.meshes do
-				if not library:FindFirstChild(info.name) then
-					local mesh = Instance.new("MeshPart")
-					mesh.Name = info.name
-					mesh.Anchored = true -- like Studio's importer leaves them
-					mesh.Parent = library
-				end
+				add(info)
 			end
+		end
+		for _, info in CarMeshes.Shared do
+			add(info)
 		end
 		CarModelBuilder.setMeshLibrary(library)
 		for id, set in CarMeshes.Cars do
@@ -120,17 +127,28 @@ return function(t)
 			expect.truthy(CarModelBuilder.usesMeshes(def), `{id} uses its meshes`)
 			for stage = 1, 4 do
 				local model = CarModelBuilder.build(def, { teamColor = Color3.fromRGB(255, 0, 0), stage = stage })
-				local meshes = 0
+				local meshes, tires, hubs = 0, 0, 0
 				for _, child in model:GetChildren() do
 					expect.falsy(set.replaces[child.Name], `{id}: the {child.Name} parts were swapped out`)
-					if child:IsA("MeshPart") then
-						meshes += 1
+					expect.truthy(child.Name ~= "Sidewall", "the tyres have their own sidewalls")
+					if child.Name == "WheelHub" then
+						hubs += 1
+					elseif child:IsA("MeshPart") then
 						expect.truthy(child.Massless and not child.CanCollide, `{child.Name} is just for looks`)
 						expect.falsy(child.Anchored, `{child.Name} moves with the car`)
-						expect.truthy(child:FindFirstChildOfClass("WeldConstraint") ~= nil, `{child.Name} is welded`)
+						local weld = child:FindFirstChildOfClass("WeldConstraint")
+						assert(weld, `{child.Name} is welded`)
+						if child.Name == "Wheel" then
+							tires += 1
+							local hub = weld.Part0
+							expect.truthy(hub ~= nil and hub.Name == "WheelHub", "tyres turn with their hubs")
+						else
+							meshes += 1
+						end
 					end
 				end
 				expect.equal(meshes, #set.meshes, `{id} at stage {stage} has all its meshes`)
+				expect.equal(tires, hubs, `{id}'s wheels all have treaded tyres`)
 			end
 		end
 		-- A car whose meshes aren't all there stays built from parts.
@@ -145,6 +163,13 @@ return function(t)
 			CarModelBuilder.setMeshLibrary(library)
 			expect.falsy(CarModelBuilder.usesMeshes(def), "half-imported cars stay parts")
 		end
+		-- The ball: crisp pentagons and stitching instead of round caps.
+		local ball = BallModelBuilder.build(3)
+		local patch = ball:FindFirstChild("Patch")
+		assert(patch and patch:IsA("MeshPart"), "pentagon patches")
+		expect.truthy(ball:FindFirstChild("Seam") ~= nil, "stitching")
+		expect.near(patch.Size.X, CarMeshes.Shared.ball_patches.size.X * 6, 1e-3)
 		CarModelBuilder.setMeshLibrary(nil)
+		expect.truthy(BallModelBuilder.build(3):FindFirstChild("Seam") == nil, "back to the plain ball")
 	end)
 end

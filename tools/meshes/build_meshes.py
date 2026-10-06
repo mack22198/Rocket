@@ -11,6 +11,9 @@ Usage, from the repository root, with Blender's Python module installed (`pip in
     lune run tools/meshes/export_parts
     python tools/meshes/build_meshes.py
 
+It also makes three meshes every car and ball share: a tyre with tread blocks, and the ball's twelve crisp
+pentagon patches and its stitching.
+
 It writes:
     assets/meshes/TurboBallCars.fbx     import this once in Roblox Studio (see the README)
     tools/preview/meshes/cars.glb       the same meshes for the offline previews
@@ -263,7 +266,7 @@ def check_axes():
     assert np.allclose(exported, probe[0]), f"axis conversion is not what we expect: {exported}"
 
 
-def make_object(name, vertices, triangles, budget):
+def make_object(name, vertices, triangles, budget, sharp_angle=None):
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(to_blender(vertices).tolist(), [], triangles.tolist())
     mesh.update()
@@ -288,6 +291,8 @@ def make_object(name, vertices, triangles, budget):
         mesh.name = name
     for polygon in mesh.polygons:
         polygon.use_smooth = True
+    if sharp_angle is not None:
+        mesh.set_sharp_from_angle(angle=math.radians(sharp_angle))
     return obj
 
 
@@ -296,6 +301,137 @@ def bounds(obj):
     car = from_blender(points)
     lo, hi = car.min(axis=0), car.max(axis=0)
     return (hi - lo), (hi + lo) / 2
+
+
+# --- Shared meshes: the tyre, and the ball's patches and stitching --------------------------------------------
+
+
+def tire_solid():
+    """A tyre one unit wide and one unit across, its axle along X: a rounded ring with two staggered rows of
+    tread blocks (the game's rim, spokes and hub cap sit in the hole)."""
+    step = 0.007
+    reach = 0.52
+    axis = np.arange(-reach, reach + step, step, dtype=np.float32)
+    gx, gy, gz = np.meshgrid(axis, axis, axis, indexing="ij")
+    x, y, z = gx.ravel(), gy.ravel(), gz.ravel()
+    rho = np.sqrt(y * y + z * z)
+    theta = np.arctan2(z, y)
+    inner, outer = 0.32, 0.465
+    carcass = rounded_rect(np.abs(x) - 0.5, np.abs(rho - (inner + outer) / 2) - (outer - inner) / 2, 0.06)
+    count = 20
+    pitch = 2 * math.pi / count
+    half = 0.62 * pitch / 2
+    blocks = np.full(x.shape, 10.0, dtype=np.float32)
+    for centre, offset in ((-0.245, 0.0), (0.245, pitch / 2)):
+        nearest = np.round((theta - offset) / pitch)
+        arc = (np.abs(theta - offset - nearest * pitch) - half) * rho
+        across = np.abs(x - centre) - 0.2
+        radial = np.abs(rho - 0.4725) - 0.0275
+        blocks = np.minimum(blocks, smax(smax(arc, across, 0.01), radial, 0.01))
+    field = smin(carcass, blocks, 0.01).reshape(gx.shape).astype(np.float32)
+    vertices, triangles, _, _ = measure.marching_cubes(field, level=0.0, spacing=(step, step, step))
+    return vertices - reach, triangles
+
+
+def icosahedron():
+    phi = (1 + math.sqrt(5)) / 2
+    points = []
+    for a in (-1, 1):
+        for b in (-phi, phi):
+            points += [(0, a, b), (a, b, 0), (b, 0, a)]
+    v = np.array(points, dtype=np.float64)
+    return v / np.linalg.norm(v, axis=1, keepdims=True)
+
+
+def unit(v):
+    return v / np.linalg.norm(v)
+
+
+def pentagons():
+    """For each of the ball's 12 patches: its centre and its 5 corners in order (a truncated icosahedron)."""
+    v = icosahedron()
+    result = []
+    for centre in v:
+        neighbours = np.argsort(np.linalg.norm(v - centre, axis=1))[1:6]
+        corners = [unit((2 * centre + v[j]) / 3) for j in neighbours]
+        ref = unit(corners[0] - centre * np.dot(corners[0], centre))
+        other = np.cross(centre, ref)
+        corners.sort(key=lambda q: math.atan2(np.dot(q, other), np.dot(q, ref)))
+        result.append((centre, corners))
+    return v, result
+
+
+class MeshBuilder:
+    """Collects triangles, turning each one to face away from the ball's centre."""
+
+    def __init__(self):
+        self.vertices, self.triangles = [], []
+
+    def tri(self, a, b, c):
+        n = len(self.vertices)
+        if np.dot(np.cross(b - a, c - a), a + b + c) < 0:
+            b, c = c, b
+        self.vertices += [a, b, c]
+        self.triangles.append([n, n + 1, n + 2])
+
+    def quad(self, a, b, c, d):
+        self.tri(a, b, c)
+        self.tri(a, c, d)
+
+    def arrays(self):
+        return np.array(self.vertices), np.array(self.triangles)
+
+
+def ball_patches(top=0.5025, base=0.496, level=5):
+    """The 12 dark pentagons of a ball one unit across, raised a hair above the white ball, with crisp edges."""
+    out = MeshBuilder()
+    _, patches = pentagons()
+    for centre, corners in patches:
+        for k in range(5):
+            a, b = corners[k], corners[(k + 1) % 5]
+            grid = {}
+            for i in range(level + 1):
+                for j in range(level + 1 - i):
+                    grid[i, j] = unit(centre + (a - centre) * i / level + (b - centre) * j / level) * top
+            for i in range(level):
+                for j in range(level - i):
+                    out.tri(grid[i, j], grid[i + 1, j], grid[i, j + 1])
+                    if i + j + 1 < level:
+                        out.tri(grid[i + 1, j], grid[i + 1, j + 1], grid[i, j + 1])
+            # The patch's edge, down into the ball.
+            for i in range(level):
+                p = unit(a + (b - a) * i / level)
+                q = unit(a + (b - a) * (i + 1) / level)
+                out.quad(p * top, q * top, q * base, p * base)
+    return out.arrays()
+
+
+def ball_seams(radius=0.5018, width=0.011, samples=10):
+    """The stitching between every panel: thin strips along all 90 edges of the ball's pattern."""
+    out = MeshBuilder()
+    v, patches = pentagons()
+    edges = []
+    for _, corners in patches:
+        edges += [(corners[k], corners[(k + 1) % 5]) for k in range(5)]
+    for i in range(len(v)):
+        for j in range(i + 1, len(v)):
+            if np.linalg.norm(v[i] - v[j]) < 1.1:  # neighbours on the icosahedron
+                edges.append((unit((2 * v[i] + v[j]) / 3), unit((2 * v[j] + v[i]) / 3)))
+    for a, b in edges:
+        points = [unit(a + (b - a) * t / samples) for t in range(samples + 1)]
+        for t in range(samples):
+            p, q = points[t], points[t + 1]
+            side = unit(np.cross(p, q - p)) * (width / 2)
+            out.quad(p * radius + side, q * radius + side, q * radius - side, p * radius - side)
+    return out.arrays()
+
+
+SHARED = {
+    # name: (what it's painted, how it's made, triangle budget, sharp edges above this angle)
+    "tire": ("tire", tire_solid, 3200, 50),
+    "ball_patches": ("patch", ball_patches, 4000, 50),
+    "ball_seams": ("seam", ball_seams, 4000, None),
+}
 
 
 def fingerprint(role, parts):
@@ -307,7 +443,7 @@ def luau_vector(v):
     return f"Vector3.new({v[0]:.4f}, {v[1]:.4f}, {v[2]:.4f})"
 
 
-def write_manifest(cars):
+def write_manifest(cars, shared):
     lines = [
         "--!strict",
         "-- GENERATED by tools/meshes/build_meshes.py - don't edit by hand (run the tool again instead).",
@@ -322,9 +458,17 @@ def write_manifest(cars):
         "export type CarMeshSet = { replaces: { [string]: boolean }, meshes: { MeshInfo } }",
         "",
         "return {",
-        "\tVersion = 1,",
-        "\tCars = {",
+        "\tVersion = 2,",
+        "\t-- Meshes made for a unit-sized thing (a tyre 1 wide and 1 across, a ball 1 across), shared by all.",
+        "\tShared = {",
     ]
+    for name in sorted(shared):
+        mesh = shared[name]
+        lines.append(
+            f'\t\t{name} = {{ name = "{name}", role = "{mesh["role"]}", '
+            f'size = {luau_vector(mesh["size"])}, center = {luau_vector(mesh["center"])} }},'
+        )
+    lines += ["\t} :: { [string]: MeshInfo },", "\tCars = {"]
     for car_id in sorted(cars):
         info = cars[car_id]
         lines.append(f"\t\t{car_id} = {{")
@@ -381,6 +525,17 @@ def main():
         detail = ", ".join(f"{m['role']}={made[fingerprint(m['role'], roles[m['role']])]['tris']}" for m in meshes)
         print(f"{car_id}: {len(replaced)} part names -> {len(meshes)} meshes ({detail}) in {time.time() - started:.1f}s")
 
+    shared = {}
+    for index, (name, (role, make, budget, sharp)) in enumerate(SHARED.items()):
+        started = time.time()
+        vertices, triangles = make()
+        obj = make_object(name, vertices, triangles, budget, sharp)
+        size, center = bounds(obj)
+        obj.location = (-12.0 - index * 4.0, 0.0, 0.0)
+        shared[name] = {"role": role, "size": size.tolist(), "center": center.tolist()}
+        made[name] = {"name": name, "tris": len(obj.data.polygons)}
+        print(f"{name}: {len(obj.data.polygons)} triangles in {time.time() - started:.1f}s")
+
     os.makedirs(os.path.dirname(FBX_OUT), exist_ok=True)
     os.makedirs(os.path.dirname(GLB_OUT), exist_ok=True)
     for obj in bpy.context.scene.objects:
@@ -408,7 +563,7 @@ def main():
         export_normals=True,
         export_materials="NONE",
     )
-    write_manifest(manifest)
+    write_manifest(manifest, shared)
     total = sum(m["tris"] for m in made.values())
     print(f"wrote {len(made)} meshes ({total} triangles) to {FBX_OUT}, {GLB_OUT} and {MANIFEST_OUT}")
 

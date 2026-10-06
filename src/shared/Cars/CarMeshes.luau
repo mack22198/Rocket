@@ -11,7 +11,28 @@ export type MeshInfo = { name: string, role: string, size: Vector3, center: Vect
 export type CarMeshSet = { replaces: { [string]: boolean }, meshes: { MeshInfo } }
 
 return {
-	Version = 1,
+	Version = 2,
+	-- Meshes made for a unit-sized thing (a tyre 1 wide and 1 across, a ball 1 across), shared by all.
+	Shared = {
+		ball_patches = {
+			name = "ball_patches",
+			role = "patch",
+			size = Vector3.new(0.9843, 0.9843, 0.9843),
+			center = Vector3.new(0.0000, 0.0000, 0.0000),
+		},
+		ball_seams = {
+			name = "ball_seams",
+			role = "seam",
+			size = Vector3.new(1.0036, 1.0036, 1.0036),
+			center = Vector3.new(0.0000, 0.0000, 0.0000),
+		},
+		tire = {
+			name = "tire",
+			role = "tire",
+			size = Vector3.new(0.9999, 0.9996, 1.0003),
+			center = Vector3.new(0.0000, -0.0004, -0.0000),
+		},
+	} :: { [string]: MeshInfo },
 	Cars = {
 		banana = {
 			replaces = {

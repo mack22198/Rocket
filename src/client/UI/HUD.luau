@@ -430,14 +430,16 @@ local function build()
 	})
 	bigText.Visible = false
 	Theme.stroke(bigText, rgb(0, 0, 0), 5).ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-	subText = Theme.label(gui, {
+	subText = Theme.pill(gui, {
 		name = "SubText",
-		size = UDim2.fromOffset(760, 40),
+		size = UDim2.fromOffset(760, 42),
 		position = UDim2.new(0.5, 0, 0.3, 84),
 		anchor = Vector2.new(0.5, 0),
 		text = "",
-		zIndex = 5,
+		background = C.PanelDark,
+		transparency = 0.25,
 	})
+	subText.ZIndex = 5
 	subText.Visible = false
 
 	local scaledObjects: { GuiObject } =

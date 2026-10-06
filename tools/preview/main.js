@@ -95,7 +95,7 @@ if (data.parts.some((p) => p.s === "Mesh")) {
   gltf.scene.traverse((o) => { if (o.isMesh) meshGeometries[o.name] = o.geometry; });
 }
 function meshGeometry(p) {
-  const source = meshGeometries[p.n];
+  const source = meshGeometries[p.mesh || p.n];
   if (!source) return new THREE.BoxGeometry(...p.sz);
   const g = source.clone();
   g.computeBoundingBox();

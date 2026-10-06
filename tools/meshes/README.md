@@ -16,7 +16,9 @@ How it works:
    - cleans the mesh up in Blender, slims it down (at most 4,500 triangles for a body, 1,800 for the rest) and
      shades it smooth.
 
-   Fused cars share their base car's meshes when they're the same shape.
+   Fused cars share their base car's meshes when they're the same shape. It also makes three shared meshes: a
+   tyre with two staggered rows of tread blocks (every car's wheels use it, sized to each wheel), and the
+   ball's twelve pentagon patches and the stitching along all 90 of its seams.
 3. It writes:
    - `assets/meshes/TurboBallCars.fbx` - every mesh, named `<car>_<colour>` (e.g. `pizza_body`). This is the
      file to import in Roblox Studio (see the main README).

@@ -20,6 +20,7 @@
 local CarCatalog = require(script.Parent.Parent.Config.CarCatalog)
 local CarMeshes = require(script.Parent.CarMeshes)
 local GameConfig = require(script.Parent.Parent.Config.GameConfig)
+local MeshLibrary = require(script.Parent.Parent.Build.MeshLibrary)
 
 type CarDef = CarCatalog.CarDef
 
@@ -44,7 +45,7 @@ type PartSpec = {
 	name: string?,
 	text: string?, -- painted on the part (a badge on a door, a sign)
 	look: Look?, -- a fixed look instead of the role's (hats keep their colours at every stage)
-	mesh: MeshPart?, -- for "Mesh": the imported mesh to copy
+	mesh: string?, -- for "Mesh": which imported mesh to copy (see MeshLibrary)
 }
 
 -- Adds one part to the car being built.
@@ -1983,14 +1984,8 @@ end
 
 local function makePart(spec: PartSpec, style: Look): BasePart
 	local part: BasePart
-	if spec.shape == "Mesh" and spec.mesh then
-		-- A copy of the imported mesh, without whatever Studio's importer set on it (it anchors what it imports).
-		local copy = spec.mesh:Clone()
-		for _, child in copy:GetChildren() do
-			child:Destroy()
-		end
-		copy.TextureID = ""
-		copy.Anchored = false
+	local copy = if spec.shape == "Mesh" and spec.mesh then MeshLibrary.copy(spec.mesh) else nil
+	if copy then
 		part = copy
 	elseif spec.shape == "Wedge" then
 		part = Instance.new("WedgePart")
@@ -2120,21 +2115,10 @@ end
 -- Smooth meshes
 ---------------------------------------------------------------------------------------------------------------
 
--- The imported meshes, by name (empty until they've been imported and handed over with setMeshLibrary).
-local meshLibrary: { [string]: MeshPart } = {}
-
 -- Hands over the folder the Blender meshes were imported into (nil = there isn't one). Any MeshParts inside it,
--- however deep, are used by name.
+-- however deep, are used by name - by the cars here and by the ball (see MeshLibrary).
 function CarModelBuilder.setMeshLibrary(folder: Instance?)
-	local found: { [string]: MeshPart } = {}
-	if folder then
-		for _, child in folder:GetDescendants() do
-			if child:IsA("MeshPart") then
-				found[child.Name] = child
-			end
-		end
-	end
-	meshLibrary = found
+	MeshLibrary.set(folder)
 end
 
 -- The smooth meshes for a car, if every one of them has been imported (a half-imported car stays all parts).
@@ -2144,12 +2128,15 @@ local function meshSetFor(def: CarDef): CarMeshes.CarMeshSet?
 		return nil
 	end
 	for _, info in set.meshes do
-		if not meshLibrary[info.name] then
+		if not MeshLibrary.get(info.name) then
 			return nil
 		end
 	end
 	return set
 end
+
+-- The parts of a wheel the tyre mesh takes the place of.
+local TIRE_REPLACES: { [string]: boolean } = { Sidewall = true }
 
 -- Is this car built with smooth meshes right now?
 function CarModelBuilder.usesMeshes(def: CarDef): boolean
@@ -2166,11 +2153,28 @@ local function collectSpecs(def: CarDef, stage: number, meshes: boolean): { Part
 	local design = designs[def.Id] or designs.pizza
 	local set = if meshes then meshSetFor(def) else nil
 	local replaced = if set then set.replaces else {}
+	local tire = if meshes then CarMeshes.Shared.tire else nil
+	if tire and not MeshLibrary.get(tire.name) then
+		tire = nil
+	end
 	local specs: { PartSpec } = {}
 	design.build(def.Hitbox, stage, function(role, shape, size, cframe, name, text)
-		if not replaced[name or ""] then
-			table.insert(specs, { role = role, shape = shape, size = size, cframe = cframe, name = name, text = text })
+		if replaced[name or ""] or (tire and TIRE_REPLACES[name or ""]) then
+			return
 		end
+		if tire and name == "Wheel" then
+			-- A treaded tyre instead of a plain cylinder (still called "Wheel", so it turns on its hub).
+			table.insert(specs, {
+				role = role,
+				shape = "Mesh",
+				size = size * tire.size,
+				cframe = cframe * CFrame.new(tire.center * size),
+				name = "Wheel" :: string,
+				mesh = tire.name,
+			})
+			return
+		end
+		table.insert(specs, { role = role, shape = shape, size = size, cframe = cframe, name = name, text = text })
 	end)
 	if set then
 		for _, info in set.meshes do
@@ -2180,7 +2184,7 @@ local function collectSpecs(def: CarDef, stage: number, meshes: boolean): { Part
 				size = info.size,
 				cframe = CFrame.new(info.center),
 				name = info.name,
-				mesh = meshLibrary[info.name],
+				mesh = info.name,
 			})
 		end
 	end

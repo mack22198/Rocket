@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local MatchState = require(Shared.Match.MatchState)
 local Remotes = require(Shared.Net.Remotes)
 
 local Theme = require(script.Parent.Theme)
@@ -78,6 +79,10 @@ local function addFeedLine(text: string, color: Color3)
 end
 
 function Announcer.popup(text: string, color: Color3)
+	-- A goal has the screen to itself (the feed still gets the line).
+	if MatchState.phase(MatchState.getObject()) == MatchState.Phases.GoalScored then
+		return
+	end
 	popupToken += 1
 	local token = popupToken
 	popup.Text = text
@@ -134,6 +139,7 @@ function Announcer.start()
 		zIndex = 4,
 	})
 	popup.Visible = false
+	popup.TextWrapped = false -- long names shrink to fit on one line instead of spilling over the car
 	local stroke = Instance.new("UIStroke")
 	stroke.Thickness = 3
 	stroke.Parent = popup

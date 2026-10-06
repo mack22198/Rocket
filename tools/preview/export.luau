@@ -65,15 +65,21 @@ local CarMeshes = harness.require(Shared.Cars.CarMeshes)
 -- Pretend the Blender meshes have been imported: a MeshPart for each (main.js draws them from cars.glb).
 if fs.isFile("tools/preview/meshes/cars.glb") and not process.env.NO_MESHES then
 	local library = roblox.Instance.new("Folder")
+	local function add(info)
+		if not library:FindFirstChild(info.name) then
+			local mesh = roblox.Instance.new("MeshPart")
+			mesh.Name = info.name
+			mesh.Size = info.size
+			mesh.Parent = library
+		end
+	end
 	for _, set in CarMeshes.Cars do
 		for _, info in set.meshes do
-			if not library:FindFirstChild(info.name) then
-				local mesh = roblox.Instance.new("MeshPart")
-				mesh.Name = info.name
-				mesh.Size = info.size
-				mesh.Parent = library
-			end
+			add(info)
 		end
+	end
+	for _, info in CarMeshes.Shared do
+		add(info)
 	end
 	CarModelBuilder.setMeshLibrary(library)
 end
@@ -299,6 +305,7 @@ for _, d in workspaceInstance:GetDescendants() do
 		local cf = { d.CFrame:GetComponents() }
 		table.insert(parts, {
 			n = d.Name,
+			mesh = d:GetAttribute("Mesh"),
 			s = shape,
 			sz = { size.X, size.Y, size.Z },
 			cf = cf,

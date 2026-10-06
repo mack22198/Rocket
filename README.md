@@ -105,7 +105,8 @@ evolutions quickly, lower the numbers in `GameConfig.Evolution.Xp`.
 
 ### Smooth car bodies (one-time import, recommended)
 
-The cars' bodies have smooth versions made in Blender (rounded panels, curved fenders, a proper rubber duck...).
+The cars' bodies have smooth versions made in Blender (rounded panels, curved fenders, a proper rubber duck...),
+every wheel gets a treaded tyre, and the ball gets crisp pentagons and stitching like a real soccer ball.
 Roblox only lets meshes into a game through Studio, so this takes one import:
 
 1. Download [`assets/meshes/TurboBallCars.fbx`](assets/meshes/TurboBallCars.fbx) from this repo.
