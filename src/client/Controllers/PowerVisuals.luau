@@ -372,7 +372,7 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 		E.burst(position, rgb(255, 230, 120), 30, 26, 1.4, 0.7)
 		E.burst(position, rgb(140, 210, 255), 20, 18, 1, 0.6)
 		if mine then
-			E.play("Click", 0.8, 1.3)
+			E.play("Pickup", 0.8, 1.3)
 		end
 	elseif kind == "magnet" then
 		E.burst(at, rgb(255, 90, 100), 24, 20, 1.2, 0.6)

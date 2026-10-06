@@ -1,15 +1,19 @@
 --!strict
 -- Plays the game's sounds (see Sounds): one-off effects, the music and crowd that loop in the background (menu
 -- music in the menus; the crowd and match music in the stadium), the referee's whistle at kickoffs and full
--- time, and the crowd's cheer after a goal. Sounds without an ID yet are simply skipped.
+-- time, the crowd's cheer after a goal, and your own car's engine (higher the faster you go) and boost roar.
+-- Sounds without an ID yet are simply skipped.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local MatchState = require(Shared.Match.MatchState)
+local GameConfig = require(Shared.Config.GameConfig)
 local Remotes = require(Shared.Net.Remotes)
 local Sounds = require(Shared.Config.Sounds)
+
+local CarController = require(script.Parent.CarController)
 
 local SoundController = {}
 
@@ -70,7 +74,67 @@ function SoundController.setScene(newScene: string)
 	setLoop("Crowd", newScene == "match")
 end
 
+-- Your car's engine and boost, every frame while you're driving.
+local engine: Sound? = nil
+local roar: Sound? = nil
+local function looped(name: string, parent: Instance): Sound?
+	local id = Sounds.idFor(name)
+	if id == "" then
+		return nil
+	end
+	local sound = Instance.new("Sound")
+	sound.Name = name
+	sound.SoundId = id
+	sound.Looped = true
+	sound.Volume = 0
+	sound.Parent = parent
+	sound:Play()
+	return sound
+end
+
+local function updateCar(dt: number)
+	local chassis = CarController.getChassis()
+	if not chassis or scene ~= "match" then
+		if engine then
+			engine:Destroy()
+			engine = nil
+		end
+		if roar then
+			roar:Destroy()
+			roar = nil
+		end
+		return
+	end
+	if not engine or engine.Parent ~= chassis then
+		if engine then
+			engine:Destroy()
+		end
+		if roar then
+			roar:Destroy()
+		end
+		engine, roar = looped("Engine", chassis), looped("BoostLoop", chassis)
+	end
+	local speed = chassis.AssemblyLinearVelocity.Magnitude / GameConfig.Car.MaxSpeed
+	local blend = math.min(1, dt * 8)
+	local e = engine
+	if e then
+		e.PlaybackSpeed += (0.75 + math.min(speed, 1.6) * 0.6 - e.PlaybackSpeed) * blend
+		e.Volume += (Sounds.List.Engine.Volume * (0.5 + math.min(speed, 1) * 0.5) - e.Volume) * blend
+	end
+	local r = roar
+	if r then
+		local wanted = if CarController.isBoosting() then Sounds.List.BoostLoop.Volume else 0
+		r.Volume += (wanted - r.Volume) * math.min(1, dt * 12)
+	end
+end
+
 function SoundController.start()
+	game:GetService("RunService").Heartbeat:Connect(updateCar)
+	Remotes.Bumped.OnClientEvent:Connect(function()
+		if scene == "match" then
+			SoundController.play("Bump", 0.7)
+		end
+	end)
 	local stateObject = MatchState.getObject()
 	local lastPhase = MatchState.phase(stateObject)
 	stateObject:GetAttributeChangedSignal(MatchState.Attr.Phase):Connect(function()

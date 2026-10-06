@@ -82,6 +82,9 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   price and evolution track on the right, with an EVOLVE! button that sets off a light show (and a 🧬 FUSE
   button for fused cars). The menu's "saving
   up for" card and the results screen keep the next goal in sight.
+- **A coach for new players:** during your first three matches, one short tip at a time pops up when it's useful
+  ("Hold SHIFT to boost!" while you're cruising, "Press SPACE to jump!" when the ball's in the air), with the
+  buttons for whatever you're playing on, and each only until you've done it.
 - **Works on computer, gamepad and phone/tablet.** On touch screens you drag your thumb toward where you want to
   go on the screen and the car drives there (easy steering - it can be switched off in the match menu), the Mega
   Shot arms itself, and the car levels itself out in the air so it lands on its wheels.
@@ -250,7 +253,8 @@ src/
                   cheering crowd)
     UI/           MainMenu, Garage, PauseMenu, HowToPlay, HUD, Announcer, ResultsScreen, ReplayScreen,
                   DailyRewards (streak and chest pop-ups), CollectionBook, StylePanel (the garage's STYLE tab),
-                  SeasonTrack (every tier of the season), TouchControls, Transition, Theme
+                  SeasonTrack (every tier of the season), Coach (first-match tips), TouchControls, Transition,
+                  Theme
 tests/      Lune unit tests (run outside Roblox)
 tools/      Offline previews of the 3D world and the UI
 ```
@@ -292,7 +296,8 @@ Ideas from the design, roughly in order:
 - Other players' hits reach you after a short network delay (standard for online games). Your own hits are instant.
 - Sounds are Roblox's built-in placeholders, and there's no music yet. Every sound has a slot in
   [`Sounds.luau`](src/shared/Config/Sounds.luau): paste a Toolbox sound's ID there (menu music, match music, a
-  crowd, a goal horn, a whistle, a cheer...) and the game uses it.
+  crowd, a goal horn, a whistle, a cheer, an engine hum that rises with your speed, a boost roar...) and the game
+  uses it.
 - Apart from the optional smooth car bodies (above), everything is built from Roblox's basic parts, which is why
   the stadium has a clean "low-poly" look. The next visual steps would be more Blender meshes (wheels, the
   stadium, the ball) and textures. Also: Roblox shows its best lighting, shadows and glow only at high graphics
