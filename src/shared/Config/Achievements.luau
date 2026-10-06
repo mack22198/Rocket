@@ -38,7 +38,7 @@ export type View = { [string]: number }
 Achievements.WelcomeBadge = 0
 
 -- View numbers: matches, wins, goals, assists, saves, shots, megaShots, demos, mvps, styleTouches, items, powers,
--- bestStreak (wins in a row), level, carsOwned, evolvedCars (fully evolved), fusedCars, loginStreak, and at the end
+-- bestStreak (wins in a row), friendMatches, level, carsOwned, evolvedCars (fully evolved), fusedCars, loginStreak, and at the end
 -- of a match: matchGoals, cleanSheetWin (1 = won without letting a goal in), comebackWin (1 = won after being
 -- 2 goals behind).
 Achievements.List = {
@@ -128,6 +128,16 @@ Achievements.List = {
 		Target = 5,
 		Reward = 300,
 		Title = "Unstoppable",
+	},
+	{
+		Id = "squad",
+		Emoji = "👋",
+		Name = "Squad Up",
+		Text = "Play a match with a Roblox friend",
+		Stat = "friendMatches",
+		Target = 1,
+		Reward = 150,
+		Title = "Squad",
 	},
 	{
 		Id = "login_7",

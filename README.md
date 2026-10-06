@@ -62,6 +62,13 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   🎩 Hat Trick Hero...) to wear under your name - so do levels 5, 10, 20, 30 and 50. Tap your card in the menu
   for your profile: your stats, every achievement with how close you are, and the titles to choose from. Each
   achievement can also award a Roblox badge (see *Publishing*).
+- **Playtime gifts:** free gifts that unlock the longer you play in one visit (3, 6, 10, 15, 20, 30, 45 and 60
+  minutes) - Scrap and double-Scrap matches, every prize shown up front. The 🎁 GIFTS button shows how many are
+  waiting.
+- **Weekly leaderboard:** 🏆 TOP 50 shows this week's best drivers by Scrap won in matches (and your own
+  score); everyone starts again on Monday. It needs DataStores, so it fills in once the game is published.
+- **Invite friends:** 👋 INVITE opens Roblox's invite window. Playing in the same match as a friend pays +25%
+  Scrap, and the first time is an achievement.
 - **Rewards:** everyone earns **Scrap** every match (more for winning, goals, saves and style, and +25% when one
   of your Roblox friends is in the match too). Scrap is the only currency and there are no loot boxes.
 - **Seasons:** a free reward track that changes every six weeks, starting with 🍔 **Season 1: Food Fight**. Every
@@ -249,7 +256,7 @@ src/
                   quests, daily chest), Twists (match twists and weekend events), Cosmetics (hats, horns,
                   goal parties), Season (the free season reward track), Sounds (every sound, for Toolbox IDs),
                   QuickChat (the quick chat phrases), Levels (player levels), Achievements (achievements and
-                  titles)
+                  titles), Gifts (playtime gifts), Leaderboard (the weekly leaderboard)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay
@@ -267,7 +274,8 @@ src/
                   PowerService
                   (using items and powers, cheese and banana traps), DailyService (streaks, quests, chest),
                   SeasonService (season XP and tier rewards), ProgressService (levels, achievements, titles,
-                  badges), QuickChatService, DataService (saving),
+                  badges), GiftService (playtime gifts), LeaderboardService (the weekly top 50),
+                  QuickChatService, DataService (saving),
                   GarageService (unlocking, fusing, evolving, style)
   client/   (StarterPlayerScripts.Client)
     Showroom/     ShowroomBuilder (the menu's garage showroom and its mirror-floor reflection),
@@ -283,7 +291,7 @@ src/
                   DailyRewards (streak and chest pop-ups), CollectionBook, StylePanel (the garage's STYLE tab),
                   SeasonTrack (every tier of the season), Coach (first-match tips), QuickChatPanel (the chat
                   button, its list and the speech bubbles), ProfilePanel (stats, achievements, titles), Toasts
-                  (level-up and achievement cards), TouchControls, Transition,
+                  (level-up and achievement cards), GiftsPanel, LeaderboardPanel, TouchControls, Transition,
                   Theme
 tests/      Lune unit tests (run outside Roblox)
 tools/      Offline previews of the 3D world and the UI

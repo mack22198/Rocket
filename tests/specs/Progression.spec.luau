@@ -55,6 +55,7 @@ return function(t)
 			items = true,
 			powers = true,
 			bestStreak = true,
+			friendMatches = true,
 			level = true,
 			carsOwned = true,
 			evolvedCars = true,

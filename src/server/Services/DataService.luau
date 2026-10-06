@@ -36,6 +36,7 @@ export type LifetimeStats = {
 	items: number,
 	powers: number,
 	bestStreak: number, -- most wins in a row
+	friendMatches: number, -- matches played with a Roblox friend
 }
 
 -- The login streak, today's quests and the daily chest (see Daily).
@@ -111,6 +112,7 @@ local function defaultData(): SavedData
 			items = 0,
 			powers = 0,
 			bestStreak = 0,
+			friendMatches = 0,
 		},
 		carXp = {},
 		carStage = {},

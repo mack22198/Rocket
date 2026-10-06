@@ -14,6 +14,8 @@
 --   LeaveMatch()                                                             back to the menu (a bot takes your seat)
 --   QuickChat(phraseIndex)                                                   say one of the QuickChat phrases
 --   Profile(action, id) -> result                                            choose your title
+--   Gift(index) -> result                                                    open a playtime gift
+--   Leaderboard() -> board                                                   this week's top drivers
 --   GetPlayerData() -> data                                                  initial profile snapshot
 -- Server -> Client
 --   BallState(time, position, velocity, flags, lastTouchTeam)  (unreliable, ~30/s)
@@ -90,6 +92,8 @@ local Remotes = {
 	LeaveMatch = event("LeaveMatch"),
 	QuickChat = event("QuickChat"),
 	Profile = func("Profile"),
+	Gift = func("Gift"),
+	Leaderboard = func("Leaderboard"),
 	GetPlayerData = func("GetPlayerData"),
 
 	BallState = unreliable("BallState"),

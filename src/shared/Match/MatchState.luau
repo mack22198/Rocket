@@ -46,6 +46,8 @@ MatchState.PlayerAttr = {
 	Status = "Status", -- one of MatchState.Status
 	Team = "Team", -- "Blue" / "Orange" while playing
 	QuickChat = "QuickChat", -- true if their Roblox settings let them use quick chat
+	PlayStart = "PlayStart", -- server time they joined (playtime gifts count from here)
+	GiftsOpened = "GiftsOpened", -- the playtime gifts they've opened, e.g. "1,2,3"
 }
 
 -- A player's status (players who just joined are in the menu).

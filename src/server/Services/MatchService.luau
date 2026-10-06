@@ -34,6 +34,7 @@ local DailyService = require(script.Parent.DailyService)
 local DataService = require(script.Parent.DataService)
 local DemolitionService = require(script.Parent.DemolitionService)
 local ItemService = require(script.Parent.ItemService)
+local LeaderboardService = require(script.Parent.LeaderboardService)
 local PowerService = require(script.Parent.PowerService)
 local ProgressService = require(script.Parent.ProgressService)
 local QuickChatService = require(script.Parent.QuickChatService)
@@ -615,7 +616,8 @@ local function finishMatch(aborted: boolean)
 				summary.total += bonus
 			end
 			-- Playing with friends pays a little extra.
-			if playingWithFriends(p) then
+			local withFriends = playingWithFriends(p)
+			if withFriends then
 				local bonus = math.floor(summary.total * Rewards.Scrap.FriendBonus)
 				table.insert(summary.lines, { label = "🤝 Playing with friends!", amount = bonus })
 				summary.total += bonus
@@ -670,6 +672,9 @@ local function finishMatch(aborted: boolean)
 				if mvp == p then
 					data.stats.mvps += 1
 				end
+				if withFriends then
+					data.stats.friendMatches += 1
+				end
 				data.winStreak = streak
 				data.stats.bestStreak = math.max(data.stats.bestStreak, streak)
 				scrap = data.scrap
@@ -678,6 +683,7 @@ local function finishMatch(aborted: boolean)
 			-- The season track moves on by as much as the Scrap they won (and pays out any tiers reached), and so
 			-- does their player level; then the achievements are checked.
 			local season = SeasonService.recordMatch(player, summary.total)
+			LeaderboardService.record(player, summary.total)
 			local conceded = if p.team == "Blue" then orangeScore else blueScore
 			local progress = ProgressService.recordMatch(player, summary.total, {
 				matchGoals = p.stats.goals,

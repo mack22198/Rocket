@@ -17,6 +17,7 @@ local Achievements = require(Shared.Config.Achievements)
 local CarCatalog = require(Shared.Config.CarCatalog)
 local Daily = require(Shared.Config.Daily)
 local Evolution = require(Shared.Config.Evolution)
+local Gifts = require(Shared.Config.Gifts)
 local Levels = require(Shared.Config.Levels)
 local MatchState = require(Shared.Match.MatchState)
 local Remotes = require(Shared.Net.Remotes)
@@ -39,6 +40,9 @@ MainMenu.StreakPressed = Signal.new() :: Signal.Signal<>
 MainMenu.ChestPressed = Signal.new() :: Signal.Signal<>
 MainMenu.SeasonPressed = Signal.new() :: Signal.Signal<>
 MainMenu.ProfilePressed = Signal.new() :: Signal.Signal<>
+MainMenu.GiftsPressed = Signal.new() :: Signal.Signal<>
+MainMenu.LeaderboardPressed = Signal.new() :: Signal.Signal<>
+MainMenu.InvitePressed = Signal.new() :: Signal.Signal<>
 
 local C = Theme.Colors
 local rgb = Color3.fromRGB
@@ -59,6 +63,8 @@ local garageButton: TextButton
 local evolveBadge: TextLabel
 local statusPill: TextLabel
 local eventPill: TextLabel
+local giftsButton: TextButton
+local giftBadge: TextLabel
 local playerLevel: TextLabel
 local playerTitle: TextLabel
 local playerXp: Theme.Bar
@@ -609,6 +615,77 @@ local function buildRight()
 	end)
 end
 
+-- Along the top: playtime gifts, this week's leaderboard and inviting friends.
+local function buildDock()
+	local dock = Instance.new("Frame")
+	dock.Name = "Dock"
+	dock.Size = UDim2.fromOffset(480, 46)
+	dock.Position = UDim2.new(0.5, 0, 0, 12)
+	dock.AnchorPoint = Vector2.new(0.5, 0)
+	dock.BackgroundTransparency = 1
+	dock.Parent = gui
+	Theme.scaled(dock)
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.Padding = UDim.new(0, 10)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = dock
+	local function dockButton(order: number, name: string, text: string, color: Color3, textColor: Color3?)
+		local button = Theme.button(dock, {
+			name = name,
+			size = UDim2.fromOffset(150, 46),
+			text = text,
+			color = color,
+			textColor = textColor,
+		})
+		button.LayoutOrder = order
+		return button
+	end
+	giftsButton = dockButton(1, "Gifts", "🎁 GIFTS", C.Good)
+	giftsButton.Activated:Connect(function()
+		MainMenu.GiftsPressed:Fire()
+	end)
+	giftBadge = Theme.label(giftsButton, {
+		name = "Badge",
+		size = UDim2.fromOffset(26, 26),
+		position = UDim2.new(1, 12, 0, -12),
+		anchor = Vector2.new(1, 0),
+		text = "",
+		color = C.Text,
+		stroke = false,
+		zIndex = 3,
+	})
+	giftBadge.BackgroundColor3 = C.Bad
+	giftBadge.BackgroundTransparency = 0
+	giftBadge.Visible = false
+	Theme.corner(giftBadge, 13)
+	local top = dockButton(2, "Leaderboard", "🏆 TOP 50", C.Gold)
+	top.Activated:Connect(function()
+		MainMenu.LeaderboardPressed:Fire()
+	end)
+	local invite = dockButton(3, "Invite", "👋 INVITE", C.Blue, C.Text)
+	invite.Activated:Connect(function()
+		MainMenu.InvitePressed:Fire()
+	end)
+end
+
+-- How many playtime gifts are ready to open (the server keeps the clock in the player's attributes).
+local function giftsReady(): number
+	local started = localPlayer:GetAttribute(MatchState.PlayerAttr.PlayStart)
+	if type(started) ~= "number" then
+		return 0
+	end
+	local opened: { [number]: boolean } = {}
+	local list = localPlayer:GetAttribute(MatchState.PlayerAttr.GiftsOpened)
+	if type(list) == "string" then
+		for index in string.gmatch(list, "%d+") do
+			opened[tonumber(index) :: number] = true
+		end
+	end
+	return Gifts.readyCount(workspace:GetServerTimeNow() - started, opened)
+end
+
 local function build()
 	gui = Theme.screen("TurboMainMenu", 8)
 	gui.Enabled = false
@@ -616,6 +693,7 @@ local function build()
 	Theme.shade(gui, "RightShade", false, 0.36, 0.5)
 	buildLeft()
 	buildRight()
+	buildDock()
 	toast = Theme.pill(gui, {
 		name = "Toast",
 		size = UDim2.fromOffset(460, 38),
@@ -811,6 +889,12 @@ local function update()
 	if evolveReady then
 		evolveBadge.Rotation = 4 + math.sin(os.clock() * 5) * 3
 	end
+
+	-- Playtime gifts waiting: a red count on the button, which wiggles.
+	local ready = giftsReady()
+	giftBadge.Visible = ready > 0
+	giftBadge.Text = tostring(ready)
+	giftsButton.Rotation = if ready > 0 then math.sin(os.clock() * 8) * 3 else 0
 
 	-- Things waiting to be collected pulse.
 	local pulse = math.floor(os.clock() * 3) % 2 == 0

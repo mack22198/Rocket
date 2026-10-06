@@ -24,6 +24,8 @@ local Garage = require(UI.Garage)
 local HowToPlay = require(UI.HowToPlay)
 local HUD = require(UI.HUD)
 local MainMenu = require(UI.MainMenu)
+local GiftsPanel = require(UI.GiftsPanel)
+local LeaderboardPanel = require(UI.LeaderboardPanel)
 local PauseMenu = require(UI.PauseMenu)
 local ProfilePanel = require(UI.ProfilePanel)
 local ReplayScreen = require(UI.ReplayScreen)
@@ -33,6 +35,7 @@ local TouchControls = require(UI.TouchControls)
 local Transition = require(UI.Transition)
 
 local InputController = require(script.Parent.InputController)
+local Invite = require(script.Parent.Invite)
 local PlayerDataClient = require(script.Parent.PlayerDataClient)
 local PodiumController = require(script.Parent.PodiumController)
 local ReplayController = require(script.Parent.ReplayController)
@@ -64,7 +67,12 @@ end
 
 -- Is one of the menu's pop-up screens open (so the streak reward shouldn't pop up over it)?
 local function overlayOpen(): boolean
-	return HowToPlay.isOpen() or CollectionBook.isOpen() or SeasonTrack.isOpen() or ProfilePanel.isOpen()
+	return HowToPlay.isOpen()
+		or CollectionBook.isOpen()
+		or SeasonTrack.isOpen()
+		or ProfilePanel.isOpen()
+		or GiftsPanel.isOpen()
+		or LeaderboardPanel.isOpen()
 end
 
 -- The match HUD, the announcer feed and the touch buttons, together.
@@ -117,6 +125,8 @@ local function apply(target: Screen)
 		CollectionBook.close()
 		SeasonTrack.close()
 		ProfilePanel.close()
+		GiftsPanel.close()
+		LeaderboardPanel.close()
 		return
 	end
 	PauseMenu.close()
@@ -180,6 +190,10 @@ local function onMenuKey()
 		SeasonTrack.close()
 	elseif ProfilePanel.isOpen() then
 		ProfilePanel.close()
+	elseif GiftsPanel.isOpen() then
+		GiftsPanel.close()
+	elseif LeaderboardPanel.isOpen() then
+		LeaderboardPanel.close()
 	elseif screen == "Match" then
 		if not ResultsScreen.isOpen() then
 			PauseMenu.toggle()
@@ -214,6 +228,18 @@ function GameFlow.start()
 	end)
 	MainMenu.ProfilePressed:Connect(function()
 		ProfilePanel.open()
+	end)
+	MainMenu.GiftsPressed:Connect(function()
+		GiftsPanel.open()
+	end)
+	MainMenu.LeaderboardPressed:Connect(function()
+		LeaderboardPanel.open()
+	end)
+	MainMenu.InvitePressed:Connect(function()
+		local ok, why = Invite.prompt()
+		if not ok and why then
+			MainMenu.toast(why, false)
+		end
 	end)
 	MainMenu.StreakPressed:Connect(function()
 		DailyRewards.openStreak()

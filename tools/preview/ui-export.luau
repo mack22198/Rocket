@@ -2,7 +2,8 @@
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
 --   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay,
---              streak, chest, collection, twist, style, fuse, season, chat, profile, titles, toast
+--              streak, chest, collection, twist, style, fuse, season, chat, profile, titles, toast,
+--              gifts, leaderboard
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -63,6 +64,8 @@ local MENU_SCENARIOS = {
 	profile = true,
 	titles = true,
 	toast = true,
+	gifts = true,
+	leaderboard = true,
 }
 if MENU_SCENARIOS[scenario] and scenario ~= "queued" then
 	attrs.Phase = "Waiting"
@@ -120,6 +123,14 @@ local remotes = setmetatable({}, {
 	end,
 })
 remotes.BallFlags = { Snap = 1, Hidden = 2, Frozen = 4 }
+remotes.Leaderboard.InvokeServer = function()
+	local names = { "TurboTina", "GoalGuru", "Zoomer", "SkyHopper", "Player1", "NeonNate", "QuackAttack", "Bananza" }
+	local top = {}
+	for i, name in names do
+		table.insert(top, { userId = if name == "Player1" then 1 else 100 + i, name = name, score = 9000 - i * 870 })
+	end
+	return { available = true, top = top, mine = 4650, secondsLeft = 3 * 86400 + 4 * 3600 }
+end
 harness.preload("src/shared/Net/Remotes", remotes)
 
 local playerGui = Instance.new("Folder")
@@ -136,7 +147,14 @@ local localPlayer = {
 		return if name == "PlayerGui" then playerGui else nil
 	end,
 	GetAttribute = function(_, name)
-		return if name == "QuickChat" then true else nil
+		if name == "QuickChat" then
+			return true
+		elseif name == "PlayStart" then
+			return NOW - 11 * 60 -- playing for 11 minutes...
+		elseif name == "GiftsOpened" then
+			return "1" -- ...and opened the first gift
+		end
+		return nil
 	end,
 	GetAttributeChangedSignal = function()
 		return signal()
@@ -456,6 +474,8 @@ for _, name in
 		"QuickChatPanel",
 		"ProfilePanel",
 		"Toasts",
+		"GiftsPanel",
+		"LeaderboardPanel",
 	}
 do
 	harness.sourceTransforms["src/client/UI/" .. name] = function(source)
@@ -485,6 +505,8 @@ local SeasonTrack = harness.require(UI.SeasonTrack)
 local QuickChatPanel = harness.require(UI.QuickChatPanel)
 local ProfilePanel = harness.require(UI.ProfilePanel)
 local Toasts = harness.require(UI.Toasts)
+local GiftsPanel = harness.require(UI.GiftsPanel)
+local LeaderboardPanel = harness.require(UI.LeaderboardPanel)
 HUD.start()
 Announcer.start()
 ResultsScreen.start()
@@ -499,6 +521,8 @@ SeasonTrack.start()
 QuickChatPanel.start()
 ProfilePanel.start()
 Toasts.start()
+GiftsPanel.start()
+LeaderboardPanel.start()
 if touch then
 	TouchControls.start()
 end
@@ -526,6 +550,10 @@ if scenario == "goal" then
 	remotes.Announce.OnClientEvent:Fire("save", "EPIC SAVE!", "Orange", "Bolt (bot)")
 	remotes.Announce.OnClientEvent:Fire("power", "❄️ Player1 froze Bolt (bot)!", "Blue", "Player1")
 	remotes.Announce.OnClientEvent:Fire("power", "🍌 Comet (bot) slipped on a banana!", "Blue", "Zippy (bot)")
+elseif scenario == "gifts" then
+	GiftsPanel.open()
+elseif scenario == "leaderboard" then
+	LeaderboardPanel.open()
 elseif scenario == "profile" then
 	ProfilePanel.open(1)
 elseif scenario == "titles" then
