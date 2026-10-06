@@ -19,6 +19,7 @@ return function(t)
 			points = 0,
 			items = 0,
 			powers = 0,
+			demos = 0,
 		}
 		for k, v in overrides or {} do
 			s[k] = v

@@ -58,6 +58,7 @@ Daily.Quests = {
 	{ Id = "assists", Stat = "assists", Target = 2, Reward = 70, Text = "Get %d assists", Emoji = "🤝" },
 	{ Id = "style", Stat = "styleTouches", Target = 3, Reward = 70, Text = "Do %d air or wall hits", Emoji = "✨" },
 	{ Id = "mega", Stat = "megaShots", Target = 1, Reward = 60, Text = "Hit a Mega Shot", Emoji = "💥" },
+	{ Id = "demos", Stat = "demos", Target = 2, Reward = 70, Text = "Demolish %d cars", Emoji = "💨" },
 	{ Id = "wins", Stat = "wins", Target = 1, Reward = 80, Text = "Win a match", Emoji = "🏆" },
 } :: { QuestDef }
 

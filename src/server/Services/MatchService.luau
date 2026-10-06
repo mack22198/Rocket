@@ -31,6 +31,7 @@ local BumpService = require(script.Parent.BumpService)
 local CarService = require(script.Parent.CarService)
 local DailyService = require(script.Parent.DailyService)
 local DataService = require(script.Parent.DataService)
+local DemolitionService = require(script.Parent.DemolitionService)
 local ItemService = require(script.Parent.ItemService)
 local PowerService = require(script.Parent.PowerService)
 local SeasonService = require(script.Parent.SeasonService)
@@ -277,8 +278,12 @@ local function joinInProgress(player: Player): boolean
 		return false
 	end
 	local botChassis = seat.chassis
-	local cframe = if botChassis then botChassis.CFrame else kickoffCFrame(seat)
+	local cframe = if DemolitionService.isDemolished(seat)
+		then safeSpawnCFrame(seat)
+		elseif botChassis then botChassis.CFrame
+		else kickoffCFrame(seat)
 	CarService.despawn(seat)
+	DemolitionService.forget(seat)
 	StatsService.forget(seat)
 	Roster.remove(seat)
 
@@ -302,8 +307,12 @@ end
 -- A player leaves (or quits) mid-match: a bot takes over their seat.
 local function replaceWithBot(p: Participant)
 	local chassis = p.chassis
-	local cframe = if chassis then chassis.CFrame else kickoffCFrame(p)
+	local cframe = if DemolitionService.isDemolished(p)
+		then safeSpawnCFrame(p)
+		elseif chassis then chassis.CFrame
+		else kickoffCFrame(p)
 	CarService.despawn(p)
+	DemolitionService.forget(p)
 	StatsService.forget(p)
 	Roster.remove(p)
 	if not matchRunning then
@@ -398,6 +407,7 @@ local function kickoff()
 	BoostPadService.resetAll()
 	ItemService.resetAll()
 	BumpService.reset()
+	DemolitionService.reset()
 	for _, p in Roster.all() do
 		CarService.freezeAt(p, kickoffCFrame(p))
 		CarService.resetForKickoff(p)
@@ -556,6 +566,7 @@ local function finishMatch(aborted: boolean)
 	matchRunning = false
 	BallService.hide()
 	PowerService.clear()
+	DemolitionService.reset()
 	local winner: Team? = if blueScore > orangeScore then "Blue" elseif orangeScore > blueScore then "Orange" else nil
 	local mvp: Participant? = nil
 	for _, p in Roster.all() do
@@ -795,6 +806,7 @@ local function onPlayerRemoving(player: Player)
 end
 
 function MatchService.start()
+	DemolitionService.init(safeSpawnCFrame)
 	BallService.GoalScored:Connect(function(side: number, position: Vector3)
 		pendingGoal = { side = side, position = position }
 	end)
@@ -834,6 +846,7 @@ function MatchService.start()
 					warn(`[Match] The match crashed: {err}`)
 					matchRunning = false
 					PowerService.clear()
+					DemolitionService.reset()
 					applyTwist("")
 					for _, p in Roster.all() do
 						CarService.despawn(p)

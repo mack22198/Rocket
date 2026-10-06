@@ -176,7 +176,7 @@ local function nearestEnemy(p: Participant, from: Vector3, range: number, now: n
 	local bestDistance = range
 	for _, other in Roster.all() do
 		local chassis = other.chassis
-		if other.team ~= p.team and chassis and not protected(other, now) then
+		if other.team ~= p.team and chassis and not chassis.Anchored and not protected(other, now) then
 			local distance = (chassis.CFrame.Position - from).Magnitude
 			if distance <= bestDistance then
 				best, bestDistance = other, distance

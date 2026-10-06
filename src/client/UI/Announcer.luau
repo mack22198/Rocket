@@ -1,6 +1,6 @@
 --!strict
 -- Hype popups for cool moments ("AIR HIT!", "EPIC SAVE!", "MEGA SHOT!") plus a small feed on the right
--- (which also tells you who froze whom, who slipped on a banana, and so on).
+-- (which also tells you who froze whom, who slipped on a banana, who demolished whom, and so on).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,7 +26,19 @@ local EMOJI: { [string]: string } = {
 	mega = "💥",
 	bump = "💢",
 	join = "👋",
+	demo = "💥",
 }
+
+-- "Bolt froze Sparky!" as Sparky sees it: "Bolt froze you!" (and "You froze Sparky!" for Bolt).
+local function personal(text: string, me: string): (string, boolean)
+	local at = string.find(text, me, 1, true)
+	if not at or me == "" then
+		return text, false
+	end
+	local before = string.sub(text, 1, at - 1)
+	local you = if string.find(before, "%a") then "you" else "You"
+	return before .. you .. string.sub(text, at + #me), true
+end
 
 local function addFeedLine(text: string, color: Color3)
 	local line = Instance.new("Frame")
@@ -162,13 +174,19 @@ function Announcer.start()
 			addFeedLine(`{emoji} {text}`, color)
 			return
 		elseif kind == "power" then
-			-- Items and powers: the text says it all ("❄️ Bolt froze Sparky!"), with "You" for you. Yours get a
+			-- Items and powers: the text says it all ("❄️ Bolt froze Sparky!"), with "you" for you. Yours get a
 			-- popup too.
-			local me = localPlayer.DisplayName
-			local at = string.find(text, me, 1, true)
-			local line = if at then string.sub(text, 1, at - 1) .. "You" .. string.sub(text, at + #me) else text
+			local line = personal(text, localPlayer.DisplayName)
 			addFeedLine(line, color)
-			if who ~= nil and who == me then
+			if who ~= nil and who == localPlayer.DisplayName then
+				Announcer.popup(line, color)
+			end
+			return
+		elseif kind == "demo" then
+			-- Demolitions: a popup whether you did the smashing or got smashed.
+			local line, aboutMe = personal(`{EMOJI.demo} {text}`, localPlayer.DisplayName)
+			addFeedLine(line, color)
+			if aboutMe then
 				Announcer.popup(line, color)
 			end
 			return

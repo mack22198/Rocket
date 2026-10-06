@@ -127,6 +127,8 @@ GameConfig.Bump = {
 	AttackerSlowdown = 0.2,
 	Cooldown = 0.6,
 	BigBumpSpeed = 60, -- announce bumps faster than this
+	DemoSpeed = 110, -- smashing into the other team this fast (only boosting gets you there) demolishes them...
+	DemoRespawn = 2, -- ...and they pop back in at their own goal this many seconds later
 }
 
 GameConfig.BoostPads = {
@@ -168,6 +170,7 @@ GameConfig.Points = {
 	Touch = 2,
 	Style = 15,
 	MegaShot = 10,
+	Demo = 15,
 }
 
 GameConfig.Style = {

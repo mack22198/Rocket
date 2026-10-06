@@ -234,6 +234,77 @@ EffectsController.burst = burst
 EffectsController.shockwave = shockwave
 EffectsController.flash = flash
 
+-- Toy-car bits (panels in the car's colour, dark tyres) that fly out of a demolition, tumble and fade.
+local function flyingBits(position: Vector3, color: Color3)
+	local bits: { { part: Part, velocity: Vector3, spin: Vector3 } } = {}
+	for i = 1, 9 do
+		local tyre = i % 3 == 0
+		local bit = holder(position, nil, 1.6)
+		bit.Shape = if tyre then Enum.PartType.Cylinder else Enum.PartType.Block
+		bit.Size = if tyre
+			then Vector3.new(0.7, 1.6, 1.6)
+			else Vector3.new(rng:NextNumber(0.8, 1.8), 0.4, rng:NextNumber(0.8, 1.6))
+		bit.Color = if tyre then rgb(40, 42, 48) else color
+		bit.Material = Enum.Material.SmoothPlastic
+		bit.Transparency = 0
+		local angle = rng:NextNumber(0, math.pi * 2)
+		local out = rng:NextNumber(14, 30)
+		table.insert(bits, {
+			part = bit,
+			velocity = Vector3.new(math.cos(angle) * out, rng:NextNumber(26, 44), math.sin(angle) * out),
+			spin = Vector3.new(rng:NextNumber(-12, 12), rng:NextNumber(-12, 12), rng:NextNumber(-12, 12)),
+		})
+	end
+	local started = os.clock()
+	local connection: RBXScriptConnection
+	connection = RunService.Heartbeat:Connect(function()
+		local t = os.clock() - started
+		if t > 1.4 then
+			connection:Disconnect()
+			return
+		end
+		for _, b in bits do
+			local at = position + b.velocity * t + Vector3.new(0, -60, 0) * (t * t / 2)
+			b.part.CFrame = CFrame.new(at) * CFrame.Angles(b.spin.X * t, b.spin.Y * t, b.spin.Z * t)
+			b.part.Transparency = math.clamp((t - 0.9) / 0.5, 0, 1)
+		end
+	end)
+end
+
+-- A cartoon demolition: a fluffy white POOF of cloud, a ring of stars and sparkles in the car's colour, a pop of
+-- confetti and toy-car bits flying everywhere. Nobody gets hurt - it's a toy!
+function EffectsController.poof(position: Vector3, color: Color3)
+	local part = holder(position, nil, 2.5)
+	local cloud = Instance.new("ParticleEmitter")
+	cloud.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	cloud.Color = ColorSequence.new(rgb(255, 255, 255), rgb(226, 230, 244))
+	cloud.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 3),
+		NumberSequenceKeypoint.new(0.25, 9),
+		NumberSequenceKeypoint.new(1, 12),
+	})
+	cloud.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.6, 0.25),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	cloud.Lifetime = NumberRange.new(0.7, 1.2)
+	cloud.Speed = NumberRange.new(16, 30)
+	cloud.SpreadAngle = Vector2.new(180, 180)
+	cloud.Drag = 5
+	cloud.Rotation = NumberRange.new(0, 360)
+	cloud.RotSpeed = NumberRange.new(-60, 60)
+	cloud.Rate = 0
+	cloud.Parent = part
+	cloud:Emit(28)
+	burst(position, rgb(255, 228, 90), 40, 46, 2.2, 0.9, 25)
+	burst(position, color, 50, 38, 1.6, 0.8, 25)
+	shockwave(position, rgb(255, 255, 255), 15, 0.35)
+	flash(position, rgb(255, 240, 210), 50, 6, 0.4)
+	confetti(position + Vector3.new(0, 3, 0), Vector3.new(6, 2, 6), 10)
+	flyingBits(position, color)
+end
+
 -- A party over a spot (the podium): confetti raining down and fireworks going off overhead.
 function EffectsController.party(centre: Vector3, color: Color3)
 	confetti(centre + Vector3.new(0, 26, 0), Vector3.new(46, 4, 26), 40)

@@ -33,6 +33,7 @@ type Frame = Replay.Frame
 local A = MatchState.CarAttr
 local Phases = MatchState.Phases
 local RECORD_INTERVAL = 1 / 45
+local OUT_OF_SIGHT = CFrame.new(0, -500, 0)
 local arena = ArenaShape.new(GameConfig.Arena)
 local stateObject = MatchState.getObject()
 
@@ -63,7 +64,8 @@ local function recordFrame()
 	local mine = CarController.getCar()
 	for _, model in folder:GetChildren() do
 		local chassis = model:FindFirstChild("Chassis")
-		if model:IsA("Model") and chassis and chassis:IsA("BasePart") then
+		-- (A demolished car is left out until it's back.)
+		if model:IsA("Model") and chassis and chassis:IsA("BasePart") and model:GetAttribute(A.Demolished) ~= true then
 			cars[model] = chassis.CFrame
 			boosting[model] = if model == mine
 				then CarController.isBoosting()
@@ -270,6 +272,8 @@ local function play(clip: { Frame }, scorer: string, team: string, combo: string
 					shown[model] = boosting
 					setBoosting(copy, boosting)
 				end
+			else
+				copy:PivotTo(OUT_OF_SIGHT) -- demolished at this point in the clip
 			end
 		end
 		ballPosition = a.ball:Lerp(b.ball, alpha)

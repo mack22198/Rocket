@@ -2,7 +2,8 @@
 -- What items and powers look like: the "?" boxes spinning and bobbing on the pitch, a bubble around shielded
 -- cars, a block of ice around frozen ones, see-through diving sharks, rocket-fuel flames, the glowing beam of a
 -- Magnet or Tractor Beam reaching for the ball, and a burst of effects whenever an item or power goes off.
--- It's all just for looks; the server decides what actually happens (see PowerService).
+-- Demolitions too: the POOF, the car vanishing, and the sparkle when it pops back in at its goal.
+-- It's all just for looks; the server decides what actually happens (see PowerService and DemolitionService).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -152,6 +153,13 @@ local function track(model: Instance)
 		ghostParts = ghostParts,
 		ghosted = false,
 	}
+
+	-- A demolished car is gone from every screen until it's back.
+	local function syncDemolished()
+		LocalHide.set(model, model:GetAttribute(A.Demolished) == true, "demo")
+	end
+	model:GetAttributeChangedSignal(A.Demolished):Connect(syncDemolished)
+	syncDemolished()
 end
 
 local function untrack(model: Model)
@@ -161,6 +169,7 @@ local function untrack(model: Model)
 		look.ice:Destroy()
 		cars[model] = nil
 	end
+	LocalHide.forget(model)
 end
 
 local function updateCar(look: CarLook, ballPosition: Vector3, ballShown: boolean)
@@ -434,6 +443,25 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 	elseif kind == "slip" then
 		E.burst(at + Vector3.new(0, 3, 0), rgb(255, 236, 90), 30, 18, 1.4, 0.8)
 		E.play("Whoosh", 0.7, 1.6)
+	elseif kind == "demo" then
+		-- `position` is where the car was smashed (it's hidden there until it respawns).
+		E.poof(position, color)
+		shout(extra, "POOF!", rgb(255, 236, 110))
+		E.play("Poof", 1, 1)
+		E.play("Whoosh", 0.8, 0.6)
+		if mine then
+			CameraController.shake(1.4, 0.5)
+		elseif nearMe(position, 45) then
+			CameraController.shake(0.7, 0.3)
+		end
+		return
+	elseif kind == "respawn" then
+		E.burst(position, color, 40, 24, 1.5, 0.7)
+		E.burst(position, rgb(255, 255, 255), 20, 16, 1, 0.5)
+		E.shockwave(position, color, 9, 0.35)
+		if mine then
+			E.play("Pickup", 0.8, 0.9)
+		end
 	end
 	if mine and kind ~= "box" then
 		CameraController.shake(0.35, 0.2)

@@ -73,6 +73,7 @@ MatchState.CarAttr = {
 	Ghost = "Ghost",
 	Rocket = "Rocket",
 	Pull = "Pull", -- "magnet" / "beam" while pulling the ball, else ""
+	Demolished = "Demolished", -- smashed to bits; gone until it pops back in at its goal
 }
 
 -- Names of the folders the server puts in Workspace.

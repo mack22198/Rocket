@@ -15,6 +15,7 @@ export type MatchStats = {
 	points: number,
 	items: number, -- item boxes used
 	powers: number, -- car powers used
+	demos: number, -- cars demolished
 }
 
 export type Outcome = "Win" | "Loss" | "Draw"
@@ -48,6 +49,7 @@ Rewards.Scrap = {
 	TouchCap = 20, -- ...up to this much
 	Style = 5,
 	MegaShot = 5,
+	Demo = 5,
 	Mvp = 20,
 	MatchCap = 350,
 	FriendBonus = 0.25, -- +25% when one of your Roblox friends is in the match too
@@ -65,6 +67,7 @@ function Rewards.emptyStats(): MatchStats
 		points = 0,
 		items = 0,
 		powers = 0,
+		demos = 0,
 	}
 end
 
@@ -90,6 +93,7 @@ function Rewards.compute(stats: MatchStats, outcome: Outcome, isMvp: boolean): R
 	add(`Ball touches x{stats.touches}`, math.min(math.floor(stats.touches / s.TouchesPerScrap), s.TouchCap))
 	add(`Style moves x{stats.styleTouches}`, stats.styleTouches * s.Style)
 	add(`Mega Shots x{stats.megaShots}`, stats.megaShots * s.MegaShot)
+	add(`Demolitions x{stats.demos}`, stats.demos * s.Demo)
 	if isMvp then
 		add("MVP!", s.Mvp)
 	end

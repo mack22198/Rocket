@@ -31,6 +31,9 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   pitch - the MVP on the top step - with confetti and fireworks, before the results screen.
 - **Arcade driving:** boost, jump, double jump, flips (dodges), air control and air roll, driving up the curved
   walls, and bumping other cars.
+- **Demolitions:** smash into the other team at full boost and their car goes **POOF** - a cartoon cloud, stars
+  and toy-car bits flying everywhere - then pops back in at its own goal two seconds later. Each one is worth a
+  little Scrap (and there's a daily quest for it). Bots never demolish players in their first five matches.
 - **Item boxes:** spinning "?" boxes on the pitch give you a random item to use whenever you like (R): a
   **Magnet** that pulls the ball to your car, a **Freeze Ray** that freezes the closest opponent, a **Super
   Spring**, **Rocket Fuel** (boost that doesn't run out), a **Bubble Shield** and a **Mega Charge**. A team
@@ -227,7 +230,8 @@ src/
                   goal parties), Season (the free season reward track), Sounds (every sound, for Toolbox IDs)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
-    Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay timing)
+    Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay
+                  timing), Teams (who plays on which team), Demolition (when a bump is a demolition)
     Bots/         BotBrain (bot decisions)
     Cars/         CarModelBuilder (car looks at every evolution stage), CarDriver (connects CarPhysics to a car)
     Ball/         BallModelBuilder (the ball's look)
@@ -237,7 +241,8 @@ src/
     Arena/        ArenaBuilder (pitch, walls, goals), StadiumBuilder (stands, crowd, roof, screens),
                   LobbyBuilder (VIP deck), EnvironmentBuilder (terrain, trees)
     Services/     MatchService (menu -> queue -> match loop), BallService, CarService, BotService,
-                  StatsService, BoostPadService, BumpService, ItemService (item boxes), PowerService
+                  StatsService, BoostPadService, BumpService, DemolitionService, ItemService (item boxes),
+                  PowerService
                   (using items and powers, cheese and banana traps), DailyService (streaks, quests, chest),
                   SeasonService (season XP and tier rewards), DataService (saving), GarageService (unlocking,
                   fusing, evolving, style)
@@ -246,7 +251,7 @@ src/
                   PodiumBuilder (the winners' podium)
     Controllers/  GameFlow (menu / garage / match), ReplayController (goal replays), PodiumController,
                   TwistController (twist rules and the Neon Night sky on this screen),
-                  LocalHide (hides real cars behind replays), InputController, CarController, CarVisuals (wheels,
+                  LocalHide (hides cars behind replays, and demolished ones), InputController, CarController, CarVisuals (wheels,
                   trails), BallView, CameraController, EffectsController, SoundController (effects, music,
                   crowd, whistle), PowerVisuals (item boxes,
                   shields, ice, beams), ShowroomController, StadiumController (live scoreboards, LED boards,

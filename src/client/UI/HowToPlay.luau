@@ -22,7 +22,7 @@ local CARDS = {
 	{
 		icon = "🚀",
 		title = "BOOST & JUMP",
-		text = "Boost to go super fast - pads fill it up. Jump to reach the ball, jump again to flip into it!",
+		text = "Boost to go super fast - pads fill it up. Jump twice to flip! Smash the other team at full boost - POOF!",
 		color = C.Boost,
 	},
 	{

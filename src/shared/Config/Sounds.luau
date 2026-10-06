@@ -51,6 +51,12 @@ Sounds.List = {
 		Volume = 1,
 		Note = "a cartoon car bonk (when your car gets bumped)",
 	},
+	Poof = {
+		Id = 0,
+		BuiltIn = "rbxasset://sounds/action_jump_land.mp3",
+		Volume = 1,
+		Note = "a cartoon explosion poof (when a car gets demolished)",
+	},
 	Pickup = {
 		Id = 0,
 		BuiltIn = "rbxasset://sounds/button.wav",

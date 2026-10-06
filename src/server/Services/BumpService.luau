@@ -1,15 +1,18 @@
 --!strict
 -- Cars already collide physically; this adds a knock-back that depends on each car's Weight and BumpPower,
--- so the Monster Truck really does bully the Tiny Kart.
+-- so the Monster Truck really does bully the Tiny Kart. Smash into the other team at full boost and it's a
+-- demolition instead (see DemolitionService).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Demolition = require(Shared.Match.Demolition)
 local GameConfig = require(Shared.Config.GameConfig)
 local MathUtil = require(Shared.Util.MathUtil)
 
 local Roster = require(script.Parent.Parent.Match.Roster)
 local CarService = require(script.Parent.CarService)
+local DemolitionService = require(script.Parent.DemolitionService)
 local StatsService = require(script.Parent.StatsService)
 
 type Participant = Roster.Participant
@@ -26,6 +29,10 @@ end
 -- Bubble Shields can't be bumped, and diving sharks pass straight through everyone.
 local function untouchable(p: Participant, now: number): boolean
 	return Roster.hasEffect(p, "shield", now) or Roster.hasEffect(p, "ghost", now)
+end
+
+local function side(p: Participant): Demolition.Side
+	return { team = p.team, bot = p.isBot, matches = p.experience }
 end
 
 local function contactDistance(a: Participant, b: Participant): number
@@ -73,6 +80,10 @@ function BumpService.update()
 			lastBump[key] = now
 			if untouchable(victim, now) then
 				continue -- bounced off the bubble
+			end
+			if Demolition.check(side(attacker), side(victim), speed) then
+				DemolitionService.demolish(attacker, victim)
+				continue
 			end
 			local power = attacker.def.Stats.BumpPower / victim.def.Stats.Weight
 			local flat = MathUtil.safeUnit(MathUtil.flat(towardVictim), towardVictim)
