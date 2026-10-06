@@ -28,6 +28,7 @@ export type Data = {
 	winStreak: number,
 	achievements: { [string]: boolean },
 	title: string, -- "" = the best title the level gives
+	vip: boolean,
 }
 
 -- Hats, horns and goal celebrations (see Cosmetics).
@@ -63,6 +64,7 @@ local current: Data = {
 	winStreak = 0,
 	achievements = {},
 	title = "",
+	vip = false,
 }
 local loaded = false
 
@@ -127,6 +129,7 @@ local function readSeason(raw: any): Season.State
 				(state :: any)[key] = raw[key]
 			end
 		end
+		state.gold = raw.gold == true
 	end
 	return state
 end
@@ -151,6 +154,7 @@ local function apply(raw: any)
 		winStreak = if type(raw.winStreak) == "number" then raw.winStreak else 0,
 		achievements = if type(raw.achievements) == "table" then raw.achievements else {},
 		title = if type(raw.title) == "string" then raw.title else "",
+		vip = raw.vip == true,
 	}
 	loaded = true
 	PlayerDataClient.Changed:Fire(current)

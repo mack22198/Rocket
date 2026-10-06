@@ -43,7 +43,10 @@ local function handleStyle(player: Player, action: string, id: unknown): Result
 		if owned then
 			return { ok = false, message = "You already have that!" }
 		elseif not Cosmetics.forSale(item) then
-			return { ok = false, message = "This one comes from the season track." }
+			return {
+				ok = false,
+				message = if item.Vip then "This one comes with VIP." else "This one comes from the season track.",
+			}
 		elseif data.scrap < item.Price then
 			return { ok = false, message = `You need {item.Price - data.scrap} more Scrap.` }
 		end

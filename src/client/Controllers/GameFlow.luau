@@ -28,6 +28,7 @@ local GiftsPanel = require(UI.GiftsPanel)
 local LeaderboardPanel = require(UI.LeaderboardPanel)
 local PauseMenu = require(UI.PauseMenu)
 local ProfilePanel = require(UI.ProfilePanel)
+local ShopPanel = require(UI.ShopPanel)
 local ReplayScreen = require(UI.ReplayScreen)
 local ResultsScreen = require(UI.ResultsScreen)
 local SeasonTrack = require(UI.SeasonTrack)
@@ -73,6 +74,7 @@ local function overlayOpen(): boolean
 		or ProfilePanel.isOpen()
 		or GiftsPanel.isOpen()
 		or LeaderboardPanel.isOpen()
+		or ShopPanel.isOpen()
 end
 
 -- The match HUD, the announcer feed and the touch buttons, together.
@@ -127,6 +129,7 @@ local function apply(target: Screen)
 		ProfilePanel.close()
 		GiftsPanel.close()
 		LeaderboardPanel.close()
+		ShopPanel.close()
 		return
 	end
 	PauseMenu.close()
@@ -194,6 +197,8 @@ local function onMenuKey()
 		GiftsPanel.close()
 	elseif LeaderboardPanel.isOpen() then
 		LeaderboardPanel.close()
+	elseif ShopPanel.isOpen() then
+		ShopPanel.close()
 	elseif screen == "Match" then
 		if not ResultsScreen.isOpen() then
 			PauseMenu.toggle()
@@ -234,6 +239,13 @@ function GameFlow.start()
 	end)
 	MainMenu.LeaderboardPressed:Connect(function()
 		LeaderboardPanel.open()
+	end)
+	MainMenu.ShopPressed:Connect(function()
+		ShopPanel.open()
+	end)
+	SeasonTrack.GoldPressed:Connect(function()
+		SeasonTrack.close()
+		ShopPanel.open()
 	end)
 	MainMenu.InvitePressed:Connect(function()
 		local ok, why = Invite.prompt()

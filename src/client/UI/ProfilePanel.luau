@@ -242,7 +242,7 @@ local function refresh()
 		table.insert(entries, {
 			id = title.Id,
 			text = `{title.Emoji} {title.Text}`,
-			owned = Achievements.ownsTitle(title.Id, level, data.achievements),
+			owned = Achievements.ownsTitle(title.Id, level, data.achievements, data.vip),
 		})
 	end
 	for order, entry in entries do

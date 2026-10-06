@@ -69,13 +69,16 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   score); everyone starts again on Monday. It needs DataStores, so it fills in once the game is published.
 - **Invite friends:** 👋 INVITE opens Roblox's invite window. Playing in the same match as a friend pays +25%
   Scrap, and the first time is an achievement.
+- **A Robux shop:** Scrap packs, a Gold Season Pass and VIP (see *Making money*). Everything in it can also be
+  earned by playing, nothing is random, and it reminds kids to ask a grown-up first.
 - **Rewards:** everyone earns **Scrap** every match (more for winning, goals, saves and style, and +25% when one
   of your Roblox friends is in the match too). Scrap is the only currency and there are no loot boxes.
 - **Seasons:** a free reward track that changes every six weeks, starting with 🍔 **Season 1: Food Fight**. Every
   match earns season XP (as much as the Scrap you win), and each of the 20 tiers pays out the moment you reach it:
   Scrap, matches of double Scrap, and season-only style - a 🎺 fanfare horn, a 🌈 rainbow goal party and a 👑
-  Golden Crown at the end. There's no paid track; the menu shows your tier, what's next and the days left, and
-  the whole track is one tap away.
+  Golden Crown at the end. The optional **Gold Season Pass** adds a gold reward to every tier (with gold-only
+  style: a 📣 Stadium Air Horn, a 🪙 Gold Rush goal party and a 🏆 Gold Trophy hat). The menu shows your tier,
+  what's next and the days left, and the whole track (free and gold) is one tap away.
 - **Daily reasons to come back:** a **login streak** (more Scrap every day in a row, up to day 7), **three daily
   quests** ("Score 2 goals", "Use 5 items"...) and a **daily chest** once they're done - its three prizes are
   shown face up and you pick one (Scrap, XP for your car, or double Scrap for a few matches). Nothing is random
@@ -178,6 +181,35 @@ ever remade (see [tools/meshes](tools/meshes)), delete the old `TurboBallCars` a
    achievement in [`Achievements.luau`](src/shared/Config/Achievements.luau) (`WelcomeBadge` is given to
    everyone the first time they play).
 
+## Making money (Robux)
+
+The shop (🛒 SHOP in the menu) sells, for Robux:
+
+| Item | Kind | Suggested price | What you get |
+| --- | --- | --- | --- |
+| Bag / Box / Crate / Truckload of Scrap | Developer Products | 49 / 99 / 199 / 449 | 1,000 / 2,500 / 6,000 / 15,000 Scrap (bigger packs are better value) |
+| Gold Season Pass | Developer Product (once per season) | 399 | A gold reward on every season tier: 4,800 more Scrap, 14 Double Scrap matches and 3 gold-only items; tiers already reached pay out at once |
+| VIP | Game Pass (forever) | 249 | +20% Scrap every match, the 💎 Diamond Crown hat, the 💎 VIP title and a 💎 by your name |
+
+Roblox Premium members also get +10% Scrap every match (free), and Roblox pays you **Premium Payouts** for the
+time Premium members spend in the game. Nothing in the shop is random and everything can also be earned by
+playing. To switch it on:
+
+1. Publish the game, then open it on the [Creator Dashboard](https://create.roblox.com/dashboard/creations).
+2. **Monetization → Developer Products → Create a Developer Product** for each of the five products above
+   (name, price, an icon). Copy each product's ID into `ProductId` in
+   [`src/shared/Config/Shop.luau`](src/shared/Config/Shop.luau). The Gold Season Pass is one product for every
+   season.
+3. **Monetization → Passes → Create a Pass** called VIP, put it on sale, and copy its ID into `Shop.Vip.PassId`.
+4. **Monetization → Private Servers:** turn them on and pick a monthly price (100 Robux is common) - friends
+   and families can then have their own server.
+5. Build, publish again. The shop shows Roblox's real prices once the IDs are in.
+
+Until an item has an ID it shows "Coming soon" in the live game, and in Studio pressing BUY simply hands it over
+(nothing is charged) so you can try everything. Products that are set up open Roblox's test purchase window in
+Studio. Every purchase is saved with the player's progress before Roblox is told it's done, so a purchase is never
+lost or given twice.
+
 ## Changing the game
 
 Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
@@ -256,7 +288,7 @@ src/
                   quests, daily chest), Twists (match twists and weekend events), Cosmetics (hats, horns,
                   goal parties), Season (the free season reward track), Sounds (every sound, for Toolbox IDs),
                   QuickChat (the quick chat phrases), Levels (player levels), Achievements (achievements and
-                  titles), Gifts (playtime gifts), Leaderboard (the weekly leaderboard)
+                  titles), Gifts (playtime gifts), Leaderboard (the weekly leaderboard), Shop (Robux products)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay
@@ -274,7 +306,8 @@ src/
                   PowerService
                   (using items and powers, cheese and banana traps), DailyService (streaks, quests, chest),
                   SeasonService (season XP and tier rewards), ProgressService (levels, achievements, titles,
-                  badges), GiftService (playtime gifts), LeaderboardService (the weekly top 50),
+                  badges), GiftService (playtime gifts), LeaderboardService (the weekly top 50), ShopService
+                  (Robux purchases, VIP, the Premium bonus),
                   QuickChatService, DataService (saving),
                   GarageService (unlocking, fusing, evolving, style)
   client/   (StarterPlayerScripts.Client)
@@ -291,7 +324,8 @@ src/
                   DailyRewards (streak and chest pop-ups), CollectionBook, StylePanel (the garage's STYLE tab),
                   SeasonTrack (every tier of the season), Coach (first-match tips), QuickChatPanel (the chat
                   button, its list and the speech bubbles), ProfilePanel (stats, achievements, titles), Toasts
-                  (level-up and achievement cards), GiftsPanel, LeaderboardPanel, TouchControls, Transition,
+                  (level-up and achievement cards), GiftsPanel, LeaderboardPanel, ShopPanel, TouchControls,
+                  Transition,
                   Theme
 tests/      Lune unit tests (run outside Roblox)
 tools/      Offline previews of the 3D world and the UI

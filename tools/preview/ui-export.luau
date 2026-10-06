@@ -3,7 +3,7 @@
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
 --   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay,
 --              streak, chest, collection, twist, style, fuse, season, chat, profile, titles, toast,
---              gifts, leaderboard
+--              gifts, leaderboard, shop
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -66,6 +66,7 @@ local MENU_SCENARIOS = {
 	toast = true,
 	gifts = true,
 	leaderboard = true,
+	shop = true,
 }
 if MENU_SCENARIOS[scenario] and scenario ~= "queued" then
 	attrs.Phase = "Waiting"
@@ -192,6 +193,10 @@ local services = {
 		RenderStepped = renderStepped,
 		Heartbeat = heartbeat,
 		PreSimulation = signal(),
+	},
+	MarketplaceService = {
+		PromptProductPurchase = function() end,
+		PromptGamePassPurchase = function() end,
 	},
 	TweenService = {
 		Create = function(_, object, _info, goal)
@@ -476,6 +481,7 @@ for _, name in
 		"Toasts",
 		"GiftsPanel",
 		"LeaderboardPanel",
+		"ShopPanel",
 	}
 do
 	harness.sourceTransforms["src/client/UI/" .. name] = function(source)
@@ -484,6 +490,8 @@ do
 		end
 		-- (The pretend camera isn't an instance, so 3D effects like chat bubbles get nowhere to live.)
 		source = string.gsub(source, "workspace%.CurrentCamera or workspace", "nil")
+		-- (Browsers can't draw Roblox's Robux icon.)
+		source = string.gsub(source, "utf8%.char%(0xE002%)", '"R$"')
 		source = string.gsub(source, "([%w_%.]+):PivotTo%(", "__pivotTo(%1, ")
 		return (string.gsub(source, "([%w_%.]+):GetPropertyChangedSignal%(([^)]*)%)", "__event(%1, %2)"))
 	end
@@ -507,6 +515,7 @@ local ProfilePanel = harness.require(UI.ProfilePanel)
 local Toasts = harness.require(UI.Toasts)
 local GiftsPanel = harness.require(UI.GiftsPanel)
 local LeaderboardPanel = harness.require(UI.LeaderboardPanel)
+local ShopPanel = harness.require(UI.ShopPanel)
 HUD.start()
 Announcer.start()
 ResultsScreen.start()
@@ -523,6 +532,7 @@ ProfilePanel.start()
 Toasts.start()
 GiftsPanel.start()
 LeaderboardPanel.start()
+ShopPanel.start()
 if touch then
 	TouchControls.start()
 end
@@ -550,6 +560,8 @@ if scenario == "goal" then
 	remotes.Announce.OnClientEvent:Fire("save", "EPIC SAVE!", "Orange", "Bolt (bot)")
 	remotes.Announce.OnClientEvent:Fire("power", "❄️ Player1 froze Bolt (bot)!", "Blue", "Player1")
 	remotes.Announce.OnClientEvent:Fire("power", "🍌 Comet (bot) slipped on a banana!", "Blue", "Zippy (bot)")
+elseif scenario == "shop" then
+	ShopPanel.open()
 elseif scenario == "gifts" then
 	GiftsPanel.open()
 elseif scenario == "leaderboard" then

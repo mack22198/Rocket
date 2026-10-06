@@ -1966,6 +1966,52 @@ local HATS: { [string]: (put: HatAdd) -> () } = {
 			)
 		end
 	end,
+	trophy = function(put)
+		local gold, dark = rgb(255, 200, 60), rgb(70, 50, 30)
+		put("HatBase", "Block", Vector3.new(0.9, 0.24, 0.9), at(0, 0.12, 0), dark)
+		put("HatStem", "Cylinder", Vector3.new(0.4, 0.26, 0.26), at(0, 0.44, 0) * CYL_ALONG_Y, gold, METAL)
+		put("HatCup", "Ellipsoid", Vector3.new(0.95, 0.7, 0.95), at(0, 0.86, 0), gold, METAL)
+		put("HatRim", "Cylinder", Vector3.new(0.1, 1.0, 1.0), at(0, 1.16, 0) * CYL_ALONG_Y, gold, METAL)
+		for _, side in { -1, 1 } do
+			put(
+				"HatHandle",
+				"Cylinder",
+				Vector3.new(0.12, 0.5, 0.5),
+				at(side * 0.55, 0.9, 0) * CFrame.Angles(0, math.rad(90), 0),
+				gold,
+				METAL
+			)
+		end
+		put("HatStar", "Ball", Vector3.one * 0.2, at(0, 0.86, -0.46), rgb(255, 250, 220), NEON)
+	end,
+	diamond = function(put)
+		local ice, white = rgb(140, 220, 255), rgb(235, 250, 255)
+		for i = 0, 9 do
+			local angle = i / 10 * math.pi * 2
+			put(
+				"HatBand",
+				"Block",
+				Vector3.new(0.42, 0.42, 0.12),
+				at(math.sin(angle) * 0.62, 0.21, math.cos(angle) * 0.62) * CFrame.Angles(0, angle, 0),
+				white,
+				METAL
+			)
+		end
+		for i = 0, 4 do
+			local angle = i / 5 * math.pi * 2
+			local x, z = math.sin(angle) * 0.62, math.cos(angle) * 0.62
+			put(
+				"HatSpike",
+				"Wedge",
+				Vector3.new(0.12, 0.5, 0.3),
+				at(x, 0.66, z) * CFrame.Angles(0, angle + math.rad(90), 0),
+				ice,
+				GLASS
+			)
+			put("HatGem", "Ball", Vector3.one * 0.2, at(x, 0.95, z), ice, NEON)
+		end
+		put("HatDiamond", "Ball", Vector3.one * 0.38, at(0, 0.62, 0), ice, GLASS)
+	end,
 }
 
 -- Every hat that can be built (for the tests).

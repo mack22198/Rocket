@@ -29,7 +29,8 @@ export type TitleDef = {
 	Emoji: string,
 	Text: string,
 	Level: number?, -- unlocked by reaching this level...
-	Achievement: string?, -- ...or by this achievement
+	Achievement: string?, -- ...or by this achievement...
+	Vip: boolean?, -- ...or by having VIP (see Shop)
 }
 
 export type View = { [string]: number }
@@ -317,6 +318,7 @@ local titlesById: { [string]: TitleDef } = {}
 for _, title in LEVEL_TITLES do
 	table.insert(Achievements.Titles, title)
 end
+table.insert(Achievements.Titles, { Id = "vip", Emoji = "💎", Text = "VIP", Vip = true })
 for _, def in Achievements.List do
 	byId[def.Id] = def
 	if def.Title then
@@ -395,13 +397,15 @@ function Achievements.titleText(id: string): string
 	return if title then `{title.Emoji} {title.Text}` else ""
 end
 
--- Has someone at `level` with these achievements unlocked this title?
-function Achievements.ownsTitle(id: string, level: number, done: { [string]: boolean }): boolean
+-- Has someone at `level` with these achievements (and VIP or not) unlocked this title?
+function Achievements.ownsTitle(id: string, level: number, done: { [string]: boolean }, vip: boolean?): boolean
 	local title = titlesById[id]
 	if not title then
 		return false
 	elseif title.Level then
 		return level >= title.Level
+	elseif title.Vip then
+		return vip == true
 	end
 	return title.Achievement ~= nil and done[title.Achievement] == true
 end
@@ -413,6 +417,8 @@ function Achievements.howToUnlock(id: string): string
 		return ""
 	elseif title.Level then
 		return `Reach level {title.Level}`
+	elseif title.Vip then
+		return "Comes with VIP (in the Shop)"
 	end
 	local def = if title.Achievement then byId[title.Achievement] else nil
 	return if def then `{def.Name}: {def.Text}` else ""

@@ -72,20 +72,27 @@ return function(t)
 		end
 	end)
 
-	t.test("every reward is real, and every season-only item is on a track", function()
+	t.test("every reward is real, and every season-only item is on its track", function()
 		local onTrack: { [string]: string } = {}
 		for _, theme in Season.Themes do
-			for tier, reward in theme.Rewards do
-				expect.truthy(reward.Amount > 0, `{theme.Id} tier {tier} is worth something`)
-				local emoji, text = Season.describe(reward)
-				expect.truthy(emoji ~= "" and text ~= "")
-				if reward.Kind == "style" then
-					local item = Cosmetics.get(reward.Id)
-					assert(item, `{theme.Id} tier {tier}: {reward.Id} exists`)
-					expect.equal(item.Season, theme.Id, `{item.Id} belongs to {theme.Id}`)
-					onTrack[item.Id] = theme.Id
-				else
-					expect.truthy(reward.Kind == "scrap" or reward.Kind == "boost", `{reward.Kind} is a known reward`)
+			expect.equal(#theme.GoldRewards, #theme.Rewards, `{theme.Id}'s gold track has a reward for every tier`)
+			for _, track in { { rewards = theme.Rewards, gold = false }, { rewards = theme.GoldRewards, gold = true } } do
+				for tier, reward in track.rewards do
+					expect.truthy(reward.Amount > 0, `{theme.Id} tier {tier} is worth something`)
+					local emoji, text = Season.describe(reward)
+					expect.truthy(emoji ~= "" and text ~= "")
+					if reward.Kind == "style" then
+						local item = Cosmetics.get(reward.Id)
+						assert(item, `{theme.Id} tier {tier}: {reward.Id} exists`)
+						expect.equal(item.Season, theme.Id, `{item.Id} belongs to {theme.Id}`)
+						expect.equal(item.Gold == true, track.gold, `{item.Id} is on the right track`)
+						onTrack[item.Id] = theme.Id
+					else
+						expect.truthy(
+							reward.Kind == "scrap" or reward.Kind == "boost",
+							`{reward.Kind} is a known reward`
+						)
+					end
 				end
 			end
 		end
@@ -95,5 +102,27 @@ return function(t)
 				expect.truthy(Season.theme(item.Season) ~= nil, `{item.Id}'s season exists`)
 			end
 		end
+	end)
+
+	t.test("the Gold Pass lasts one season and adds a reward to every tier", function()
+		local state = Season.newState()
+		expect.equal(state.gold, false)
+		Season.addXp(state, Season.XpPerTier * 3, first)
+		state.gold = true
+		Season.addXp(state, 10, first + 1)
+		expect.truthy(state.gold, "it lasts the whole season")
+		Season.addXp(state, 10, first + Season.Days)
+		expect.equal(state.gold, false, "a new season needs a new pass")
+		local theme = Season.at(first).theme
+		expect.truthy(Season.goldRewardFor(theme, 1) == theme.GoldRewards[1])
+		expect.equal(Season.goldRewardFor(theme, #theme.GoldRewards + 5).Amount, Season.GoldBonusScrap)
+		-- The gold track is worth more than the free one.
+		local free, gold = 0, 0
+		for tier = 1, #theme.Rewards do
+			local f, g = theme.Rewards[tier], theme.GoldRewards[tier]
+			free += if f.Kind == "scrap" then f.Amount else 0
+			gold += if g.Kind == "scrap" then g.Amount else 0
+		end
+		expect.truthy(gold > free)
 	end)
 end

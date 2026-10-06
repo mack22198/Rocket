@@ -1,8 +1,8 @@
 --!strict
 -- Collectible style: hats that sit on your car's roof, horns you honk in a match (H), and the celebration that
 -- goes off when YOU score. Only looks and sounds - nothing here changes how a car drives.
--- Prices are fixed and shown up front in the garage's STYLE tab; a few come only from a season's free reward
--- track (see Season).
+-- Prices are fixed and shown up front in the garage's STYLE tab; a few come only from a season's reward track
+-- (see Season) - the free one, or the Gold Season Pass's - and one comes with VIP (see Shop).
 
 local Cosmetics = {}
 
@@ -16,7 +16,9 @@ export type CosmeticDef = {
 	Description: string,
 	Price: number, -- Scrap (0 = free)
 	Default: boolean?, -- everyone starts with it
-	Season: string?, -- only from the reward track of the season with this theme (see Season.Themes)
+	Season: string?, -- only from the reward track of the season with this theme (see Season.Themes)...
+	Gold: boolean?, -- ...the Gold Season Pass's track
+	Vip: boolean?, -- comes with VIP (see Shop)
 	Sound: string?, -- horns: which sound, and how high it plays
 	Pitch: number?,
 	Word: string?, -- horns: the word that pops up over your car
@@ -68,6 +70,25 @@ Cosmetics.List = {
 		Description = "The top prize of the Food Fight season.",
 		Price = 0,
 		Season = "foodfight",
+	},
+	{
+		Id = "trophy",
+		Kind = "topper",
+		Name = "Gold Trophy",
+		Emoji = "🏆",
+		Description = "The top prize of the Food Fight Gold Pass.",
+		Price = 0,
+		Season = "foodfight",
+		Gold = true,
+	},
+	{
+		Id = "diamond",
+		Kind = "topper",
+		Name = "Diamond Crown",
+		Emoji = "💎",
+		Description = "Sparkly! For VIPs only.",
+		Price = 0,
+		Vip = true,
 	},
 	-- Horns
 	{
@@ -138,6 +159,19 @@ Cosmetics.List = {
 		Pitch = 1.9,
 		Word = "TA-DA!",
 	},
+	{
+		Id = "airhorn",
+		Kind = "horn",
+		Name = "Stadium Air Horn",
+		Emoji = "📣",
+		Description = "The loudest horn in the stadium, from the Food Fight Gold Pass.",
+		Price = 0,
+		Season = "foodfight",
+		Gold = true,
+		Sound = "rbxasset://sounds/electronicpingshort.wav",
+		Pitch = 0.75,
+		Word = "BWAAAP!",
+	},
 	-- Goal celebrations
 	{
 		Id = "fireworks",
@@ -189,6 +223,16 @@ Cosmetics.List = {
 		Price = 0,
 		Season = "foodfight",
 	},
+	{
+		Id = "goldrush",
+		Kind = "celebration",
+		Name = "Gold Rush",
+		Emoji = "🪙",
+		Description = "It rains gold coins, from the Food Fight Gold Pass.",
+		Price = 0,
+		Season = "foodfight",
+		Gold = true,
+	},
 } :: { CosmeticDef }
 
 Cosmetics.Kinds = { "topper", "horn", "celebration" } :: { Kind }
@@ -239,9 +283,9 @@ function Cosmetics.defaultFor(kind: Kind): string
 	return ""
 end
 
--- Can this be bought with Scrap in the shop? (Season rewards can't.)
+-- Can this be bought with Scrap in the shop? (Season rewards and VIP items can't.)
 function Cosmetics.forSale(def: CosmeticDef): boolean
-	return def.Season == nil and not def.Default
+	return def.Season == nil and not def.Default and not def.Vip
 end
 
 return Cosmetics

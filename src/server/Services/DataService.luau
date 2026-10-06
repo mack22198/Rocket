@@ -69,6 +69,8 @@ export type SavedData = {
 	winStreak: number, -- wins in a row right now
 	achievements: { [string]: boolean }, -- the ones done (see Achievements)
 	title: string, -- the title under your name ("" = the best one your level gives)
+	vip: boolean, -- has the VIP Game Pass (checked again every time they join)
+	purchases: { [string]: number }, -- Robux purchases already handed out: purchase id -> when (see Shop)
 }
 
 type Profile = {
@@ -82,7 +84,7 @@ local DataService = {}
 -- Fired once a player's data has loaded (before it's sent to them), so other services can bring it up to date.
 DataService.Loaded = Signal.new() :: Signal.Signal<Player>
 
-local DATA_VERSION = 6
+local DATA_VERSION = 7
 local LOAD_ATTEMPTS = 6
 local LOAD_RETRY_DELAY = 3
 
@@ -131,6 +133,8 @@ local function defaultData(): SavedData
 		winStreak = 0,
 		achievements = {},
 		title = "",
+		vip = false,
+		purchases = {},
 	}
 end
 
@@ -229,6 +233,7 @@ local function sanitize(raw: any): SavedData
 		data.season.number = number(season.number, 0)
 		data.season.xp = number(season.xp, 0)
 		data.season.tier = math.min(number(season.tier, 0), Season.tierFor(data.season.xp))
+		data.season.gold = season.gold == true
 	end
 	-- Levels, streaks, achievements and titles (added in version 6). Older saves start with as much level XP as
 	-- all the Scrap they've ever won in matches, without paying out the levels they skip.
@@ -240,6 +245,15 @@ local function sanitize(raw: any): SavedData
 		data.levelPaid = (Levels.levelFor(data.xp))
 	end
 	data.winStreak = number(raw.winStreak, 0)
+	-- VIP and Robux purchases (added in version 7).
+	data.vip = raw.vip == true
+	if type(raw.purchases) == "table" then
+		for id, time in raw.purchases do
+			if type(id) == "string" and type(time) == "number" then
+				data.purchases[id] = time
+			end
+		end
+	end
 	if type(raw.achievements) == "table" then
 		for id, done in raw.achievements do
 			if done == true and type(id) == "string" and Achievements.get(id) then
@@ -248,7 +262,7 @@ local function sanitize(raw: any): SavedData
 		end
 	end
 	local level = Levels.levelFor(data.xp)
-	if type(raw.title) == "string" and Achievements.ownsTitle(raw.title, level, data.achievements) then
+	if type(raw.title) == "string" and Achievements.ownsTitle(raw.title, level, data.achievements, data.vip) then
 		data.title = raw.title
 	end
 	return data
@@ -289,6 +303,8 @@ local function serialize(data: SavedData, withSession: boolean): { [string]: any
 		winStreak = data.winStreak,
 		achievements = table.clone(data.achievements),
 		title = data.title,
+		vip = data.vip,
+		purchases = table.clone(data.purchases),
 	}
 	if withSession then
 		copy.session = { jobId = game.JobId, time = os.time() }
@@ -335,6 +351,7 @@ local function clientView(data: SavedData): { [string]: any }
 		winStreak = data.winStreak,
 		achievements = table.clone(data.achievements),
 		title = data.title,
+		vip = data.vip,
 	}
 end
 
@@ -394,10 +411,10 @@ local function loadFromStore(player: Player): (SavedData, boolean)
 	return defaultData(), false
 end
 
-local function saveToStore(player: Player, release: boolean)
+local function saveToStore(player: Player, release: boolean): boolean
 	local profile = profiles[player]
 	if not profile or not profile.persistent or not store or not storeUsable then
-		return
+		return false
 	end
 	local snapshot = serialize(profile.data, not release)
 	local ok, err = pcall(function()
@@ -413,6 +430,7 @@ local function saveToStore(player: Player, release: boolean)
 	else
 		warn(`[Data] Saving {player.Name} failed: {err}`)
 	end
+	return ok
 end
 
 local function onPlayerAdded(player: Player)
@@ -517,6 +535,17 @@ end
 -- Save right away (used after spending Scrap so a crash can't undo a purchase).
 function DataService.saveNow(player: Player)
 	task.spawn(saveToStore, player, false)
+end
+
+-- Saves right away and waits for it. True once the save is safely stored.
+function DataService.saveAndWait(player: Player): boolean
+	return saveToStore(player, false)
+end
+
+-- Is this player's progress being saved? (Not in Studio without API access, or if loading it failed.)
+function DataService.isPersistent(player: Player): boolean
+	local profile = profiles[player]
+	return profile ~= nil and profile.persistent
 end
 
 function DataService.clientView(player: Player): { [string]: any }?

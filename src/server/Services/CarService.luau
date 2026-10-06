@@ -154,6 +154,7 @@ function CarService.spawn(p: Participant, cframe: CFrame)
 	model:SetAttribute(A.Power, Powers.forCar(p.def.Id).Id)
 	model:SetAttribute(A.Level, p.level)
 	model:SetAttribute(A.Title, p.title)
+	model:SetAttribute(A.Vip, p.player ~= nil and p.player:GetAttribute(MatchState.PlayerAttr.Vip) == true)
 	local chassis = model.PrimaryPart :: BasePart
 	chassis.CollisionGroup = CAR_GROUP
 	chassis.Anchored = true

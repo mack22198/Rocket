@@ -134,7 +134,7 @@ return function(t)
 		for _, title in Achievements.Titles do
 			expect.falsy(ids[title.Id], `{title.Id} is listed twice`)
 			ids[title.Id] = true
-			expect.truthy(title.Level ~= nil or title.Achievement ~= nil, `{title.Id} can be earned`)
+			expect.truthy(title.Level ~= nil or title.Achievement ~= nil or title.Vip, `{title.Id} can be earned`)
 			expect.truthy(Achievements.titleText(title.Id) ~= "")
 			expect.truthy(Achievements.howToUnlock(title.Id) ~= "")
 		end
@@ -147,6 +147,8 @@ return function(t)
 		expect.falsy(Achievements.ownsTitle("speedster", 9, {}))
 		expect.truthy(Achievements.ownsTitle("speedster", 10, {}))
 		expect.falsy(Achievements.ownsTitle("nope", 99, {}))
+		expect.falsy(Achievements.ownsTitle("vip", 99, {}), "the VIP title needs VIP")
+		expect.truthy(Achievements.ownsTitle("vip", 1, {}, true))
 		expect.equal(Achievements.titleText("nope"), "")
 	end)
 end

@@ -1,8 +1,9 @@
 --!strict
--- Seasons: a free reward track that changes every six weeks. Every match earns season XP (as much as the Scrap
--- you win), and each tier you reach pays out straight away - Scrap, matches of double Scrap, and a few style
--- items you can only get from that season. There is only the free track: nothing to buy, nothing random, and
--- every reward is shown up front.
+-- Seasons: a reward track that changes every six weeks. Every match earns season XP (as much as the Scrap you
+-- win), and each tier you reach pays out straight away - Scrap, matches of double Scrap, and a few style items you
+-- can only get from that season. The free track is for everyone. The Gold Season Pass (see Shop) adds a second,
+-- gold reward to every tier - with the season's gold-only items - and pays the gold rewards of the tiers you've
+-- already reached the moment you get it. Nothing is random, and every reward is shown up front.
 --
 -- Seasons run back to back from `FirstDay`, taking their theme from `Themes` in turn (add a theme to give a
 -- season new rewards). A reward you already own turns into Scrap.
@@ -24,6 +25,7 @@ export type Theme = {
 	Description: string,
 	Color: Color3,
 	Rewards: { Reward }, -- one for each tier, in order
+	GoldRewards: { Reward }, -- the Gold Season Pass's reward for each tier
 }
 
 export type Info = {
@@ -33,8 +35,9 @@ export type Info = {
 	endDay: number, -- the first day of the next season
 }
 
--- A player's progress this season: which season it is, their XP, and how many tiers have paid out.
-export type State = { number: number, xp: number, tier: number }
+-- A player's progress this season: which season it is, their XP, how many tiers have paid out, and whether they
+-- have this season's Gold Pass.
+export type State = { number: number, xp: number, tier: number, gold: boolean }
 
 -- A tier that just paid out.
 export type Reached = { tier: number, reward: Reward }
@@ -42,7 +45,8 @@ export type Reached = { tier: number, reward: Reward }
 Season.FirstDay = 20724 -- Monday 28 September 2026 (see Daily.dayNumber)
 Season.Days = 42 -- six weeks
 Season.XpPerTier = 250
-Season.BonusScrap = 100 -- every tier past the end of the track
+Season.BonusScrap = 100 -- every tier past the end of the track...
+Season.GoldBonusScrap = 100 -- ...and as much again on the gold track
 
 local function scrap(amount: number): Reward
 	return { Kind = "scrap", Amount = amount }
@@ -85,6 +89,28 @@ Season.Themes = {
 			scrap(500),
 			style("crown", 600),
 		},
+		GoldRewards = {
+			scrap(200),
+			boost(2),
+			scrap(250),
+			scrap(250),
+			style("airhorn", 500),
+			scrap(300),
+			boost(3),
+			scrap(300),
+			scrap(350),
+			scrap(350),
+			scrap(400),
+			style("goldrush", 700),
+			scrap(400),
+			boost(4),
+			scrap(450),
+			scrap(450),
+			scrap(500),
+			boost(5),
+			scrap(600),
+			style("trophy", 1000),
+		},
 	},
 } :: { Theme }
 
@@ -110,22 +136,28 @@ function Season.at(day: number): Info
 end
 
 function Season.newState(): State
-	return { number = 0, xp = 0, tier = 0 }
+	return { number = 0, xp = 0, tier = 0, gold = false }
 end
 
--- A new season starts everyone from zero.
+-- A new season starts everyone from zero (and a Gold Pass is for one season).
 function Season.rollover(state: State, day: number)
 	local number = Season.at(day).number
 	if state.number ~= number then
 		state.number = number
 		state.xp = 0
 		state.tier = 0
+		state.gold = false
 	end
 end
 
 -- The reward for a tier (past the end of the track, every tier is worth some bonus Scrap).
 function Season.rewardFor(theme: Theme, tier: number): Reward
 	return theme.Rewards[tier] or scrap(Season.BonusScrap)
+end
+
+-- The Gold Season Pass's reward for a tier.
+function Season.goldRewardFor(theme: Theme, tier: number): Reward
+	return theme.GoldRewards[tier] or scrap(Season.GoldBonusScrap)
 end
 
 -- How many tiers this much XP reaches.

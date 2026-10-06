@@ -91,6 +91,12 @@ function StylePanel.refresh()
 		elseif owned then
 			tile.status.Text = "OWNED"
 			tile.status.TextColor3 = C.Text
+		elseif def.Vip then
+			tile.status.Text = "💎 VIP"
+			tile.status.TextColor3 = rgb(120, 210, 255)
+		elseif def.Season and def.Gold then
+			tile.status.Text = "🏆 GOLD PASS"
+			tile.status.TextColor3 = C.Gold
 		elseif def.Season then
 			local theme = Season.theme(def.Season)
 			tile.status.Text = if theme then `🏆 {string.upper(theme.Name)}` else "🏆 SEASON"
@@ -130,11 +136,17 @@ function StylePanel.refresh()
 		statusLabel.Text = "You own this."
 		primaryButton.Text = "USE THIS"
 		Theme.setButtonColor(primaryButton, C.Good)
+	elseif def.Vip then
+		statusLabel.Text = "Comes with VIP - see the 🛒 SHOP in the menu."
+		primaryButton.Text = "💎 VIP ONLY"
+		Theme.setButtonColor(primaryButton, C.PanelLight, C.Muted)
 	elseif def.Season then
 		local theme = Season.theme(def.Season)
 		local name = if theme then `{theme.Emoji} {theme.Name}` else "season"
-		statusLabel.Text = `A reward on the {name} season track - keep playing to earn it!`
-		primaryButton.Text = "🏆 SEASON REWARD"
+		statusLabel.Text = if def.Gold
+			then `A Gold Season Pass reward on the {name} track.`
+			else `A reward on the {name} season track - keep playing to earn it!`
+		primaryButton.Text = if def.Gold then "🏆 GOLD PASS REWARD" else "🏆 SEASON REWARD"
 		Theme.setButtonColor(primaryButton, C.PanelLight, C.Muted)
 	elseif data.scrap >= def.Price then
 		statusLabel.Text = "Fixed price - no surprises."
@@ -185,8 +197,10 @@ local function onPrimary()
 		return
 	elseif data.style.owned[def.Id] then
 		request("equipStyle", def.Id)
+	elseif def.Vip then
+		toast("Comes with VIP - see the Shop!", false)
 	elseif def.Season then
-		toast("Earn it on the season track!", false)
+		toast(if def.Gold then "A Gold Season Pass reward!" else "Earn it on the season track!", false)
 	elseif data.scrap >= def.Price then
 		request("buyStyle", def.Id)
 	else

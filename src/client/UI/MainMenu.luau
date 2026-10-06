@@ -43,6 +43,7 @@ MainMenu.ProfilePressed = Signal.new() :: Signal.Signal<>
 MainMenu.GiftsPressed = Signal.new() :: Signal.Signal<>
 MainMenu.LeaderboardPressed = Signal.new() :: Signal.Signal<>
 MainMenu.InvitePressed = Signal.new() :: Signal.Signal<>
+MainMenu.ShopPressed = Signal.new() :: Signal.Signal<>
 
 local C = Theme.Colors
 local rgb = Color3.fromRGB
@@ -615,11 +616,11 @@ local function buildRight()
 	end)
 end
 
--- Along the top: playtime gifts, this week's leaderboard and inviting friends.
+-- Along the top: playtime gifts, this week's leaderboard, inviting friends and the shop.
 local function buildDock()
 	local dock = Instance.new("Frame")
 	dock.Name = "Dock"
-	dock.Size = UDim2.fromOffset(480, 46)
+	dock.Size = UDim2.fromOffset(640, 46)
 	dock.Position = UDim2.new(0.5, 0, 0, 12)
 	dock.AnchorPoint = Vector2.new(0.5, 0)
 	dock.BackgroundTransparency = 1
@@ -667,6 +668,10 @@ local function buildDock()
 	local invite = dockButton(3, "Invite", "👋 INVITE", C.Blue, C.Text)
 	invite.Activated:Connect(function()
 		MainMenu.InvitePressed:Fire()
+	end)
+	local shop = dockButton(4, "Shop", "🛒 SHOP", C.Evolve, C.Text)
+	shop.Activated:Connect(function()
+		MainMenu.ShopPressed:Fire()
 	end)
 end
 

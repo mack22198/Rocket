@@ -153,7 +153,7 @@ function ProgressService.init()
 		if not data then
 			return { ok = false }
 		end
-		if id ~= "" and not Achievements.ownsTitle(id, ProgressService.level(data), data.achievements) then
+		if id ~= "" and not Achievements.ownsTitle(id, ProgressService.level(data), data.achievements, data.vip) then
 			return { ok = false, message = Achievements.howToUnlock(id) }
 		end
 		DataService.update(player, function(saved)

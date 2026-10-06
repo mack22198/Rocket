@@ -38,8 +38,8 @@ return function(t)
 			if def.Kind == "horn" then
 				expect.truthy(def.Sound ~= nil and def.Word ~= nil, `{def.Id} can be heard`)
 			end
-			if def.Season then
-				expect.falsy(Cosmetics.forSale(def), `{def.Id} is a season reward`)
+			if def.Season or def.Vip then
+				expect.falsy(Cosmetics.forSale(def), `{def.Id} is a season reward or comes with VIP`)
 			elseif not def.Default then
 				expect.truthy(Cosmetics.forSale(def))
 				expect.atLeast(def.Price, 100, `{def.Id} costs something`)

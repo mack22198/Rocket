@@ -48,6 +48,7 @@ MatchState.PlayerAttr = {
 	QuickChat = "QuickChat", -- true if their Roblox settings let them use quick chat
 	PlayStart = "PlayStart", -- server time they joined (playtime gifts count from here)
 	GiftsOpened = "GiftsOpened", -- the playtime gifts they've opened, e.g. "1,2,3"
+	Vip = "Vip", -- has the VIP Game Pass
 }
 
 -- A player's status (players who just joined are in the menu).
@@ -79,6 +80,7 @@ MatchState.CarAttr = {
 	Demolished = "Demolished", -- smashed to bits; gone until it pops back in at its goal
 	Level = "Level", -- the driver's player level
 	Title = "Title", -- the driver's title, e.g. "🧤 Brick Wall"
+	Vip = "Vip", -- the driver has VIP (a 💎 by their name)
 }
 
 -- Names of the folders the server puts in Workspace.

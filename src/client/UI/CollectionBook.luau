@@ -105,10 +105,12 @@ local function styleEntries(kind: Cosmetics.Kind): () -> { Entry }
 				key = `style:{item.Id}`,
 				name = item.Name,
 				owned = owned[item.Id] == true,
-				hint = if item.Season
-					then `🏆 {seasonName(item.Season)} season reward`
+				hint = if item.Vip
+					then "💎 Comes with VIP"
+					elseif item.Season and item.Gold then `🏆 {seasonName(item.Season)} Gold Pass`
+					elseif item.Season then `🏆 {seasonName(item.Season)} season reward`
 					else `🔩 {Theme.formatNumber(item.Price)} in the Garage`,
-				color = if item.Season then C.Evolve else C.Gold,
+				color = if item.Vip then rgb(120, 210, 255) elseif item.Season then C.Evolve else C.Gold,
 				emoji = item.Emoji,
 			})
 		end

@@ -16,6 +16,7 @@
 --   Profile(action, id) -> result                                            choose your title
 --   Gift(index) -> result                                                    open a playtime gift
 --   Leaderboard() -> board                                                   this week's top drivers
+--   Shop(action, id) -> result                                               shop prices (and Studio test buys)
 --   GetPlayerData() -> data                                                  initial profile snapshot
 -- Server -> Client
 --   BallState(time, position, velocity, flags, lastTouchTeam)  (unreliable, ~30/s)
@@ -26,6 +27,7 @@
 --   HornPlayed(car, hornId)                                    someone honked
 --   QuickChatShown(car, phraseIndex, name, team)               someone said a QuickChat phrase
 --   Progress(kind, info)                                       you reached a level or finished an achievement
+--   Purchased(id, message)                                     a Robux purchase was handed over
 --   Announce(kind, text, team, extra)                          big text popups ("AIR HIT!", "SAVE!")
 --   GoalScored(team, scorerName, assistName, position, comboText, celebrationId)
 --   MatchResults(payload)                                      end of match summary + rewards
@@ -94,6 +96,7 @@ local Remotes = {
 	Profile = func("Profile"),
 	Gift = func("Gift"),
 	Leaderboard = func("Leaderboard"),
+	Shop = func("Shop"),
 	GetPlayerData = func("GetPlayerData"),
 
 	BallState = unreliable("BallState"),
@@ -104,6 +107,7 @@ local Remotes = {
 	HornPlayed = event("HornPlayed"),
 	QuickChatShown = event("QuickChatShown"),
 	Progress = event("Progress"),
+	Purchased = event("Purchased"),
 	Announce = event("Announce"),
 	GoalScored = event("GoalScored"),
 	MatchResults = event("MatchResults"),

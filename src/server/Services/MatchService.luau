@@ -39,6 +39,7 @@ local PowerService = require(script.Parent.PowerService)
 local ProgressService = require(script.Parent.ProgressService)
 local QuickChatService = require(script.Parent.QuickChatService)
 local SeasonService = require(script.Parent.SeasonService)
+local ShopService = require(script.Parent.ShopService)
 local StatsService = require(script.Parent.StatsService)
 
 type Participant = Roster.Participant
@@ -231,7 +232,7 @@ local function makeBot(team: Team, slot: number): Participant
 	bot.level = rng:NextInteger(2, 40)
 	local titles = {}
 	for _, title in Achievements.Titles do
-		if (title.Level or 0) <= bot.level then
+		if (title.Level or 0) <= bot.level and not title.Vip then
 			table.insert(titles, title.Id)
 		end
 	end
@@ -620,6 +621,12 @@ local function finishMatch(aborted: boolean)
 			if withFriends then
 				local bonus = math.floor(summary.total * Rewards.Scrap.FriendBonus)
 				table.insert(summary.lines, { label = "🤝 Playing with friends!", amount = bonus })
+				summary.total += bonus
+			end
+			-- VIP and Roblox Premium pay a little extra.
+			for _, extra in ShopService.matchBonuses(player) do
+				local bonus = math.floor(summary.total * extra.fraction)
+				table.insert(summary.lines, { label = extra.label, amount = bonus })
 				summary.total += bonus
 			end
 			-- Wins in a row pay more and more (a draw keeps the streak going; a loss starts it again).

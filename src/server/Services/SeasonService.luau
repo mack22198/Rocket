@@ -1,6 +1,7 @@
 --!strict
 -- The server side of seasons (see Season): every match adds season XP, and each tier's reward is paid out the
--- moment it's reached - nothing to claim, nothing to buy.
+-- moment it's reached - nothing to claim. With this season's Gold Pass (see ShopService), each tier pays its gold
+-- reward too.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -69,6 +70,10 @@ function SeasonService.recordMatch(player: Player, xp: number): Summary?
 		local rewards: { string } = {}
 		for _, reached in Season.addXp(data.season, xp, day) do
 			table.insert(rewards, `⭐ Tier {reached.tier}: {grant(data, reached.reward)}`)
+			if data.season.gold then
+				local gold = Season.goldRewardFor(info.theme, reached.tier)
+				table.insert(rewards, `🏆 Gold Tier {reached.tier}: {grant(data, gold)}`)
+			end
 		end
 		local into, need = Season.tierProgress(data.season)
 		local nextEmoji, nextText = Season.describe(Season.rewardFor(info.theme, data.season.tier + 1))
@@ -88,6 +93,23 @@ function SeasonService.recordMatch(player: Player, xp: number): Summary?
 		DataService.saveNow(player)
 	end
 	return summary
+end
+
+-- Gives `data` this season's Gold Pass and pays the gold rewards of every tier already reached. Returns what was
+-- paid, or nil if they already had it. (Call inside DataService.update.)
+function SeasonService.unlockGold(data: DataService.SavedData): { string }?
+	local day = today()
+	Season.rollover(data.season, day)
+	if data.season.gold then
+		return nil
+	end
+	data.season.gold = true
+	local theme = Season.at(day).theme
+	local paid: { string } = {}
+	for tier = 1, data.season.tier do
+		table.insert(paid, `🏆 Gold Tier {tier}: {grant(data, Season.goldRewardFor(theme, tier))}`)
+	end
+	return paid
 end
 
 function SeasonService.init()

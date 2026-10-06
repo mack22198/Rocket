@@ -358,6 +358,9 @@ local function decorateCar(model: Instance)
 		local level = model:GetAttribute(A.Level)
 		local shown = if type(name) == "string" then name else "Driver"
 		shown = string.gsub(string.gsub(string.gsub(shown, "&", "&amp;"), "<", "&lt;"), ">", "&gt;")
+		if model:GetAttribute(A.Vip) == true then
+			shown = `💎 {shown}`
+		end
 		label.Text = if type(level) == "number" then `<font color="#FFCC33">{level}</font>  {shown}` else shown
 		label.TextColor3 = teamColor(model:GetAttribute(A.Team))
 		label.Parent = tag
@@ -526,6 +529,18 @@ local function rubberDuck(parent: Instance): Model
 	return model
 end
 
+local function coin(parent: Instance): Model
+	local model = Instance.new("Model")
+	local face = part(model, Enum.PartType.Cylinder, Vector3.new(0.35, 2.4, 2.4), CFrame.new(), rgb(255, 200, 50))
+	face.Material = Enum.Material.Metal
+	face.Reflectance = 0.25
+	local star = part(model, Enum.PartType.Ball, Vector3.new(0.3, 0.9, 0.9), CFrame.new(0.15, 0, 0), rgb(255, 240, 160))
+	star.Material = Enum.Material.Neon
+	model.PrimaryPart = face
+	model.Parent = parent
+	return model
+end
+
 local function taco(parent: Instance): Model
 	local model = Instance.new("Model")
 	local shell =
@@ -612,6 +627,9 @@ local function celebration(kind: string, goalZ: number, side: number, color: Col
 		rain(goalZ, side, 28, rubberDuck)
 	elseif kind == "tacos" then
 		rain(goalZ, side, 28, taco)
+	elseif kind == "goldrush" then
+		rain(goalZ, side, 36, coin)
+		flash(Vector3.new(0, 30, goalZ - side * 30), rgb(255, 210, 90), 60, 5, 0.6)
 	elseif kind == "rainbow" then
 		rainbow(goalZ, side)
 		confetti(Vector3.new(0, 34, goalZ - side * 24), Vector3.new(80, 4, 36), 30)
