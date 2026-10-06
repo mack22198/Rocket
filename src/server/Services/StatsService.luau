@@ -13,6 +13,7 @@ local Remotes = require(Shared.Net.Remotes)
 local Roster = require(script.Parent.Parent.Match.Roster)
 local CarService = require(script.Parent.CarService)
 local BallService = require(script.Parent.BallService)
+local QuickChatService = require(script.Parent.QuickChatService)
 
 type Participant = Roster.Participant
 type Team = Roster.Team
@@ -94,6 +95,7 @@ local function onTouch(info: BallService.TouchInfo)
 		megaGain += GameConfig.Mega.PerSave
 		local epic = info.before.velocity.Magnitude > 120
 		announce("save", if epic then "EPIC SAVE!" else "SAVE!", team, p.name)
+		QuickChatService.react("save", team, p)
 	elseif after == -ownSide and before ~= -ownSide then
 		stats.shots += 1
 		stats.points += P.Shot

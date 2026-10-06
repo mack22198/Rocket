@@ -22,6 +22,7 @@ local GarageService = require(Services.GarageService)
 local ItemService = require(Services.ItemService)
 local MatchService = require(Services.MatchService)
 local PowerService = require(Services.PowerService)
+local QuickChatService = require(Services.QuickChatService)
 local SeasonService = require(Services.SeasonService)
 local StatsService = require(Services.StatsService)
 
@@ -54,6 +55,7 @@ StatsService.init(arenaShape)
 BoostPadService.init()
 ItemService.init()
 PowerService.init(arenaFolder)
+QuickChatService.init()
 MatchService.start()
 
 -- The scenery outside the stadium takes a moment to fill in, and nothing in the game needs it, so it comes last.

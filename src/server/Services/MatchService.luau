@@ -34,6 +34,7 @@ local DataService = require(script.Parent.DataService)
 local DemolitionService = require(script.Parent.DemolitionService)
 local ItemService = require(script.Parent.ItemService)
 local PowerService = require(script.Parent.PowerService)
+local QuickChatService = require(script.Parent.QuickChatService)
 local SeasonService = require(script.Parent.SeasonService)
 local StatsService = require(script.Parent.StatsService)
 
@@ -471,10 +472,12 @@ local function celebrate(goal: { side: number, position: Vector3 })
 		summary.comboText or "",
 		if scorer and not summary.ownGoal then scorer.celebration else "fireworks"
 	)
-	-- Bots are proud of their goals.
+	-- Bots are proud of their goals (and their team-mates might say so).
 	if scorer and scorer.isBot then
 		task.delay(0.6, CarService.honk, scorer)
 	end
+	QuickChatService.react("goal", summary.team, scorer)
+	QuickChatService.react("conceded", Roster.otherTeam(summary.team))
 	setPhase(Phases.GoalScored, M.GoalCelebration)
 	task.wait(M.GoalCelebration)
 end

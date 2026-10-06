@@ -3,9 +3,10 @@
 --
 -- Keyboard: W/S or arrows = drive (and pitch in the air), A/D = steer, Space / right mouse = jump,
 --           Shift / left mouse = boost, F = Mega Shot, R = use item, G = car power, H = horn,
---           C = ball cam, Q/E = air roll, M = menu
+--           C = ball cam, Q/E = air roll, M = menu, T = quick chat list, 1-8 = say a quick chat phrase
 -- Gamepad:  RT/LT = drive/brake, left stick = steer + pitch, A = jump, B = boost, X = Mega Shot,
---           RB = use item, LB = car power, D-pad up = horn, Y = ball cam, View/Back = menu
+--           RB = use item, LB = car power, D-pad up = horn, D-pad left/right/down = quick chat,
+--           Y = ball cam, View/Back = menu
 -- Touch:    on-screen stick and buttons (see TouchControls). With easy steering (on by default) you push the
 --           stick toward where you want to go on the screen (see EasySteer); in the air it tips the car.
 
@@ -16,6 +17,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarPhysics = require(Shared.Physics.CarPhysics)
 local EasySteer = require(Shared.Cars.EasySteer)
+local QuickChat = require(Shared.Config.QuickChat)
 local Signal = require(Shared.Util.Signal)
 
 local InputController = {}
@@ -26,6 +28,8 @@ InputController.PowerPressed = Signal.new() :: Signal.Signal<>
 InputController.HornPressed = Signal.new() :: Signal.Signal<>
 InputController.BallCamToggled = Signal.new() :: Signal.Signal<>
 InputController.MenuPressed = Signal.new() :: Signal.Signal<>
+-- A quick chat key: the phrase to say (see QuickChat), or 0 to open/close the list.
+InputController.ChatPressed = Signal.new() :: Signal.Signal<number>
 
 local DEADZONE = 0.15
 
@@ -193,8 +197,29 @@ local PRESS_ACTIONS: { { name: string, signal: Signal.Signal<>, keys: { Enum.Key
 	},
 }
 
--- One-press actions (Mega Shot, items, powers, ball cam) are bound only while driving, so they don't clash with
--- anything else.
+-- Quick chat keys and what they do (0 = open/close the list of phrases).
+local CHAT_KEYS: { [Enum.KeyCode]: number } = {
+	[Enum.KeyCode.T] = 0,
+	[Enum.KeyCode.DPadLeft] = QuickChat.indexOf(QuickChat.Gamepad.Left) or 1,
+	[Enum.KeyCode.DPadRight] = QuickChat.indexOf(QuickChat.Gamepad.Right) or 1,
+	[Enum.KeyCode.DPadDown] = QuickChat.indexOf(QuickChat.Gamepad.Down) or 1,
+}
+local NUMBER_KEYS = {
+	Enum.KeyCode.One,
+	Enum.KeyCode.Two,
+	Enum.KeyCode.Three,
+	Enum.KeyCode.Four,
+	Enum.KeyCode.Five,
+	Enum.KeyCode.Six,
+	Enum.KeyCode.Seven,
+	Enum.KeyCode.Eight,
+}
+for index = 1, math.min(#NUMBER_KEYS, #QuickChat.Phrases) do
+	CHAT_KEYS[NUMBER_KEYS[index]] = index
+end
+
+-- One-press actions (Mega Shot, items, powers, ball cam, quick chat) are bound only while driving, so they don't
+-- clash with anything else.
 function InputController.setDriving(driving: boolean)
 	if driving == actionsBound then
 		return
@@ -212,6 +237,21 @@ function InputController.setDriving(driving: boolean)
 		else
 			ContextActionService:UnbindAction(action.name)
 		end
+	end
+	if driving then
+		local keys: { Enum.KeyCode } = {}
+		for key in CHAT_KEYS do
+			table.insert(keys, key)
+		end
+		ContextActionService:BindActionAtPriority("TurboChat", function(_, inputState, input)
+			local slot = CHAT_KEYS[input.KeyCode]
+			if inputState == Enum.UserInputState.Begin and not blocked and slot then
+				InputController.ChatPressed:Fire(slot)
+			end
+			return Enum.ContextActionResult.Sink
+		end, false, Enum.ContextActionPriority.High.Value, table.unpack(keys))
+	else
+		ContextActionService:UnbindAction("TurboChat")
 	end
 	if not driving then
 		touchStick = Vector2.zero

@@ -2,7 +2,7 @@
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
 --   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay,
---              streak, chest, collection, twist, style, fuse, season
+--              streak, chest, collection, twist, style, fuse, season, chat
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -132,8 +132,11 @@ local localPlayer = {
 	FindFirstChild = function(_, name)
 		return if name == "PlayerGui" then playerGui else nil
 	end,
-	GetAttribute = function()
-		return nil
+	GetAttribute = function(_, name)
+		return if name == "QuickChat" then true else nil
+	end,
+	GetAttributeChangedSignal = function()
+		return signal()
 	end,
 }
 
@@ -335,7 +338,7 @@ harness.preload(controllers .. "CameraController", {
 	shake = function() end,
 	start = function() end,
 })
-harness.preload(controllers .. "InputController", {
+local fakeInput = {
 	MegaPressed = signal(),
 	ItemPressed = signal(),
 	PowerPressed = signal(),
@@ -356,6 +359,12 @@ harness.preload(controllers .. "InputController", {
 		return true
 	end,
 	setEasySteer = function() end,
+	ChatPressed = signal(),
+	start = function() end,
+}
+harness.preload(controllers .. "InputController", fakeInput)
+harness.preload(controllers .. "SoundController", {
+	play = function() end,
 	start = function() end,
 })
 harness.preload(controllers .. "EffectsController", {
@@ -422,12 +431,15 @@ for _, name in
 		"CollectionBook",
 		"StylePanel",
 		"SeasonTrack",
+		"QuickChatPanel",
 	}
 do
 	harness.sourceTransforms["src/client/UI/" .. name] = function(source)
 		for _, event in UI_EVENTS do
 			source = string.gsub(source, "([%w_%.]+)%." .. event .. ":", '__event(%1, "' .. event .. '"):')
 		end
+		-- (The pretend camera isn't an instance, so 3D effects like chat bubbles get nowhere to live.)
+		source = string.gsub(source, "workspace%.CurrentCamera or workspace", "nil")
 		source = string.gsub(source, "([%w_%.]+):PivotTo%(", "__pivotTo(%1, ")
 		return (string.gsub(source, "([%w_%.]+):GetPropertyChangedSignal%(([^)]*)%)", "__event(%1, %2)"))
 	end
@@ -446,6 +458,7 @@ local ReplayScreen = harness.require(UI.ReplayScreen)
 local DailyRewards = harness.require(UI.DailyRewards)
 local CollectionBook = harness.require(UI.CollectionBook)
 local SeasonTrack = harness.require(UI.SeasonTrack)
+local QuickChatPanel = harness.require(UI.QuickChatPanel)
 HUD.start()
 Announcer.start()
 ResultsScreen.start()
@@ -457,6 +470,7 @@ ReplayScreen.start()
 DailyRewards.start()
 CollectionBook.start()
 SeasonTrack.start()
+QuickChatPanel.start()
 if touch then
 	TouchControls.start()
 end
@@ -465,6 +479,7 @@ local inMatch = not MENU_SCENARIOS[scenario] and scenario ~= "live"
 local overlay = inMatch and scenario ~= "podium" and scenario ~= "replay" and scenario ~= "results"
 HUD.setVisible(overlay)
 Announcer.setVisible(overlay)
+QuickChatPanel.setVisible(overlay)
 local GARAGE_SCENARIOS = { garage = true, evolve = true, style = true, fuse = true }
 if not inMatch and not GARAGE_SCENARIOS[scenario] then
 	MainMenu.setQueued(scenario == "queued")
@@ -483,6 +498,20 @@ if scenario == "goal" then
 	remotes.Announce.OnClientEvent:Fire("save", "EPIC SAVE!", "Orange", "Bolt (bot)")
 	remotes.Announce.OnClientEvent:Fire("power", "❄️ Player1 froze Bolt (bot)!", "Blue", "Player1")
 	remotes.Announce.OnClientEvent:Fire("power", "🍌 Comet (bot) slipped on a banana!", "Blue", "Zippy (bot)")
+elseif scenario == "chat" then
+	fakeInput.ChatPressed:Fire(0)
+	local function chatCar(owner: number): any
+		local model = Instance.new("Model")
+		local chassis = Instance.new("Part")
+		chassis.Name = "Chassis"
+		chassis.Parent = model
+		model:SetAttribute("OwnerUserId", owner)
+		return model
+	end
+	remotes.Announce.OnClientEvent:Fire("demo", "Player1 demolished Bolt (bot)!", "Blue", "Player1")
+	remotes.QuickChatShown.OnClientEvent:Fire(chatCar(0), 1, "Sparky (bot)", "Blue")
+	remotes.QuickChatShown.OnClientEvent:Fire(chatCar(1), 8, "Player1", "Blue")
+	remotes.QuickChatShown.OnClientEvent:Fire(chatCar(0), 7, "Bolt (bot)", "Orange")
 elseif scenario == "garage" then
 	Garage.open()
 elseif scenario == "style" then

@@ -52,10 +52,13 @@ local CARDS = {
 }
 
 local CONTROLS = {
-	{ "⌨️", "WASD drive · SPACE jump · SHIFT boost · R item · G power · F mega · H horn · C cam · M menu" },
+	{
+		"⌨️",
+		"WASD drive · SPACE jump · SHIFT boost · R item · G power · F mega · H horn · C cam · T chat · M menu",
+	},
 	{
 		"🎮",
-		"RT/LT drive · A jump · B boost · RB item · LB power · X mega · D-pad up horn · Y cam · VIEW menu",
+		"RT/LT drive · A jump · B boost · RB item · LB power · X mega · D-pad horn/chat · Y cam · VIEW menu",
 	},
 	{ "📱", "Drag toward where you want to go, then JUMP, BOOST, ITEM and POWER. Mega Shot arms itself!" },
 }

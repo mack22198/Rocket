@@ -17,6 +17,7 @@ local Remotes = require(Shared.Net.Remotes)
 local UI = script.Parent.Parent.UI
 local Announcer = require(UI.Announcer)
 local Coach = require(UI.Coach)
+local QuickChatPanel = require(UI.QuickChatPanel)
 local CollectionBook = require(UI.CollectionBook)
 local DailyRewards = require(UI.DailyRewards)
 local Garage = require(UI.Garage)
@@ -70,6 +71,7 @@ local function setMatchOverlay(on: boolean)
 	HUD.setVisible(on)
 	Announcer.setVisible(on)
 	Coach.setVisible(on)
+	QuickChatPanel.setVisible(on)
 	TouchControls.setHidden(not on)
 end
 

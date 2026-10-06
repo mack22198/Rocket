@@ -85,6 +85,10 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   price and evolution track on the right, with an EVOLVE! button that sets off a light show (and a 🧬 FUSE
   button for fused cars). The menu's "saving
   up for" card and the results screen keep the next goal in sight.
+- **Quick chat:** eight friendly phrases (👏 Nice shot!, 🧤 What a save!, 🙋 I got it!, 🏆 GG!...) from the 💬
+  CHAT button, keys 1-8 (T opens the list) or the gamepad's D-pad. They pop up in a speech bubble over your car
+  and in the feed. There's no typing, so nobody can say anything unkind; it can't be spammed; and players whose
+  Roblox settings don't allow chat neither send nor see it. Bots chat too, now and then, after goals and saves.
 - **A coach for new players:** during your first three matches, one short tip at a time pops up when it's useful
   ("Hold SHIFT to boost!" while you're cruising, "Press SPACE to jump!" when the ball's in the air), with the
   buttons for whatever you're playing on, and each only until you've done it.
@@ -137,6 +141,7 @@ ever remade (see [tools/meshes](tools/meshes)), delete the old `TurboBallCars` a
 | Use your item | R | RB | ITEM |
 | Use your car's power | G | LB | POWER |
 | Horn | H | D-pad up | 📯 |
+| Quick chat | T (the list), 1-8 (say one) | D-pad left / right / down | 💬 CHAT |
 | Ball cam on/off | C | Y | CAM |
 | Air roll | Q / E | | |
 | In the air: tip the nose | W / S | Left stick | Stick |
@@ -227,7 +232,8 @@ src/
   shared/   (ReplicatedStorage.Shared: used by both server and client)
     Config/       GameConfig, CarCatalog, Rewards, Evolution, Powers (items and car powers), Daily (streaks,
                   quests, daily chest), Twists (match twists and weekend events), Cosmetics (hats, horns,
-                  goal parties), Season (the free season reward track), Sounds (every sound, for Toolbox IDs)
+                  goal parties), Season (the free season reward track), Sounds (every sound, for Toolbox IDs),
+                  QuickChat (the quick chat phrases)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay
@@ -244,8 +250,8 @@ src/
                   StatsService, BoostPadService, BumpService, DemolitionService, ItemService (item boxes),
                   PowerService
                   (using items and powers, cheese and banana traps), DailyService (streaks, quests, chest),
-                  SeasonService (season XP and tier rewards), DataService (saving), GarageService (unlocking,
-                  fusing, evolving, style)
+                  SeasonService (season XP and tier rewards), QuickChatService, DataService (saving),
+                  GarageService (unlocking, fusing, evolving, style)
   client/   (StarterPlayerScripts.Client)
     Showroom/     ShowroomBuilder (the menu's garage showroom and its mirror-floor reflection),
                   PodiumBuilder (the winners' podium)
@@ -258,7 +264,8 @@ src/
                   cheering crowd)
     UI/           MainMenu, Garage, PauseMenu, HowToPlay, HUD, Announcer, ResultsScreen, ReplayScreen,
                   DailyRewards (streak and chest pop-ups), CollectionBook, StylePanel (the garage's STYLE tab),
-                  SeasonTrack (every tier of the season), Coach (first-match tips), TouchControls, Transition,
+                  SeasonTrack (every tier of the season), Coach (first-match tips), QuickChatPanel (the chat
+                  button, its list and the speech bubbles), TouchControls, Transition,
                   Theme
 tests/      Lune unit tests (run outside Roblox)
 tools/      Offline previews of the 3D world and the UI

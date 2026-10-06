@@ -45,6 +45,7 @@ MatchState.Status = {
 MatchState.PlayerAttr = {
 	Status = "Status", -- one of MatchState.Status
 	Team = "Team", -- "Blue" / "Orange" while playing
+	QuickChat = "QuickChat", -- true if their Roblox settings let them use quick chat
 }
 
 -- A player's status (players who just joined are in the menu).

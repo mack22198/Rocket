@@ -90,6 +90,11 @@ local function addFeedLine(text: string, color: Color3)
 	end
 end
 
+-- Adds a line to the feed (quick chat uses this too).
+function Announcer.feed(text: string, color: Color3)
+	addFeedLine(text, color)
+end
+
 function Announcer.popup(text: string, color: Color3)
 	-- A goal has the screen to itself (the feed still gets the line).
 	if MatchState.phase(MatchState.getObject()) == MatchState.Phases.GoalScored then
