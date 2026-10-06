@@ -57,7 +57,7 @@ local CONTROLS = {
 		"🎮",
 		"RT/LT drive · A jump · B boost · RB item · LB power · X mega · D-pad up horn · Y cam · VIEW menu",
 	},
-	{ "📱", "Stick to drive, big buttons to jump, boost, use your item and power, and Mega Shot" },
+	{ "📱", "Drag toward where you want to go, then JUMP, BOOST, ITEM and POWER. Mega Shot arms itself!" },
 }
 
 local gui: ScreenGui

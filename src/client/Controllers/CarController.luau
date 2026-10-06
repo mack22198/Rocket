@@ -40,6 +40,7 @@ local boosting = false
 -- server's answer arrives.
 local itemUsedAt = -math.huge
 local powerUsedAt = -math.huge
+local megaAskedAt = -math.huge
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
@@ -89,7 +90,9 @@ local function step(dt: number)
 	end
 	local phase = MatchState.phase(stateObject)
 	local canDrive = phase == MatchState.Phases.Playing or phase == MatchState.Phases.GoalScored
-	local input = if canDrive then InputController.read() else CarPhysics.NoInput
+	local input = if canDrive
+		then InputController.read({ carCFrame = d.chassis.CFrame, grounded = d:isGrounded() })
+		else CarPhysics.NoInput
 	local hasBoost = numberAttribute(car, A.Boost) > 0
 	local result = d:step(dt, input, hasBoost)
 	boosting = canDrive and result ~= nil and result.boosting
@@ -99,6 +102,17 @@ local function step(dt: number)
 	end
 	if result and (result.jumped or result.dodged) then
 		CarController.Jumped:Fire()
+	end
+	-- On phones and tablets the Mega Shot arms itself as soon as the meter is full (one button fewer).
+	if
+		canDrive
+		and InputController.isTouch()
+		and numberAttribute(car, A.Mega) >= GameConfig.Mega.Max
+		and car:GetAttribute(A.MegaArmed) ~= true
+		and os.clock() - megaAskedAt > 1
+	then
+		megaAskedAt = os.clock()
+		Remotes.ActivateMega:FireServer()
 	end
 end
 

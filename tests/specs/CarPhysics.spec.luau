@@ -258,6 +258,17 @@ return function(t)
 		expect.atMost(sim.cframe.RightVector.Y, -0.3) -- rolling right drops the right side
 	end)
 
+	t.test("hands off in the air, a tipped car turns back upright", function()
+		local tipped = CFrame.new(0, 80, 0) * CFrame.Angles(math.rad(50), 0, math.rad(40))
+		local sim = newSim(tipped)
+		sim.run(1.2)
+		expect.atLeast(sim.cframe.UpVector.Y, 0.93)
+		-- Even upside down.
+		sim = newSim(CFrame.new(0, 120, 0) * CFrame.Angles(0, 0, math.pi))
+		sim.run(2)
+		expect.atLeast(sim.cframe.UpVector.Y, 0.8)
+	end)
+
 	t.test("a car stuck on its roof flips back onto its wheels", function()
 		local upsideDown = CFrame.new(0, half.Y + 0.1, 0) * CFrame.Angles(0, 0, math.pi)
 		local sim = newSim(upsideDown)

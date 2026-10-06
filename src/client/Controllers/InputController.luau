@@ -6,7 +6,8 @@
 --           C = ball cam, Q/E = air roll, M = menu
 -- Gamepad:  RT/LT = drive/brake, left stick = steer + pitch, A = jump, B = boost, X = Mega Shot,
 --           RB = use item, LB = car power, D-pad up = horn, Y = ball cam, View/Back = menu
--- Touch:    on-screen stick and buttons (see TouchControls)
+-- Touch:    on-screen stick and buttons (see TouchControls). With easy steering (on by default) you push the
+--           stick toward where you want to go on the screen (see EasySteer); in the air it tips the car.
 
 local ContextActionService = game:GetService("ContextActionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,6 +15,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarPhysics = require(Shared.Physics.CarPhysics)
+local EasySteer = require(Shared.Cars.EasySteer)
 local Signal = require(Shared.Util.Signal)
 
 local InputController = {}
@@ -31,6 +33,30 @@ local touchStick = Vector2.zero
 local touchHeld: { [string]: boolean } = {}
 local actionsBound = false
 local blocked = false
+local easySteer = true
+local last: CarPhysics.Input = CarPhysics.NoInput
+
+-- What the car needs to know to turn the touch stick into steering.
+export type Context = { carCFrame: CFrame, grounded: boolean }
+
+-- Is this a phone or tablet (touch, no keyboard)?
+function InputController.isTouch(): boolean
+	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+end
+
+-- Easy steering for the touch stick: point where you want to go (on), or steer + drive like a gamepad (off).
+function InputController.setEasySteer(on: boolean)
+	easySteer = on
+end
+
+function InputController.easySteer(): boolean
+	return easySteer
+end
+
+-- The controls most recently read for the car (for the wheels' steering animation).
+function InputController.last(): CarPhysics.Input
+	return last
+end
 
 local function keyDown(...: Enum.KeyCode): boolean
 	for _, key in { ... } do
@@ -66,9 +92,10 @@ function InputController.setBlocked(isBlocked: boolean)
 end
 
 -- The current controls. Returns "no input" while the player is typing in chat or a menu is open.
-function InputController.read(): CarPhysics.Input
+function InputController.read(context: Context?): CarPhysics.Input
 	if blocked or UserInputService:GetFocusedTextBox() then
-		return CarPhysics.NoInput
+		last = CarPhysics.NoInput
+		return last
 	end
 
 	local throttle, steer, roll = 0, 0, 0
@@ -129,13 +156,20 @@ function InputController.read(): CarPhysics.Input
 
 	-- Touch.
 	if touchStick.Magnitude > 0 then
-		steer += touchStick.X
-		throttle += touchStick.Y
+		local camera = workspace.CurrentCamera
+		if easySteer and context and context.grounded and camera then
+			local driveThrottle, driveSteer = EasySteer.input(touchStick, context.carCFrame, camera.CFrame)
+			throttle += driveThrottle
+			steer += driveSteer
+		else
+			steer += touchStick.X
+			throttle += touchStick.Y
+		end
 	end
 	boost = boost or touchHeld.boost == true
 	jump = jump or touchHeld.jump == true
 
-	return {
+	last = {
 		throttle = math.clamp(throttle, -1, 1),
 		steer = math.clamp(steer, -1, 1),
 		pitch = if pitch then math.clamp(pitch, -1, 1) else nil,
@@ -143,6 +177,7 @@ function InputController.read(): CarPhysics.Input
 		boost = boost,
 		jump = jump,
 	}
+	return last
 end
 
 -- One-press actions: (action name, signal, keys).

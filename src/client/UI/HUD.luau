@@ -648,7 +648,7 @@ local function update()
 		local armed = car:GetAttribute(CarAttr.MegaArmed) == true
 		megaBar.set(megaValue / GameConfig.Mega.Max)
 		local key = if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-			then "TAP MEGA"
+			then "ARMING"
 			elseif UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled then "PRESS X"
 			else "PRESS F"
 		local pulse = math.floor(os.clock() * 4) % 2 == 0

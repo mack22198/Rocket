@@ -346,6 +346,16 @@ harness.preload(controllers .. "InputController", {
 	read = function()
 		return {}
 	end,
+	last = function()
+		return { steer = 0 }
+	end,
+	isTouch = function()
+		return touch
+	end,
+	easySteer = function()
+		return true
+	end,
+	setEasySteer = function() end,
 	start = function() end,
 })
 harness.preload(controllers .. "EffectsController", {

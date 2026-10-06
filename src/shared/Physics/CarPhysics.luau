@@ -42,6 +42,8 @@ export type Config = {
 	AirRollRate: number,
 	AirControlResponse: number,
 	AirSpinDamping: number,
+	AutoLevel: number,
+	AutoLevelResponse: number,
 	MaxAngularSpeed: number,
 	AutoRightDelay: number,
 	SlowFactor: number,
@@ -351,6 +353,15 @@ function CarPhysics.step(p: StepParams): StepResult
 			angular = angular:Lerp(target, MathUtil.expDecay(config.AirControlResponse, dt))
 		else
 			angular *= math.exp(-config.AirSpinDamping * dt)
+			-- Hands off in the air: turn gently back upright, so the car lands on its wheels.
+			if config.AutoLevel > 0 then
+				local tilt = up:Cross(Vector3.yAxis)
+				local sinAngle = tilt.Magnitude
+				local angle = math.atan2(sinAngle, up.Y)
+				local axis = if sinAngle > 1e-3 then tilt / sinAngle else look -- upside down: roll over
+				local target = axis * (angle * config.AutoLevel) + Vector3.yAxis * angular.Y
+				angular = angular:Lerp(target, MathUtil.expDecay(config.AutoLevelResponse, dt))
+			end
 		end
 	end
 

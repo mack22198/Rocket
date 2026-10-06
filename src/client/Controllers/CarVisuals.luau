@@ -173,7 +173,7 @@ local function step(dt: number)
 		-- Steering: your own input, or (for everyone else) worked out from how fast the car is turning.
 		local target: number
 		if car.mine and CarController.getCar() == model then
-			target = -InputController.read().steer * MAX_STEER
+			target = -InputController.last().steer * MAX_STEER
 		else
 			local yawRate = chassis.AssemblyAngularVelocity:Dot(frame.UpVector)
 			target = if math.abs(forward) > 3

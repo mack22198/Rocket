@@ -109,6 +109,8 @@ GameConfig.Car = {
 	AirRollRate = 4.5,
 	AirControlResponse = 8,
 	AirSpinDamping = 1.5,
+	AutoLevel = 2.2, -- with no air controls held, the car turns back upright this fast (0 = off)...
+	AutoLevelResponse = 2.5, -- ...easing in at this rate
 	MaxAngularSpeed = 12,
 	AutoRightDelay = 0.8, -- stuck on the roof this long -> hop back onto the wheels
 	-- Item and power effects on a car.

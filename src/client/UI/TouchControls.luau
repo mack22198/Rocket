@@ -1,5 +1,7 @@
 --!strict
--- On-screen controls for phones and tablets: a thumbstick on the left (steer + drive) and big buttons on the right.
+-- On-screen controls for phones and tablets: a thumbstick wherever your left thumb lands (with easy steering,
+-- point where you want to go) and big buttons on the right - BOOST and JUMP biggest, ITEM and POWER next to
+-- them, and small CAM and horn buttons out of the way. The Mega Shot arms itself (see CarController).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,11 +29,13 @@ local stickInput: InputObject? = nil
 local stickOrigin = Vector2.zero
 local stickBase: Frame
 local stickKnob: Frame
+local stickHint: Frame
 
 local function releaseStick()
 	stickInput = nil
 	InputController.setTouchStick(Vector2.zero)
 	stickBase.Visible = false
+	stickHint.Visible = true
 end
 
 -- Buttons are placed in pixels from the bottom-right corner of a 1280x720 screen, then scaled to fit.
@@ -41,6 +45,7 @@ local function placeAll(scale: number)
 	for _, placement in placements do
 		placement.button.Position = UDim2.new(1, -placement.fromRight * scale, 1, -placement.fromBottom * scale)
 	end
+	stickHint.Position = UDim2.new(0, 170 * scale, 1, -170 * scale)
 end
 
 local function makeButton(
@@ -135,6 +140,38 @@ local function build()
 	knobCorner.CornerRadius = UDim.new(0.5, 0)
 	knobCorner.Parent = stickKnob
 
+	-- Where to put your thumb, until you do.
+	stickHint = Instance.new("Frame")
+	stickHint.Name = "StickHint"
+	stickHint.Size = UDim2.fromOffset(STICK_RADIUS * 2, STICK_RADIUS * 2)
+	stickHint.AnchorPoint = Vector2.new(0.5, 0.5)
+	stickHint.BackgroundColor3 = Color3.new(0, 0, 0)
+	stickHint.BackgroundTransparency = 0.75
+	stickHint.Parent = gui
+	Theme.scaled(stickHint)
+	local hintCorner = Instance.new("UICorner")
+	hintCorner.CornerRadius = UDim.new(0.5, 0)
+	hintCorner.Parent = stickHint
+	Theme.stroke(stickHint, Color3.new(1, 1, 1), 3).Transparency = 0.55
+	local hintDot = Instance.new("Frame")
+	hintDot.Size = UDim2.fromOffset(46, 46)
+	hintDot.AnchorPoint = Vector2.new(0.5, 0.5)
+	hintDot.Position = UDim2.fromScale(0.5, 0.5)
+	hintDot.BackgroundColor3 = Color3.new(1, 1, 1)
+	hintDot.BackgroundTransparency = 0.6
+	hintDot.Parent = stickHint
+	local dotCorner = Instance.new("UICorner")
+	dotCorner.CornerRadius = UDim.new(0.5, 0)
+	dotCorner.Parent = hintDot
+	Theme.label(stickHint, {
+		name = "Caption",
+		size = UDim2.new(1.6, 0, 0, 22),
+		position = UDim2.new(0.5, 0, 1, 10),
+		anchor = Vector2.new(0.5, 0),
+		text = "DRAG TO DRIVE",
+		font = Enum.Font.GothamBlack,
+	})
+
 	stickZone.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.Touch and not stickInput then
 			stickInput = input
@@ -142,6 +179,7 @@ local function build()
 			stickBase.Position = UDim2.fromOffset(stickOrigin.X, stickOrigin.Y)
 			stickKnob.Position = UDim2.fromScale(0.5, 0.5)
 			stickBase.Visible = true
+			stickHint.Visible = false
 		end
 	end)
 	UserInputService.InputChanged:Connect(function(input)
@@ -164,7 +202,7 @@ local function build()
 	end)
 
 	-- The BOOST button also shows how much boost is left.
-	local boost = makeButton("Boost", "0", Color3.fromRGB(255, 140, 30), 120, 95, 110)
+	local boost = makeButton("Boost", "0", Color3.fromRGB(255, 140, 30), 126, 100, 118)
 	local boostCaption = Theme.label(boost, {
 		name = "Caption",
 		size = UDim2.fromScale(1, 0.3),
@@ -182,29 +220,25 @@ local function build()
 		local amount = if car then car:GetAttribute(MatchState.CarAttr.Boost) else nil
 		boost.Text = tostring(math.floor(if type(amount) == "number" then amount else 0))
 	end)
-	local jump = makeButton("Jump", "JUMP", Color3.fromRGB(60, 160, 255), 100, 215, 70)
+	local jump = makeButton("Jump", "JUMP", Color3.fromRGB(60, 160, 255), 108, 238, 76)
 	holdButton(jump, function(held)
 		InputController.setTouchButton("jump", held)
 	end)
-	local mega = makeButton("Mega", "MEGA", Color3.fromRGB(230, 60, 60), 80, 85, 245)
-	mega.Activated:Connect(function()
-		InputController.MegaPressed:Fire()
-	end)
-	local cam = makeButton("BallCam", "CAM", Color3.fromRGB(90, 90, 120), 60, 190, 190)
+	local cam = makeButton("BallCam", "CAM", Color3.fromRGB(90, 90, 120), 54, 62, 395)
 	cam.Activated:Connect(function()
 		CameraController.toggleBallCam()
 	end)
 
 	-- ITEM shows the item you're holding; POWER shows your car's power and counts down while it recharges.
-	local item = makeButton("Item", "?", Color3.fromRGB(70, 80, 120), 84, 200, 300)
+	local item = makeButton("Item", "?", Color3.fromRGB(70, 80, 120), 88, 112, 268)
 	item.Activated:Connect(function()
 		InputController.ItemPressed:Fire()
 	end)
-	local power = makeButton("Power", "", Color3.fromRGB(70, 80, 120), 84, 320, 175)
+	local power = makeButton("Power", "", Color3.fromRGB(70, 80, 120), 88, 250, 215)
 	power.Activated:Connect(function()
 		InputController.PowerPressed:Fire()
 	end)
-	local horn = makeButton("Horn", "📯", Color3.fromRGB(90, 90, 120), 56, 300, 285)
+	local horn = makeButton("Horn", "📯", Color3.fromRGB(90, 90, 120), 50, 360, 140)
 	horn.Activated:Connect(function()
 		InputController.HornPressed:Fire()
 	end)

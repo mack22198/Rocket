@@ -1,7 +1,7 @@
 --!strict
 -- The in-match menu (☰ MENU button, M key or the gamepad's View button). The match keeps going - it's online -
--- so your car just rolls to a stop while this is open. From here you can read how to play or leave the match
--- (a bot takes over your car, and you go back to the main menu).
+-- so your car just rolls to a stop while this is open. From here you can read how to play, switch easy steering
+-- on or off (phones and tablets), or leave the match (a bot takes over your car, and you go back to the menu).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,6 +12,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local MatchState = require(Shared.Match.MatchState)
 local Signal = require(Shared.Util.Signal)
 
+local InputController = require(script.Parent.Parent.Controllers.InputController)
 local HowToPlay = require(script.Parent.HowToPlay)
 local Theme = require(script.Parent.Theme)
 
@@ -112,6 +113,29 @@ local function build()
 	leaveButton.Activated:Connect(function()
 		showConfirm(true)
 	end)
+	-- Phones and tablets: easy steering on or off.
+	if InputController.isTouch() then
+		panel.Size = UDim2.fromOffset(460, 500)
+		local steerButton = Theme.button(mainButtons, {
+			name = "EasySteer",
+			size = UDim2.new(1, 0, 0, 58),
+			position = UDim2.fromOffset(0, 160),
+			text = "",
+			color = C.PanelLight,
+			textColor = C.Text,
+		})
+		local function refreshSteer()
+			steerButton.Text = if InputController.easySteer()
+				then "🕹️  EASY STEERING: ON"
+				else "🕹️  EASY STEERING: OFF"
+		end
+		refreshSteer()
+		steerButton.Activated:Connect(function()
+			InputController.setEasySteer(not InputController.easySteer())
+			refreshSteer()
+		end)
+		leaveButton.Position = UDim2.fromOffset(0, 232)
+	end
 	Theme.label(mainButtons, {
 		name = "Hint",
 		size = UDim2.new(1, 0, 0, 16),

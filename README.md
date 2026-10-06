@@ -82,7 +82,9 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   price and evolution track on the right, with an EVOLVE! button that sets off a light show (and a 🧬 FUSE
   button for fused cars). The menu's "saving
   up for" card and the results screen keep the next goal in sight.
-- **Works on computer, gamepad and phone/tablet** (on-screen stick and buttons).
+- **Works on computer, gamepad and phone/tablet.** On touch screens you drag your thumb toward where you want to
+  go on the screen and the car drives there (easy steering - it can be switched off in the match menu), the Mega
+  Shot arms itself, and the car levels itself out in the air so it lands on its wheels.
 - **Progress saves** with DataStores (once the game is published).
 
 ## Play it in Roblox Studio
@@ -120,11 +122,11 @@ ever remade (see [tools/meshes](tools/meshes)), delete the old `TurboBallCars` a
 
 | Action | Keyboard / mouse | Gamepad | Touch |
 | --- | --- | --- | --- |
-| Drive / brake / reverse | W / S (or arrows) | RT / LT (or left stick) | Stick (left side) |
-| Steer | A / D | Left stick | Stick |
+| Drive / brake / reverse | W / S (or arrows) | RT / LT (or left stick) | Drag toward where you want to go |
+| Steer | A / D | Left stick | (the same drag) |
 | Jump (twice to double jump, jump + direction to flip) | Space or right mouse | A | JUMP |
 | Boost | Shift or left mouse | B | BOOST |
-| Mega Shot (when the meter is full) | F | X | MEGA |
+| Mega Shot (when the meter is full) | F | X | arms itself |
 | Use your item | R | RB | ITEM |
 | Use your car's power | G | LB | POWER |
 | Horn | H | D-pad up | 📯 |
