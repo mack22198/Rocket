@@ -158,9 +158,10 @@ local THEMES: { [number]: Roles } = {
 }
 
 -- Distance from the chassis centre down to the ground when the car rests on its suspension.
+-- Where the ground is under a car, in design units (see CarCatalog.Scale): the wheels' bottoms go here.
 local function groundY(hitbox: Vector3): number
 	local sag = GameConfig.Car.Gravity / GameConfig.Car.SpringStrength
-	return -hitbox.Y / 2 - (GameConfig.Car.RideHeight - sag)
+	return -hitbox.Y / 2 - (GameConfig.Car.RideHeight - sag) / CarCatalog.Scale
 end
 
 ---------------------------------------------------------------------------------------------------------------
@@ -2154,7 +2155,7 @@ local FLAMES = {
 
 -- How high the chassis centre sits above the ground when the car rests on its wheels.
 function CarModelBuilder.restHeight(def: CarDef): number
-	return -groundY(def.Hitbox)
+	return -groundY(CarCatalog.designHitbox(def)) * CarCatalog.Scale
 end
 
 ---------------------------------------------------------------------------------------------------------------
@@ -2204,7 +2205,7 @@ local function collectSpecs(def: CarDef, stage: number, meshes: boolean): { Part
 		tire = nil
 	end
 	local specs: { PartSpec } = {}
-	design.build(def.Hitbox, stage, function(role, shape, size, cframe, name, text)
+	design.build(CarCatalog.designHitbox(def), stage, function(role, shape, size, cframe, name, text)
 		if replaced[name or ""] or (tire and TIRE_REPLACES[name or ""]) then
 			return
 		end
@@ -2267,6 +2268,7 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 	local opts: BuildOptions = options or ({} :: BuildOptions)
 	local stage = math.clamp(math.floor(opts.stage or 1), 1, GameConfig.Evolution.Stages)
 	local hitbox = def.Hitbox
+	local designHitbox = CarCatalog.designHitbox(def)
 	local model = Instance.new("Model")
 	model.Name = CarCatalog.stageName(def, stage)
 	model:SetAttribute("Stage", stage)
@@ -2300,7 +2302,7 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 	-- A hat on the roof.
 	local hat = if opts.topper then HATS[opts.topper] else nil
 	if hat then
-		local anchor = CFrame.new(design.topper(hitbox))
+		local anchor = CFrame.new(design.topper(designHitbox))
 		hat(function(name, shape, size, offset, color, material)
 			table.insert(specs, {
 				role = "hat",
@@ -2314,7 +2316,7 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 	end
 
 	-- A team-coloured ball on an antenna, so teams are easy to tell apart from anywhere on the field.
-	local antennaHeight = hitbox.Y + 1.1 - design.antenna.Y
+	local antennaHeight = designHitbox.Y + 1.1 - design.antenna.Y
 	table.insert(specs, {
 		role = "dark",
 		shape = "Cylinder",
@@ -2329,6 +2331,13 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 		cframe = CFrame.new(design.antenna + Vector3.new(0, antennaHeight + 0.25, 0)),
 		name = "TeamFlag",
 	})
+
+	-- Everything above was drawn in design units; the real car is that much bigger (see CarCatalog.Scale).
+	local scale = CarCatalog.Scale
+	for _, spec in specs do
+		spec.size *= scale
+		spec.cframe = CFrame.new(spec.cframe.Position * scale) * spec.cframe.Rotation
+	end
 
 	-- In a match the wheels turn: each wheel's parts hang off an invisible hub on a Motor6D, which CarVisuals
 	-- spins (and steers, for the front wheels) on every player's screen.
@@ -2394,7 +2403,7 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 	if opts.teamColor then
 		local glowPoint = Instance.new("Attachment")
 		glowPoint.Name = "Underglow"
-		glowPoint.Position = Vector3.new(0, groundY(hitbox) + 0.6, 0)
+		glowPoint.Position = Vector3.new(0, groundY(designHitbox) * scale + 0.6, 0)
 		glowPoint.Parent = chassis
 		local glow = Instance.new("PointLight")
 		glow.Color = opts.teamColor

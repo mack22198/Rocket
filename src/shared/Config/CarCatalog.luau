@@ -27,6 +27,7 @@ export type CarDef = {
 	Tagline: string,
 	Description: string,
 	Hitbox: Vector3, -- width, height, length of the physics box
+	DesignHitbox: Vector3?, -- the box the car's look was designed around (Hitbox / Scale; filled in below)
 	Stats: CarStats,
 	StageNames: { string }, -- the car's name at each evolution stage
 }
@@ -34,6 +35,10 @@ export type CarDef = {
 local CarCatalog = {}
 
 CarCatalog.StarterId = "pizza"
+
+-- Cars are built this much bigger than they were designed: the looks (CarModelBuilder) are drawn around each car's
+-- DesignHitbox and scaled up, and the physics box (Hitbox) is the designed box scaled up the same way.
+CarCatalog.Scale = 1.2
 
 CarCatalog.Rarities = {
 	Common = { Order = 1, Color = Color3.fromRGB(170, 180, 190) },
@@ -280,6 +285,16 @@ for _, recipe in FUSIONS do
 	}
 	table.insert(cars, def)
 	byId[def.Id] = def
+end
+
+for _, def in cars do
+	def.DesignHitbox = def.Hitbox
+	def.Hitbox = def.Hitbox * CarCatalog.Scale
+end
+
+-- The box a car's look was designed around (its Hitbox before scaling).
+function CarCatalog.designHitbox(def: CarDef): Vector3
+	return def.DesignHitbox or def.Hitbox / CarCatalog.Scale
 end
 
 function CarCatalog.get(id: string): CarDef?

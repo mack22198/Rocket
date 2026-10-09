@@ -31,8 +31,8 @@ local heading = Vector3.new(0, 0, -1)
 local shakeUntil = 0
 local shakeStrength = 0
 
-local DISTANCE = 17
-local HEIGHT = 6.5
+local DISTANCE = 18.5
+local HEIGHT = 7.2
 local FOV = 78
 local BOOST_FOV = 8 -- extra field of view at full boost speed
 local BOOST_PULL = 2.5 -- extra distance at full boost speed

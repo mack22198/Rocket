@@ -26,7 +26,7 @@ return function(t)
 		end
 		expect.equal(Twists.ballConfig("").Radius, GameConfig.Ball.Radius)
 		expect.truthy(Twists.ballConfig("giant").Radius > GameConfig.Ball.Radius * 1.4)
-		expect.equal(GameConfig.Ball.Radius, 6, "the normal settings are never changed")
+		expect.equal(GameConfig.Ball.Radius, 8, "the normal settings are never changed")
 	end)
 
 	t.test("a giant ball still fits in the goal and scores", function()

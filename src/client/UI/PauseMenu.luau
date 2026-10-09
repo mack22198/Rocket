@@ -1,7 +1,8 @@
 --!strict
 -- The in-match menu (☰ MENU button, M key or the gamepad's View button). The match keeps going - it's online -
--- so your car just rolls to a stop while this is open. From here you can read how to play, switch easy steering
--- on or off (phones and tablets), or leave the match (a bot takes over your car, and you go back to the menu).
+-- so your car just rolls to a stop while this is open. From here you can read how to play, switch driving help
+-- and easy steering (phones and tablets) on or off, or leave the match (a bot takes over your car, and you go back
+-- to the menu).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,6 +11,7 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local MatchState = require(Shared.Match.MatchState)
+local Remotes = require(Shared.Net.Remotes)
 local Signal = require(Shared.Util.Signal)
 
 local InputController = require(script.Parent.Parent.Controllers.InputController)
@@ -113,13 +115,37 @@ local function build()
 	leaveButton.Activated:Connect(function()
 		showConfirm(true)
 	end)
+	-- Driving help on or off (see DriveAssist): aim assist, smoother keyboard steering and jump help.
+	panel.Size = UDim2.fromOffset(460, 500)
+	local helpButton = Theme.button(mainButtons, {
+		name = "DrivingHelp",
+		size = UDim2.new(1, 0, 0, 58),
+		position = UDim2.fromOffset(0, 160),
+		text = "",
+		color = C.PanelLight,
+		textColor = C.Text,
+	})
+	local function refreshHelp()
+		helpButton.Text = if InputController.assist() then "DRIVING HELP: ON" else "DRIVING HELP: OFF"
+	end
+	refreshHelp()
+	Players.LocalPlayer:GetAttributeChangedSignal(MatchState.PlayerAttr.Assist):Connect(refreshHelp)
+	helpButton.Activated:Connect(function()
+		local wanted = not InputController.assist()
+		task.spawn(function()
+			pcall(function()
+				Remotes.Settings:InvokeServer("assist", wanted)
+			end)
+		end)
+	end)
+	leaveButton.Position = UDim2.fromOffset(0, 232)
 	-- Phones and tablets: easy steering on or off.
 	if InputController.isTouch() then
-		panel.Size = UDim2.fromOffset(460, 500)
+		panel.Size = UDim2.fromOffset(460, 570)
 		local steerButton = Theme.button(mainButtons, {
 			name = "EasySteer",
 			size = UDim2.new(1, 0, 0, 58),
-			position = UDim2.fromOffset(0, 160),
+			position = UDim2.fromOffset(0, 232),
 			text = "",
 			color = C.PanelLight,
 			textColor = C.Text,
@@ -134,7 +160,7 @@ local function build()
 			InputController.setEasySteer(not InputController.easySteer())
 			refreshSteer()
 		end)
-		leaveButton.Position = UDim2.fromOffset(0, 232)
+		leaveButton.Position = UDim2.fromOffset(0, 304)
 	end
 	Theme.label(mainButtons, {
 		name = "Hint",

@@ -218,7 +218,7 @@ end
 Powers.Tuning = {
 	-- Item boxes
 	BoxRespawn = 10,
-	BoxPickupRadius = 6,
+	BoxPickupRadius = 7.5,
 	BoxHeight = 4,
 	Roulette = 1.2, -- the item spins in your slot this long before you can use it
 	-- Eight boxes, mirrored across the pitch (clear of the boost pads).

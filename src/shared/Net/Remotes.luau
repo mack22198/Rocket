@@ -17,6 +17,7 @@
 --   Gift(index) -> result                                                    open a playtime gift
 --   Leaderboard() -> board                                                   this week's top drivers
 --   Shop(action, id) -> result                                               shop prices (and Studio test buys)
+--   Settings(key, value) -> result                                           driving help on or off
 --   GetPlayerData() -> data                                                  initial profile snapshot
 -- Server -> Client
 --   BallState(time, position, velocity, flags, lastTouchTeam)  (unreliable, ~30/s)
@@ -97,6 +98,7 @@ local Remotes = {
 	Gift = func("Gift"),
 	Leaderboard = func("Leaderboard"),
 	Shop = func("Shop"),
+	Settings = func("Settings"),
 	GetPlayerData = func("GetPlayerData"),
 
 	BallState = unreliable("BallState"),

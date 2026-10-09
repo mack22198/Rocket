@@ -16,9 +16,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ArenaShape = require(Shared.Arena.ArenaShape)
 local BallSim = require(Shared.Physics.BallSim)
+local DriveAssist = require(Shared.Cars.DriveAssist)
 local GameConfig = require(Shared.Config.GameConfig)
 local HitModel = require(Shared.Physics.HitModel)
 local HitValidation = require(Shared.Match.HitValidation)
+local MatchState = require(Shared.Match.MatchState)
 local MathUtil = require(Shared.Util.MathUtil)
 local Powers = require(Shared.Config.Powers)
 local Remotes = require(Shared.Net.Remotes)
@@ -138,6 +140,15 @@ local function applyHit(
 	-- Hot Sauce (the Taco Truck's power) makes this hit a Mega Shot too.
 	local hotSauce = Roster.hasEffect(p, "hotsauce", serverNow())
 	local mega = p.megaArmed or hotSauce
+	-- Players with driving help on get the same shot assist their own screen gave the hit.
+	local player = p.player
+	local aim = if player and player:GetAttribute(MatchState.PlayerAttr.Assist) ~= false
+		then DriveAssist.enemyGoal(
+			GameConfig.Teams[p.team].DefendsSide,
+			GameConfig.Arena.Length,
+			GameConfig.Arena.GoalHeight
+		)
+		else nil
 	local result = HitModel.resolve(
 		GameConfig.Hit,
 		carCFrame,
@@ -147,7 +158,8 @@ local function applyHit(
 		cfg.Radius,
 		contact,
 		mega,
-		cfg.MaxSpeed
+		cfg.MaxSpeed,
+		aim
 	)
 
 	-- The hit happened at `atTime`; replay the ball from then until now.

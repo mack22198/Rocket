@@ -9,7 +9,13 @@ return function(t)
 	local half = Vector3.new(5.5, 2.2, 8.5) / 2
 	local carCFrame = CFrame.new(0, 2, 0) -- facing -Z
 
-	local function hit(carVelocity: Vector3, ballPosition: Vector3, ballVelocity: Vector3?, mega: boolean?)
+	local function hit(
+		carVelocity: Vector3,
+		ballPosition: Vector3,
+		ballVelocity: Vector3?,
+		mega: boolean?,
+		aim: Vector3?
+	)
 		local contact = HitModel.findContact(carCFrame, half, ballPosition, r)
 		assert(contact, "expected the car to touch the ball")
 		return HitModel.resolve(
@@ -21,8 +27,14 @@ return function(t)
 			r,
 			contact,
 			mega == true,
-			maxBall
+			maxBall,
+			aim
 		)
+	end
+
+	-- How far a velocity heads off to the side of straight ahead (-Z), in radians.
+	local function sideAngle(v: Vector3): number
+		return math.atan2(v.X, -v.Z)
 	end
 
 	t.test("no contact when the ball is far away", function()
@@ -86,6 +98,41 @@ return function(t)
 		local p = result.ballPosition
 		expect.truthy(p.X == p.X and p.Y == p.Y and p.Z == p.Z)
 		expect.equal(HitModel.findContact(carCFrame, half, p, r), nil)
+	end)
+
+	t.test("driving help bends a hit part of the way toward the goal", function()
+		local goal = Vector3.new(0, 16, -300)
+		local ballPos = Vector3.new(3, 2, -(half.Z + r - 1)) -- hit off-centre: it goes off to the right
+		local plain = hit(Vector3.new(0, 0, -60), ballPos).ballVelocity
+		local helped = hit(Vector3.new(0, 0, -60), ballPos, nil, false, goal).ballVelocity
+		expect.truthy(sideAngle(plain) > 0.1)
+		expect.near(sideAngle(helped), sideAngle(plain) * (1 - cfg.ShotAssist), 0.02)
+		-- Same speed and the same height: only the direction changes.
+		local flat = function(v: Vector3)
+			return Vector3.new(v.X, 0, v.Z).Magnitude
+		end
+		expect.near(flat(helped), flat(plain), 1e-3)
+		expect.near(helped.Y, plain.Y, 1e-6)
+		-- Mega shots aim themselves already.
+		local mega = hit(Vector3.new(0, 0, -60), ballPos, nil, true).ballVelocity
+		local megaHelped = hit(Vector3.new(0, 0, -60), ballPos, nil, true, goal).ballVelocity
+		expect.near((mega - megaHelped).Magnitude, 0, 1e-6)
+	end)
+
+	t.test("shot help only bends shots already heading roughly at the goal", function()
+		local toward = Vector3.new(0, 0, -100)
+		local cone = cfg.ShotAssistCone
+		local amount = cfg.ShotAssist
+		-- Going left of the goal: bent right, toward it.
+		local bent = HitModel.bendToward(Vector3.new(-40, 10, -60), toward, amount, cone)
+		expect.truthy(bent.X > -40 and bent.X < 0)
+		expect.equal(bent.Y, 10)
+		-- Going backwards, away from the goal: left alone.
+		local back = Vector3.new(5, 10, 60)
+		expect.equal(HitModel.bendToward(back, toward, amount, cone), back)
+		-- Going straight up: left alone.
+		local up = Vector3.new(0, 50, 0)
+		expect.equal(HitModel.bendToward(up, toward, amount, cone), up)
 	end)
 
 	t.test("the car gets a small push back", function()

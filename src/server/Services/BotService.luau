@@ -177,7 +177,7 @@ local function think()
 			mind.aimTimer -= THINK_INTERVAL
 			if mind.aimTimer <= 0 then
 				mind.aimTimer = 2
-				local wobble = (1 - skill) * 6
+				local wobble = (1 - skill) * 10
 				mind.aimOffset = Vector3.new(rng:NextNumber(-wobble, wobble), 0, rng:NextNumber(-wobble, wobble))
 			end
 			local input, wantsMega = BotBrain.decide({
@@ -188,6 +188,7 @@ local function think()
 				megaReady = p.mega >= GameConfig.Mega.Max and not p.megaArmed,
 				ballPosition = ball.position,
 				ballVelocity = ball.velocity,
+				ballRadius = BallService.config().Radius,
 				predict = predict,
 				defendsSide = defendsSide,
 				role = mind.role,

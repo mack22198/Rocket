@@ -84,8 +84,15 @@ function CarDriver.isGrounded(self: CarDriver): boolean
 	return self.state.grounded
 end
 
--- Runs one physics tick. Call it every frame from RunService.PreSimulation.
-function CarDriver.step(self: CarDriver, dt: number, input: CarPhysics.Input, hasBoost: boolean): CarPhysics.StepResult?
+-- Runs one physics tick. Call it every frame from RunService.PreSimulation. `assist` is driving help for a
+-- player's own car (see DriveAssist).
+function CarDriver.step(
+	self: CarDriver,
+	dt: number,
+	input: CarPhysics.Input,
+	hasBoost: boolean,
+	assist: CarPhysics.Assist?
+): CarPhysics.StepResult?
 	local chassis = self.chassis
 	if chassis.Anchored or not chassis:IsDescendantOf(workspace) then
 		-- Held in place (a kickoff): whatever was happening to the car is over.
@@ -106,6 +113,7 @@ function CarDriver.step(self: CarDriver, dt: number, input: CarPhysics.Input, ha
 		dt = math.min(dt, 1 / 20),
 		worldGravity = workspace.Gravity,
 		hasBoost = hasBoost,
+		assist = assist,
 	})
 	self.pendingVelocity = Vector3.zero
 	if result.teleport then

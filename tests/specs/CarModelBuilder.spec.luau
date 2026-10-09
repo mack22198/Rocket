@@ -69,7 +69,7 @@ return function(t)
 					end
 				end
 				expect.atLeast(count, 2, `{def.Id} has a {hat}`)
-				expect.atMost(lowest, def.Hitbox.Y / 2 + 2.5, `{def.Id}'s {hat} sits on the car`)
+				expect.atMost(lowest, def.Hitbox.Y / 2 + 2.5 * CarCatalog.Scale, `{def.Id}'s {hat} sits on the car`)
 			end
 		end)
 

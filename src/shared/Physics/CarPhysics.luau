@@ -8,6 +8,7 @@
 -- In the air:    pitch tips the nose, steer = yaw, roll = barrel roll. Jump again within 1.5s to double jump,
 --                or jump while holding a direction to dodge/flip into the ball.
 
+local DriveAssist = require(script.Parent.Parent.Cars.DriveAssist)
 local MathUtil = require(script.Parent.Parent.Util.MathUtil)
 
 export type Config = {
@@ -90,6 +91,12 @@ export type State = {
 	freezeTimer: number,
 }
 
+-- Driving help for the car's own driver (see DriveAssist).
+export type Assist = {
+	ball: Vector3?, -- where the ball is: jumps lean toward it and the second jump flips into it
+	level: boolean, -- in the air, holding the throttle doesn't tip the nose (the car stays level)
+}
+
 export type StepParams = {
 	config: Config,
 	stats: Stats,
@@ -102,6 +109,7 @@ export type StepParams = {
 	dt: number,
 	worldGravity: number, -- the gravity the physics engine applies (workspace.Gravity)
 	hasBoost: boolean,
+	assist: Assist?,
 }
 
 export type StepResult = {
@@ -191,8 +199,16 @@ local function pitchOf(input: Input): number
 	return if input.pitch ~= nil then input.pitch else input.throttle
 end
 
-local function hasAirInput(input: Input): boolean
-	return math.abs(pitchOf(input)) > 0.05 or math.abs(input.steer) > 0.05 or math.abs(input.roll) > 0.05
+-- The nose-up/down control in the air (with driving help, only a real pitch control counts, not the throttle).
+local function airPitchOf(input: Input, assist: Assist?): number
+	if assist and assist.level and input.pitch == nil then
+		return 0
+	end
+	return pitchOf(input)
+end
+
+local function hasAirInput(input: Input, pitch: number): boolean
+	return math.abs(pitch) > 0.05 or math.abs(input.steer) > 0.05 or math.abs(input.roll) > 0.05
 end
 
 function CarPhysics.step(p: StepParams): StepResult
@@ -312,6 +328,10 @@ function CarPhysics.step(p: StepParams): StepResult
 
 		if jumpPressed then
 			velocity += normal * (config.JumpSpeed * stats.Jump)
+			local ball = if p.assist then p.assist.ball else nil
+			if ball then
+				velocity += DriveAssist.jumpPull(cframe.Position, ball) -- lean the jump toward a ball in the air
+			end
 			state.suspensionPause = config.JumpSuspensionPause
 			state.canSecondJump = true
 			state.sinceJump = 0
@@ -324,17 +344,24 @@ function CarPhysics.step(p: StepParams): StepResult
 		if jumpPressed and state.canSecondJump and state.sinceJump <= config.SecondJumpWindow then
 			state.canSecondJump = false
 			local forwardInput = pitchOf(input)
-			if math.abs(forwardInput) + math.abs(input.steer) > 0.3 then
+			local sideInput = input.steer
+			local flatForward = MathUtil.safeUnit(MathUtil.flat(look), Vector3.new(0, 0, -1))
+			local flatRight = MathUtil.safeUnit(MathUtil.flat(right), Vector3.xAxis)
+			-- Driving help: unless you're steering, the second jump near the ball flips straight into it.
+			local ball = if p.assist then p.assist.ball else nil
+			if ball and math.abs(input.steer) < 0.3 and DriveAssist.canFlipAt(cframe.Position, ball) then
+				local toBall = MathUtil.safeUnit(MathUtil.flat(ball - cframe.Position), flatForward)
+				forwardInput, sideInput = toBall:Dot(flatForward), toBall:Dot(flatRight)
+			end
+			if math.abs(forwardInput) + math.abs(sideInput) > 0.3 then
 				-- Dodge: a burst in the pressed direction plus a flip.
-				local flatForward = MathUtil.safeUnit(MathUtil.flat(look), Vector3.new(0, 0, -1))
-				local flatRight = MathUtil.safeUnit(MathUtil.flat(right), Vector3.xAxis)
 				local dodgeDirection =
-					MathUtil.safeUnit(flatForward * forwardInput + flatRight * input.steer, flatForward)
+					MathUtil.safeUnit(flatForward * forwardInput + flatRight * sideInput, flatForward)
 				velocity += dodgeDirection * config.DodgeSpeed
 				if velocity.Y < 0 then
 					velocity = Vector3.new(velocity.X, velocity.Y * 0.5, velocity.Z)
 				end
-				angular = right * (-forwardInput * config.DodgeSpinRate) + look * (input.steer * config.DodgeSpinRate)
+				angular = right * (-forwardInput * config.DodgeSpinRate) + look * (sideInput * config.DodgeSpinRate)
 				state.dodgeTimer = config.DodgeDuration
 				result.dodged = true
 			else
@@ -343,11 +370,12 @@ function CarPhysics.step(p: StepParams): StepResult
 			end
 		end
 
+		local airPitch = airPitchOf(input, p.assist)
 		if state.dodgeTimer > 0 then
 			state.dodgeTimer = math.max(0, state.dodgeTimer - dt)
-		elseif hasAirInput(input) then
+		elseif hasAirInput(input, airPitch) then
 			local control = stats.AirControl
-			local target = right * (-pitchOf(input) * config.AirPitchRate * control)
+			local target = right * (-airPitch * config.AirPitchRate * control)
 				+ up * (-input.steer * config.AirYawRate * control)
 				+ look * (input.roll * config.AirRollRate * control)
 			angular = angular:Lerp(target, MathUtil.expDecay(config.AirControlResponse, dt))

@@ -1,6 +1,7 @@
 --!strict
 -- What happens when a car touches the ball. Used by the server (authoritative) and by the client that is
--- driving the car (so a player's own hits feel instant instead of waiting for the network).
+-- driving the car (so a player's own hits feel instant instead of waiting for the network). Players with driving
+-- help on (see DriveAssist) get a shot assist: their hits bend partly toward the goal they're attacking.
 
 local MathUtil = require(script.Parent.Parent.Util.MathUtil)
 
@@ -17,6 +18,8 @@ export type Config = {
 	MegaSpeedMultiplier: number,
 	MegaMinSpeed: number,
 	MegaAimAssist: number,
+	ShotAssist: number, -- with driving help: how much of the way toward the goal a hit bends (0..1)...
+	ShotAssistCone: number, -- ...when it's already going within this angle (radians) of the goal
 }
 
 export type Contact = {
@@ -76,6 +79,26 @@ local function kickScale(config: Config, speed: number): number
 	)
 end
 
+-- Turns `velocity` (around the vertical axis only) `amount` of the way toward `toward`, if it's within `cone`
+-- radians of it along the ground. Speed and the up-and-down part are kept.
+function HitModel.bendToward(velocity: Vector3, toward: Vector3, amount: number, cone: number): Vector3
+	local flatVelocity = Vector3.new(velocity.X, 0, velocity.Z)
+	local flatToward = Vector3.new(toward.X, 0, toward.Z)
+	local speed = flatVelocity.Magnitude
+	if speed < 1 or flatToward.Magnitude < 1e-3 or amount <= 0 then
+		return velocity
+	end
+	local current = flatVelocity / speed
+	local wanted = flatToward.Unit
+	local angle = math.acos(math.clamp(current:Dot(wanted), -1, 1))
+	if angle > cone then
+		return velocity
+	end
+	local turn = angle * math.clamp(amount, 0, 1) * (if current:Cross(wanted).Y >= 0 then 1 else -1)
+	local bent = CFrame.Angles(0, turn, 0):VectorToWorldSpace(current) * speed
+	return Vector3.new(bent.X, velocity.Y, bent.Z)
+end
+
 -- Computes the ball's new motion after a touch. `contact` must come from findContact for the same car/ball.
 function HitModel.resolve(
 	config: Config,
@@ -86,7 +109,8 @@ function HitModel.resolve(
 	ballRadius: number,
 	contact: Contact,
 	mega: boolean,
-	maxBallSpeed: number
+	maxBallSpeed: number,
+	aim: Vector3? -- the goal to bend shots toward (driving help), or nil
 ): HitResult
 	local normal = contact.normal
 	local relativeVelocity = carVelocity - ballVelocity
@@ -104,12 +128,17 @@ function HitModel.resolve(
 	local relativeSpeed = relativeVelocity.Magnitude
 	newVelocity += kickDirection * (relativeSpeed * kickScale(config, relativeSpeed))
 
-	-- 3) Mega Shot: a huge, slightly aim-assisted blast.
+	-- 3) Driving help: bend the shot part of the way toward the goal, if it's already heading roughly that way.
+	if aim and not mega then
+		newVelocity = HitModel.bendToward(newVelocity, aim - ballPosition, config.ShotAssist, config.ShotAssistCone)
+	end
+
+	-- 4) Mega Shot: a huge, slightly aim-assisted blast.
 	if mega then
-		local aim = MathUtil.safeUnit(newVelocity, kickDirection):Lerp(look, config.MegaAimAssist)
-		aim = MathUtil.safeUnit(aim + Vector3.new(0, 0.12, 0), look)
+		local blast = MathUtil.safeUnit(newVelocity, kickDirection):Lerp(look, config.MegaAimAssist)
+		blast = MathUtil.safeUnit(blast + Vector3.new(0, 0.12, 0), look)
 		local speed = math.max(newVelocity.Magnitude * config.MegaSpeedMultiplier, config.MegaMinSpeed)
-		newVelocity = aim * speed
+		newVelocity = blast * speed
 	end
 
 	newVelocity = MathUtil.clampMagnitude(newVelocity, maxBallSpeed)

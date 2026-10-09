@@ -34,6 +34,7 @@ return function(t)
 			angular = Vector3.zero,
 			state = CarPhysics.newState(),
 			hasBoost = true,
+			assist = nil :: CarPhysics.Assist?,
 			lastResult = nil :: any,
 		}
 		local mounts = CarPhysics.wheelMounts(hitbox)
@@ -67,6 +68,7 @@ return function(t)
 				dt = DT,
 				worldGravity = WORLD_GRAVITY,
 				hasBoost = sim.hasBoost,
+				assist = sim.assist,
 			})
 			sim.lastResult = result
 			if result.teleport then
@@ -240,6 +242,59 @@ return function(t)
 			return input({ throttle = 1 })
 		end)
 		expect.atMost(sim.cframe.LookVector.Y, -0.3) -- nose going down: a front flip
+	end)
+
+	t.test("driving help: jumping under a ball in the air leans toward it", function()
+		local function sideways(withHelp: boolean): number
+			local sim = newSim()
+			sim.run(1)
+			local ball = sim.cframe.Position + Vector3.new(12, 14, -6)
+			sim.assist = if withHelp then { ball = ball, level = true } else nil
+			sim.step(input({ jump = true }))
+			return sim.velocity.X
+		end
+		expect.near(sideways(false), 0, 0.5)
+		expect.atLeast(sideways(true), 5)
+	end)
+
+	t.test("driving help: the second jump flips into a nearby ball", function()
+		local sim = newSim()
+		sim.run(1)
+		sim.assist = { ball = nil, level = true }
+		for n = 1, 20 do
+			sim.step(input({ jump = n <= 3 }))
+		end
+		-- The ball is ahead and to the right. No direction held: the flip goes at the ball anyway.
+		sim.assist = { ball = sim.cframe.Position + Vector3.new(8, 2, -8), level = true }
+		local before = sim.velocity
+		sim.step(input({ jump = true }))
+		expect.truthy(sim.lastResult.dodged)
+		local change = sim.velocity - before
+		expect.truthy(change.X > 10 and change.Z < -10, "toward the ball")
+		-- Without driving help, the same second jump is just a double jump.
+		local plain = newSim()
+		plain.run(1)
+		for n = 1, 20 do
+			plain.step(input({ jump = n <= 3 }))
+		end
+		plain.step(input({ jump = true }))
+		expect.falsy(plain.lastResult.dodged)
+	end)
+
+	t.test("driving help: holding the throttle in the air keeps the car level", function()
+		local sim = newSim(CFrame.new(0, 60, 0))
+		sim.assist = { ball = nil, level = true }
+		sim.run(0.5, function()
+			return input({ throttle = 1 })
+		end)
+		expect.atLeast(sim.cframe.LookVector.Y, -0.1)
+		-- A real pitch control (a gamepad stick) still tips the nose.
+		local stick = newSim(CFrame.new(0, 60, 0))
+		stick.assist = { ball = nil, level = true }
+		stick.run(0.5, function()
+			return input({ throttle = 1, pitch = 1 })
+		end)
+		expect.atMost(stick.cframe.LookVector.Y, -0.3)
 	end)
 
 	t.test("in the air, pushing forward tips the nose down", function()

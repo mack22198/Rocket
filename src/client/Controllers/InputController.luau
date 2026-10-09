@@ -11,12 +11,15 @@
 --           stick toward where you want to go on the screen (see EasySteer); in the air it tips the car.
 
 local ContextActionService = game:GetService("ContextActionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarPhysics = require(Shared.Physics.CarPhysics)
+local DriveAssist = require(Shared.Cars.DriveAssist)
 local EasySteer = require(Shared.Cars.EasySteer)
+local MatchState = require(Shared.Match.MatchState)
 local QuickChat = require(Shared.Config.QuickChat)
 local Signal = require(Shared.Util.Signal)
 
@@ -39,6 +42,8 @@ local actionsBound = false
 local blocked = false
 local easySteer = true
 local last: CarPhysics.Input = CarPhysics.NoInput
+local keySteer = 0 -- keyboard steering, eased in and out (with driving help on)
+local lastRead = os.clock()
 
 -- What the car needs to know to turn the touch stick into steering.
 export type Context = { carCFrame: CFrame, grounded: boolean }
@@ -95,9 +100,18 @@ function InputController.setBlocked(isBlocked: boolean)
 	end
 end
 
+-- Is driving help on? (It is unless the player has switched it off; see DriveAssist.)
+function InputController.assist(): boolean
+	return Players.LocalPlayer:GetAttribute(MatchState.PlayerAttr.Assist) ~= false
+end
+
 -- The current controls. Returns "no input" while the player is typing in chat or a menu is open.
 function InputController.read(context: Context?): CarPhysics.Input
+	local now = os.clock()
+	local dt = math.clamp(now - lastRead, 0, 0.1)
+	lastRead = now
 	if blocked or UserInputService:GetFocusedTextBox() then
+		keySteer = 0
 		last = CarPhysics.NoInput
 		return last
 	end
@@ -113,12 +127,16 @@ function InputController.read(context: Context?): CarPhysics.Input
 	if keyDown(Enum.KeyCode.S, Enum.KeyCode.Down) then
 		throttle -= 1
 	end
+	local keys = 0
 	if keyDown(Enum.KeyCode.D, Enum.KeyCode.Right) then
-		steer += 1
+		keys += 1
 	end
 	if keyDown(Enum.KeyCode.A, Enum.KeyCode.Left) then
-		steer -= 1
+		keys -= 1
 	end
+	-- With driving help, a tap is a gentle nudge and holding the key builds up to a full turn.
+	keySteer = if InputController.assist() then DriveAssist.smoothKey(keySteer, keys, dt) else keys
+	steer += keySteer
 	if keyDown(Enum.KeyCode.E) then
 		roll += 1
 	end

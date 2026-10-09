@@ -49,6 +49,7 @@ MatchState.PlayerAttr = {
 	PlayStart = "PlayStart", -- server time they joined (playtime gifts count from here)
 	GiftsOpened = "GiftsOpened", -- the playtime gifts they've opened, e.g. "1,2,3"
 	Vip = "Vip", -- has the VIP Game Pass
+	Assist = "Assist", -- driving help (DriveAssist) is on; false only once they've switched it off
 }
 
 -- A player's status (players who just joined are in the menu).

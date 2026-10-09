@@ -175,7 +175,7 @@ local function update()
 		speed = chassis.AssemblyLinearVelocity.Magnitude,
 		boost = numberOf(car, A.Boost),
 		ballHigh = BallView.isVisible()
-			and ball.Y > 12
+			and ball.Y > BallView.radius() + 5
 			and Vector3.new(ball.X - chassis.Position.X, 0, ball.Z - chassis.Position.Z).Magnitude < 30,
 		item = if itemReady then held :: string else nil,
 		powerReady = now >= numberOf(car, A.PowerReadyAt),

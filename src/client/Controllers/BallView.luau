@@ -5,6 +5,7 @@
 -- server to be confirmed. Magnets and Tractor Beams (a car's Pull attribute) tug the ball here too, just like
 -- on the server.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -12,6 +13,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ArenaShape = require(Shared.Arena.ArenaShape)
 local BallModelBuilder = require(Shared.Ball.BallModelBuilder)
 local BallSim = require(Shared.Physics.BallSim)
+local DriveAssist = require(Shared.Cars.DriveAssist)
 local GameConfig = require(Shared.Config.GameConfig)
 local HitModel = require(Shared.Physics.HitModel)
 local MatchState = require(Shared.Match.MatchState)
@@ -196,6 +198,16 @@ local function tryLocalHit()
 	local carVelocity = chassis.AssemblyLinearVelocity
 	local mega = car:GetAttribute(A.MegaArmed) == true
 	local before = BallSim.copy(sim)
+	-- Driving help's shot assist (the server does exactly the same).
+	local team = car:GetAttribute(A.Team)
+	local aim = if Players.LocalPlayer:GetAttribute(MatchState.PlayerAttr.Assist) ~= false
+			and (team == "Blue" or team == "Orange")
+		then DriveAssist.enemyGoal(
+			GameConfig.Teams[team :: string].DefendsSide,
+			GameConfig.Arena.Length,
+			GameConfig.Arena.GoalHeight
+		)
+		else nil
 	local result = HitModel.resolve(
 		GameConfig.Hit,
 		carCFrame,
@@ -205,7 +217,8 @@ local function tryLocalHit()
 		cfg.Radius,
 		contact,
 		mega,
-		cfg.MaxSpeed
+		cfg.MaxSpeed,
+		aim
 	)
 	hitId += 1
 	pendingHitId = hitId
@@ -320,6 +333,10 @@ function BallView.start()
 		end
 	end)
 	RunService.Heartbeat:Connect(update)
+	-- Driving help steers toward the ball and jumps at it (see DriveAssist).
+	CarController.setBallInfo(function()
+		return sim.position, sim.velocity, cfg.Radius, not hidden and not frozen
+	end)
 end
 
 -- Where the ball is drawn right now (used by the camera).

@@ -16,13 +16,13 @@ local CARDS = {
 	{
 		icon = "⚽",
 		title = "SCORE GOALS",
-		text = "Drive into the ball to knock it into the other team's goal. Most goals when the clock hits 0:00 wins!",
+		text = "Hold W and your car helps you hit the ball at the other team's goal. Most goals at 0:00 wins!",
 		color = C.Good,
 	},
 	{
 		icon = "🚀",
 		title = "BOOST & JUMP",
-		text = "Boost to go super fast - pads fill it up. Jump twice to flip! Smash the other team at full boost - POOF!",
+		text = "Boost to go super fast. Ball in the air? Jump at it, then jump again to flip into it. Smash cars at full boost - POOF!",
 		color = C.Boost,
 	},
 	{

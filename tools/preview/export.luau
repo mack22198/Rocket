@@ -118,7 +118,10 @@ local function buildStadium()
 				CarModelBuilder.build(def, { preview = true, stage = stage, teamColor = GameConfig.Teams.Blue.Color })
 			local x = (i - 1) * 100 + (stage - 1) * 14
 			local z = 600
-			pivotTo(model, roblox.CFrame.new(x, def.Hitbox.Y / 2 + 0.9, z) * roblox.CFrame.Angles(0, math.rad(205), 0))
+			pivotTo(
+				model,
+				roblox.CFrame.new(x, CarModelBuilder.restHeight(def), z) * roblox.CFrame.Angles(0, math.rad(205), 0)
+			)
 			model.Parent = showcase
 		end
 	end
@@ -133,7 +136,8 @@ local function buildStadium()
 		})
 		pivotTo(
 			model,
-			roblox.CFrame.new((i - 1) * 12, def.Hitbox.Y / 2 + 0.9, 680) * roblox.CFrame.Angles(0, math.rad(200), 0)
+			roblox.CFrame.new((i - 1) * 12, CarModelBuilder.restHeight(def), 680)
+				* roblox.CFrame.Angles(0, math.rad(200), 0)
 		)
 		model.Parent = showcase
 	end
@@ -147,7 +151,7 @@ local function buildStadium()
 			local stage = ((t - 1) * 3 + slot - 1) % GameConfig.Evolution.Stages + 1
 			local model =
 				CarModelBuilder.build(def, { preview = true, stage = stage, teamColor = GameConfig.Teams[team].Color })
-			local pos = roblox.Vector3.new(kick[slot][1] * side, def.Hitbox.Y / 2 + 0.9, kick[slot][2] * side)
+			local pos = roblox.Vector3.new(kick[slot][1] * side, CarModelBuilder.restHeight(def), kick[slot][2] * side)
 			local look = (roblox.Vector3.new(0, pos.Y, 0) - pos).Unit
 			local right = look:Cross(roblox.Vector3.yAxis).Unit
 			local up = right:Cross(look)

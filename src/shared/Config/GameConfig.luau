@@ -24,15 +24,15 @@ GameConfig.Arena = {
 	CornerCut = 40, -- 45 degree corner walls cut this much off each axis
 	CurveRadius = 20, -- radius of the curved ramp between the floor and the walls
 	CurveSegments = 8, -- how many flat parts approximate each curved ramp
-	GoalWidth = 72,
-	GoalHeight = 28,
-	GoalDepth = 20,
+	GoalWidth = 88,
+	GoalHeight = 32,
+	GoalDepth = 24,
 	WallThickness = 6,
 }
 
 GameConfig.Ball = {
-	Radius = 6,
-	Gravity = 70,
+	Radius = 8, -- big and easy to hit (about one and a half car lengths across)
+	Gravity = 62, -- a little floatier than the cars, so there's time to get under it
 	AirDrag = 0.03, -- fraction of speed lost per second
 	Restitution = 0.62, -- bounciness against the arena
 	RestThreshold = 6, -- impacts slower than this don't bounce (lets the ball settle)
@@ -58,6 +58,8 @@ GameConfig.Hit = {
 	MegaSpeedMultiplier = 1.8,
 	MegaMinSpeed = 175,
 	MegaAimAssist = 0.6, -- how much a mega shot bends toward where the car is pointing
+	ShotAssist = 0.55, -- driving help: hits bend this much of the way toward the goal...
+	ShotAssistCone = math.rad(75), -- ...when they're already going within this angle of it
 }
 
 -- Server checks on "I hit the ball" messages from players (see HitValidation).
@@ -77,8 +79,8 @@ GameConfig.HitValidation = {
 
 GameConfig.Car = {
 	Gravity = 70,
-	RideHeight = 1.2, -- gap between the chassis bottom and the ground when resting
-	SuspensionReach = 1.0, -- how far past ride height the wheels still count as touching
+	RideHeight = 1.44, -- gap between the chassis bottom and the ground when resting (cars are built 1.2x their design)
+	SuspensionReach = 1.2, -- how far past ride height the wheels still count as touching
 	SpringStrength = 220,
 	SpringDamping = 18,
 	AlignStrength = 14, -- how quickly the car tilts to match the surface under it
@@ -134,10 +136,10 @@ GameConfig.Bump = {
 GameConfig.BoostPads = {
 	BigAmount = 100,
 	BigRespawn = 10,
-	BigRadius = 5,
+	BigRadius = 6,
 	SmallAmount = 12,
 	SmallRespawn = 4,
-	SmallRadius = 3.5,
+	SmallRadius = 4.2,
 	-- Pad positions are mirrored into all four quarters of the field unless they sit on an axis.
 	Big = {
 		Vector3.new(75, 0, 115),
@@ -184,13 +186,13 @@ GameConfig.Style = {
 
 GameConfig.Bots = {
 	Names = { "Sparky", "Nitro Nell", "Bolt", "Zippy", "Rusty", "Turbo Tom", "Pickles", "Dash", "Comet", "Blip" },
-	Skill = 0.55, -- 0 = sleepy, 1 = sweaty. Kids should be able to beat the default bots.
+	Skill = 0.45, -- 0 = sleepy, 1 = sweaty. Kids should be able to beat the default bots.
 	-- Bots playing against players adjust so matches stay close (see BotBrain.adaptiveSkill).
 	SkillPerGoal = 0.08, -- harder for every goal the players are ahead, easier for every goal behind
-	MinSkill = 0.25,
+	MinSkill = 0.15,
 	MaxSkill = 0.8,
-	RookieMatches = 5, -- players who've finished fewer matches than this get easier bots...
-	RookieEase = 0.15, -- ...by this much
+	RookieMatches = 8, -- players who've finished fewer matches than this get easier bots...
+	RookieEase = 0.2, -- ...by this much
 	ThinkRate = 12, -- decisions per second
 	CarIds = { "pizza", "banana", "kart", "shark", "monster", "ufo", "duck", "taco", "hotdog" },
 	-- Now and then a bot turns up in a fused car, to show what's possible.

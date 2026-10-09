@@ -22,6 +22,7 @@ export type Context = {
 	megaReady: boolean,
 	ballPosition: Vector3,
 	ballVelocity: Vector3,
+	ballRadius: number,
 	predict: (seconds: number) -> Vector3, -- where the ball will be
 	defendsSide: number, -- 1 or -1: which goal this bot protects
 	role: Role,
@@ -119,8 +120,8 @@ local function chaseTarget(ctx: Context, aimGoal: Vector3): (Vector3, number)
 	local approach = MathUtil.safeUnit(MathUtil.flat(meet - carPos), aim)
 	local alignment = approach:Dot(aim)
 	local target
-	if alignment > 0.2 or distance < 12 then
-		target = meet - aim * 2 + ctx.aimOffset -- lined up: drive through the ball
+	if alignment > 0.2 or distance < ctx.ballRadius + 6 then
+		target = meet - aim * (ctx.ballRadius * 0.3) + ctx.aimOffset -- lined up: drive through the ball
 	else
 		-- Wrong side of the ball: loop around behind it instead of knocking it toward our own goal.
 		local side = MathUtil.safeUnit(aim:Cross(Vector3.yAxis), Vector3.xAxis)
@@ -200,7 +201,7 @@ function BotBrain.decide(ctx: Context, memory: Memory, dt: number): (CarPhysics.
 	elseif not urgent and distance < 14 then
 		throttle = distance / 14 * 0.4 -- arrive gently at a waiting spot
 	end
-	throttle *= 0.85 + 0.15 * ctx.skill
+	throttle *= 0.7 + 0.3 * ctx.skill -- sleepier bots are slower off the mark
 
 	-- Unstick: if we're pushing but not moving, reverse for a moment.
 	if memory.reverseTimer > 0 then
@@ -224,21 +225,23 @@ function BotBrain.decide(ctx: Context, memory: Memory, dt: number): (CarPhysics.
 		and math.abs(angle) < 0.3
 		and distance > 30
 		and speed < 140
-		and ctx.skill > 0.25
+		and ctx.skill > 0.4
 
 	-- Jumps and flips.
 	local jump = false
 	if memory.jumpMode == 0 and ctx.grounded and urgent and math.abs(angle) < 0.5 then
-		local height = ctx.ballPosition.Y
-		if height > 9 and height < 20 and ballFlatDistance < 14 then
+		local r = ctx.ballRadius
+		local height = ctx.ballPosition.Y - r -- how far the bottom of the ball is off the ground
+		local reach = ballFlatDistance - r
+		if height > 3 and height < 14 and reach < 8 then
 			memory.jumpMode, memory.jumpTimer = 1, 0
-		elseif height < 10 and ballFlatDistance < 13 and speed > 35 and math.abs(angle) < 0.25 and ctx.skill > 0.4 then
+		elseif height < 4 and reach < 7 and speed > 35 and math.abs(angle) < 0.25 and ctx.skill > 0.55 then
 			memory.jumpMode, memory.jumpTimer = 2, 0
 		end
 	end
 	if memory.jumpMode ~= 0 then
+		local t = memory.jumpTimer -- (time since the jump started, before this decision: the first one presses jump)
 		memory.jumpTimer += dt
-		local t = memory.jumpTimer
 		if memory.jumpMode == 1 then
 			jump = t < 0.08
 			if t > 0.9 then

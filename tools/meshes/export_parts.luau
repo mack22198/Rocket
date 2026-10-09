@@ -32,7 +32,11 @@ for _, def in CarCatalog.ordered() do
 		stages[tostring(stage)] = parts
 	end
 	cars[def.Id] = {
-		hitbox = { def.Hitbox.X, def.Hitbox.Y, def.Hitbox.Z },
+		-- (In design units, like the parts: the game scales the meshes up with everything else.)
+		hitbox = (function()
+			local box = CarCatalog.designHitbox(def)
+			return { box.X, box.Y, box.Z }
+		end)(),
 		base = if def.Fusion then def.Fusion.Base else def.Id,
 		stages = stages,
 	}

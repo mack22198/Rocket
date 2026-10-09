@@ -71,6 +71,12 @@ export type SavedData = {
 	title: string, -- the title under your name ("" = the best one your level gives)
 	vip: boolean, -- has the VIP Game Pass (checked again every time they join)
 	purchases: { [string]: number }, -- Robux purchases already handed out: purchase id -> when (see Shop)
+	settings: Settings,
+}
+
+-- Choices a player makes that the server needs to know about.
+export type Settings = {
+	assist: boolean, -- driving help (see DriveAssist)
 }
 
 type Profile = {
@@ -84,7 +90,7 @@ local DataService = {}
 -- Fired once a player's data has loaded (before it's sent to them), so other services can bring it up to date.
 DataService.Loaded = Signal.new() :: Signal.Signal<Player>
 
-local DATA_VERSION = 7
+local DATA_VERSION = 8
 local LOAD_ATTEMPTS = 6
 local LOAD_RETRY_DELAY = 3
 
@@ -135,6 +141,7 @@ local function defaultData(): SavedData
 		title = "",
 		vip = false,
 		purchases = {},
+		settings = { assist = true },
 	}
 end
 
@@ -261,6 +268,10 @@ local function sanitize(raw: any): SavedData
 			end
 		end
 	end
+	-- Settings (added in version 8).
+	if type(raw.settings) == "table" then
+		data.settings.assist = raw.settings.assist ~= false
+	end
 	local level = Levels.levelFor(data.xp)
 	if type(raw.title) == "string" and Achievements.ownsTitle(raw.title, level, data.achievements, data.vip) then
 		data.title = raw.title
@@ -305,6 +316,7 @@ local function serialize(data: SavedData, withSession: boolean): { [string]: any
 		title = data.title,
 		vip = data.vip,
 		purchases = table.clone(data.purchases),
+		settings = table.clone(data.settings),
 	}
 	if withSession then
 		copy.session = { jobId = game.JobId, time = os.time() }

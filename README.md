@@ -30,7 +30,14 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
 - **The winners' podium:** at the final whistle the top three cars appear on a podium in the middle of the
   pitch - the MVP on the top step - with confetti and fireworks, before the results screen.
 - **Arcade driving:** boost, jump, double jump, flips (dodges), air control and air roll, driving up the curved
-  walls, and bumping other cars.
+  walls, and bumping other cars. The ball is big (about as wide as a car is long) and the goals are wide, so
+  it's easy to hit and easy to score.
+- **Driving help (on by default),** so a keyboard is all you need: steering keys ease in, so a tap of A or D is
+  a nudge, not a swerve; while you hold W with the ball ahead, the car steers itself toward the spot that knocks
+  the ball at the other team's goal (your own steering always wins); your hits bend part of the way toward the
+  goal; jumping near a ball in the air leans the jump toward it and the second jump flips into it; and holding
+  W in the air keeps the car level instead of tipping it over. Players who want full control switch it off in
+  the match menu (☰ MENU → DRIVING HELP); it's remembered.
 - **Demolitions:** smash into the other team at full boost and their car goes **POOF** - a cartoon cloud, stars
   and toy-car bits flying everywhere - then pops back in at its own goal two seconds later. Each one is worth a
   little Scrap (and there's a daily quest for it). Bots never demolish players in their first five matches.
@@ -165,7 +172,9 @@ ever remade (see [tools/meshes](tools/meshes)), delete the old `TurboBallCars` a
 | Ball cam on/off | C | Y | CAM |
 | Air roll | Q / E | | |
 | In the air: tip the nose | W / S | Left stick | Stick |
-| Match menu (leave the match) | M | View / Back | ☰ MENU |
+| Match menu (leave the match, driving help) | M | View / Back | ☰ MENU |
+
+Driving help (see above) is on for every new player; ☰ MENU → DRIVING HELP switches it off and on.
 
 ## Publishing to Roblox
 
@@ -214,8 +223,12 @@ lost or given twice.
 
 Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
 
-- [`GameConfig.luau`](src/shared/Config/GameConfig.luau): match length, arena size, ball bounciness, car speed,
-  boost, jump height, gravity, bot skill, Mega Shot, boost pads and Studio shortcuts.
+- [`GameConfig.luau`](src/shared/Config/GameConfig.luau): match length, arena and goal size, ball size and
+  bounciness, car speed, boost, jump height, gravity, bot skill, Mega Shot, boost pads, how much hits bend toward
+  the goal with driving help (`Hit.ShotAssist`) and Studio shortcuts.
+- [`DriveAssist.luau`](src/shared/Cars/DriveAssist.luau): how strong the rest of the driving help is (keyboard
+  steering, aim assist, jump assist).
+- `CarCatalog.Scale`: how big the cars are built (1.2x their design).
 - [`CarCatalog.luau`](src/shared/Config/CarCatalog.luau): the cars, prices and stats, and the fusion recipes.
 - [`Rewards.luau`](src/shared/Config/Rewards.luau): how much Scrap each thing is worth.
 - [`Sounds.luau`](src/shared/Config/Sounds.luau): every sound in the game - paste Toolbox sound IDs here.
@@ -294,7 +307,8 @@ src/
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay
                   timing), Teams (who plays on which team), Demolition (when a bump is a demolition)
     Bots/         BotBrain (bot decisions)
-    Cars/         CarModelBuilder (car looks at every evolution stage), CarDriver (connects CarPhysics to a car)
+    Cars/         CarModelBuilder (car looks at every evolution stage), CarDriver (connects CarPhysics to a car),
+                  DriveAssist (driving help), EasySteer (touch steering)
     Ball/         BallModelBuilder (the ball's look)
     Build/        PartKit (part helpers), Palette (colours)
     Net/          Remotes
@@ -308,7 +322,7 @@ src/
                   SeasonService (season XP and tier rewards), ProgressService (levels, achievements, titles,
                   badges), GiftService (playtime gifts), LeaderboardService (the weekly top 50), ShopService
                   (Robux purchases, VIP, the Premium bonus),
-                  QuickChatService, DataService (saving),
+                  QuickChatService, SettingsService (driving help on/off), DataService (saving),
                   GarageService (unlocking, fusing, evolving, style)
   client/   (StarterPlayerScripts.Client)
     Showroom/     ShowroomBuilder (the menu's garage showroom and its mirror-floor reflection),

@@ -109,6 +109,7 @@ return function(t)
 								megaReady = false,
 								ballPosition = ball.position,
 								ballVelocity = ball.velocity,
+								ballRadius = ballCfg.Radius,
 								predict = predict,
 								defendsSide = side,
 								role = roles[bot.key] or "support",

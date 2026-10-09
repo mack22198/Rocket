@@ -13,6 +13,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.Config.CarCatalog)
 local CarDriver = require(Shared.Cars.CarDriver)
 local CarPhysics = require(Shared.Physics.CarPhysics)
+local DriveAssist = require(Shared.Cars.DriveAssist)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 local Powers = require(Shared.Config.Powers)
@@ -31,6 +32,9 @@ CarController.EffectApplied = Signal.new() :: Signal.Signal<string, number>
 local localPlayer = Players.LocalPlayer
 local stateObject = MatchState.getObject()
 local A = MatchState.CarAttr
+
+-- Where the ball is and how big it is (BallView hands this over, since it requires this module).
+local ballInfo: (() -> (Vector3, Vector3, number, boolean))? = nil
 
 local myCar: Model? = nil
 local driver: CarDriver.CarDriver? = nil
@@ -93,8 +97,39 @@ local function step(dt: number)
 	local input = if canDrive
 		then InputController.read({ carCFrame = d.chassis.CFrame, grounded = d:isGrounded() })
 		else CarPhysics.NoInput
+	-- Driving help: steer toward the ball when it's ahead, jump toward it and flip into it, stay level in the air.
+	local assist: CarPhysics.Assist? = nil
+	local info = ballInfo
+	if canDrive and info and InputController.assist() then
+		local ballPosition, ballVelocity, radius, visible = info()
+		local team = car:GetAttribute(A.Team)
+		assist = { ball = if visible then ballPosition else nil, level = true }
+		if visible and (team == "Blue" or team == "Orange") then
+			local goal = DriveAssist.enemyGoal(
+				GameConfig.Teams[team :: string].DefendsSide,
+				GameConfig.Arena.Length,
+				GameConfig.Arena.GoalHeight
+			)
+			local steer = DriveAssist.steer({
+				carCFrame = d.chassis.CFrame,
+				carVelocity = d.chassis.AssemblyLinearVelocity,
+				grounded = d:isGrounded(),
+				throttle = input.throttle,
+				steer = input.steer,
+				ballPosition = ballPosition,
+				ballVelocity = ballVelocity,
+				ballRadius = radius,
+				enemyGoal = goal,
+			})
+			if steer ~= input.steer then
+				local steered = table.clone(input)
+				steered.steer = steer
+				input = steered
+			end
+		end
+	end
 	local hasBoost = numberAttribute(car, A.Boost) > 0
-	local result = d:step(dt, input, hasBoost)
+	local result = d:step(dt, input, hasBoost, assist)
 	boosting = canDrive and result ~= nil and result.boosting
 	if boosting ~= sentBoosting then
 		sentBoosting = boosting
@@ -247,6 +282,11 @@ end
 function CarController.getChassis(): BasePart?
 	local d = driver
 	return if d and myCar then d.chassis else nil
+end
+
+-- BallView tells the car where the ball is, for driving help: (position, velocity, radius, visible).
+function CarController.setBallInfo(provider: () -> (Vector3, Vector3, number, boolean))
+	ballInfo = provider
 end
 
 -- Used by BallView to give the car the small push back from hitting the ball.

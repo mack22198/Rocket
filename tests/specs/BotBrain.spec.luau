@@ -15,6 +15,7 @@ return function(t)
 			megaReady = false,
 			ballPosition = Vector3.new(0, 6, 0),
 			ballVelocity = Vector3.zero,
+			ballRadius = 6,
 			predict = function(_)
 				return Vector3.new(0, 6, 0)
 			end,
@@ -77,6 +78,31 @@ return function(t)
 		}
 		local roles = BotBrain.assignRoles(members, Vector3.new(0, 6, 0), 1, 160, "b")
 		expect.equal(roles.b, "attack")
+	end)
+
+	t.test("bots jump at a ball in the air, whatever its size", function()
+		for _, radius in { 6, 8, 11.5 } do
+			local ball = Vector3.new(0, radius + 6, 60 - (radius + 4))
+			local ctx = context({
+				ballRadius = radius,
+				ballPosition = ball,
+				predict = function(_)
+					return ball
+				end,
+			})
+			local input = BotBrain.decide(ctx, BotBrain.newMemory(), 1 / GameConfig.Bots.ThinkRate)
+			expect.truthy(input.jump, `jumps at a ball of radius {radius}`)
+		end
+		-- A ball rolling along the ground: no jump.
+		local rolling = Vector3.new(0, 8, 48)
+		local ctx = context({
+			ballRadius = 8,
+			ballPosition = rolling,
+			predict = function(_)
+				return rolling
+			end,
+		})
+		expect.falsy(BotBrain.decide(ctx, BotBrain.newMemory(), 1 / GameConfig.Bots.ThinkRate).jump)
 	end)
 
 	t.test("bots in the air level themselves out", function()

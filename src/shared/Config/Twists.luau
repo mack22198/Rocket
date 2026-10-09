@@ -44,8 +44,8 @@ Twists.List = {
 		Emoji = "🏀",
 		Description = "The ball is HUGE - easy to hit, hard to stop!",
 		Weight = 3,
-		-- (Big, but it must still fit right inside the 20-stud-deep net to count as a goal.)
-		Ball = { Radius = 9, Gravity = 60 },
+		-- (Big, but it must still fit right inside the 24-stud-deep net to count as a goal.)
+		Ball = { Radius = 11.5, Gravity = 55 },
 	},
 	{
 		Id = "moon",
