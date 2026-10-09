@@ -2408,7 +2408,8 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 		local glow = Instance.new("PointLight")
 		glow.Color = opts.teamColor
 		glow.Range = 12
-		glow.Brightness = 2.5
+		-- (Softer in the showroom, where the studio lights already light the car.)
+		glow.Brightness = if opts.preview then 0.8 else 2.5
 		glow.Shadows = false
 		glow.Parent = glowPoint
 	end

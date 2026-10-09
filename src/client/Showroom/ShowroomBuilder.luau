@@ -30,6 +30,16 @@ ShowroomBuilder.Radius = 46 -- floor centre to the walls
 ShowroomBuilder.Height = 30 -- floor to ceiling
 ShowroomBuilder.RingRadius = 7.8 -- the glowing ring the car stands in
 
+-- How strong the lights on the car are. Roblox adds every light that reaches a part together, so these stay
+-- low: the car should look painted, not glowing. (Turn them all up or down together to brighten or darken it.)
+ShowroomBuilder.Lights = {
+	Key = 1.3, -- the main spotlight, front left
+	Fill = 0.6, -- a softer one, front right
+	Rim = 1, -- from behind, outlining the roof
+	Softbox = 0.45, -- the big soft light overhead
+	Stands = 0.8, -- the blue and orange lamps either side
+}
+
 local R = ShowroomBuilder.Radius
 local H = ShowroomBuilder.Height
 local SIDES = 16
@@ -405,7 +415,7 @@ function ShowroomBuilder.build(): Showroom
 		Face = Enum.NormalId.Bottom,
 		Angle = 80,
 		Range = 36,
-		Brightness = 1.3,
+		Brightness = ShowroomBuilder.Lights.Softbox,
 		Color = rgb(255, 250, 242),
 		Shadows = true,
 	})
@@ -497,9 +507,10 @@ function ShowroomBuilder.build(): Showroom
 			Material = METAL,
 		})
 	end
-	spot(Vector3.new(-10, TRUSS_Y - 1.6, -TRUSS), Vector3.new(0, 1, 0), rgb(255, 242, 226), 4, 42, true)
-	spot(Vector3.new(11, TRUSS_Y - 1.6, -TRUSS), Vector3.new(0, 1, 0), rgb(206, 222, 255), 2.2, 46, true)
-	spot(Vector3.new(0, TRUSS_Y - 1.6, TRUSS), Vector3.new(0, 2, 0), rgb(255, 255, 255), 3.4, 40, true)
+	local L = ShowroomBuilder.Lights
+	spot(Vector3.new(-10, TRUSS_Y - 1.6, -TRUSS), Vector3.new(0, 1, 0), rgb(255, 242, 226), L.Key, 42, true)
+	spot(Vector3.new(11, TRUSS_Y - 1.6, -TRUSS), Vector3.new(0, 1, 0), rgb(206, 222, 255), L.Fill, 46, true)
+	spot(Vector3.new(0, TRUSS_Y - 1.6, TRUSS), Vector3.new(0, 2, 0), rgb(255, 255, 255), L.Rim, 40, true)
 
 	-- Team-coloured lights on stands either side, grazing the car.
 	local function stand(x: number, z: number, color: Color3)
@@ -521,7 +532,7 @@ function ShowroomBuilder.build(): Showroom
 			Color = COLORS.Rig,
 			Material = METAL,
 		})
-		spot(Vector3.new(x, 5.6, z), Vector3.new(0, 1.4, 0), color, 2.4, 34, false)
+		spot(Vector3.new(x, 5.6, z), Vector3.new(0, 1.4, 0), color, L.Stands, 34, false)
 	end
 	stand(-23, 7, rgb(70, 150, 255))
 	stand(23, 7, rgb(255, 150, 60))

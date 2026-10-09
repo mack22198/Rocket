@@ -36,16 +36,17 @@ local LIGHTING: { [string]: any } = {
 	Brightness = 0,
 	ClockTime = 0, -- night outside, so shiny paint reflects a dark sky instead of a blue one
 	EnvironmentDiffuseScale = 0.2,
-	EnvironmentSpecularScale = 0.8,
-	ExposureCompensation = 0.25,
+	EnvironmentSpecularScale = 0.5,
+	ExposureCompensation = 0,
 }
 local EFFECTS: { [string]: { [string]: any } } = {
 	Atmosphere = { Density = 0, Haze = 0, Glare = 0 },
-	BloomEffect = { Intensity = 0.9, Size = 32, Threshold = 0.95 },
+	-- Only the neon (the ring, the lamps, the screen) glows; the car's paint never should.
+	BloomEffect = { Intensity = 0.4, Size = 24, Threshold = 1.3 },
 	ColorCorrectionEffect = {
-		Contrast = 0.14,
-		Saturation = 0.12,
-		Brightness = 0.02,
+		Contrast = 0.12,
+		Saturation = 0.1,
+		Brightness = 0,
 		TintColor = Color3.new(0.97, 0.98, 1),
 	},
 	SunRaysEffect = { Intensity = 0 },
