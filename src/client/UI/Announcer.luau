@@ -18,16 +18,8 @@ local localPlayer = Players.LocalPlayer
 local gui: ScreenGui
 local feed: Frame
 local popup: TextLabel
+local popupOutline: UIStroke
 local popupToken = 0
-
-local EMOJI: { [string]: string } = {
-	style = "✨",
-	save = "🧤",
-	mega = "💥",
-	bump = "💢",
-	join = "👋",
-	demo = "💥",
-}
 
 -- "Bolt froze Sparky!" as Sparky sees it: "Bolt froze you!" (and "You froze Sparky!" for Bolt).
 local function personal(text: string, me: string): (string, boolean)
@@ -44,28 +36,31 @@ local function addFeedLine(text: string, color: Color3)
 	local line = Instance.new("Frame")
 	line.Size = UDim2.fromOffset(300, 32)
 	line.BackgroundColor3 = Theme.Colors.Panel
-	line.BackgroundTransparency = 0.25
 	line.LayoutOrder = -math.floor(os.clock() * 1000)
 	line.Parent = feed
 	Theme.corner(line, 8)
+	local outline = Theme.stroke(line, Theme.Colors.Ink, 2)
 	local bar = Instance.new("Frame")
-	bar.Size = UDim2.new(0, 6, 1, 0)
+	bar.Size = UDim2.new(0, 8, 1, 0)
 	bar.BackgroundColor3 = color
 	bar.BorderSizePixel = 0
 	bar.Parent = line
-	Theme.corner(bar, 3)
+	Theme.corner(bar, 4)
 	local label = Theme.label(line, {
-		size = UDim2.new(1, -18, 1, -6),
-		position = UDim2.fromOffset(12, 3),
-		text = text,
+		size = UDim2.new(1, -24, 1, -8),
+		position = UDim2.fromOffset(16, 4),
+		text = Theme.noEmoji(text),
 		font = Theme.Body,
+		color = Theme.Colors.Text,
+		textSize = 15,
 		align = Enum.TextXAlignment.Left,
 	})
 	task.delay(3.5, function()
 		local fade = TweenInfo.new(0.4)
 		TweenService:Create(line, fade, { BackgroundTransparency = 1 }):Play()
+		TweenService:Create(outline, fade, { Transparency = 1 }):Play()
 		TweenService:Create(bar, fade, { BackgroundTransparency = 1 }):Play()
-		TweenService:Create(label, fade, { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+		TweenService:Create(label, fade, { TextTransparency = 1 }):Play()
 		task.wait(0.45)
 		line:Destroy()
 	end)
@@ -102,10 +97,10 @@ function Announcer.popup(text: string, color: Color3)
 	end
 	popupToken += 1
 	local token = popupToken
-	popup.Text = text
+	popup.Text = Theme.noEmoji(text)
 	popup.TextColor3 = color
 	popup.TextTransparency = 0
-	popup.TextStrokeTransparency = 0.3
+	popupOutline.Transparency = 0
 	popup.Visible = true
 	popup.Rotation = -8
 	popup.Size = UDim2.fromOffset(300, 40)
@@ -117,7 +112,8 @@ function Announcer.popup(text: string, color: Color3)
 		if token ~= popupToken then
 			return
 		end
-		TweenService:Create(popup, TweenInfo.new(0.3), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+		TweenService:Create(popup, TweenInfo.new(0.3), { TextTransparency = 1 }):Play()
+		TweenService:Create(popupOutline, TweenInfo.new(0.3), { Transparency = 1 }):Play()
 		task.wait(0.35)
 		if token == popupToken then
 			popup.Visible = false
@@ -147,7 +143,7 @@ function Announcer.start()
 	layout.Parent = list
 	feed = list
 
-	popup = Theme.label(gui, {
+	popup = Theme.heading(gui, {
 		name = "Popup",
 		size = UDim2.fromOffset(520, 80),
 		position = UDim2.fromScale(0.5, 0.62),
@@ -157,9 +153,7 @@ function Announcer.start()
 	})
 	popup.Visible = false
 	popup.TextWrapped = false -- long names shrink to fit on one line instead of spilling over the car
-	local stroke = Instance.new("UIStroke")
-	stroke.Thickness = 3
-	stroke.Parent = popup
+	popupOutline = Theme.outline(popup, 4)
 	Theme.scaled(feed)
 	Theme.scaled(popup)
 
@@ -174,12 +168,11 @@ function Announcer.start()
 		if kind == "overtime" then
 			return -- the HUD shows this one
 		end
-		local emoji = EMOJI[kind] or "⭐"
 		if kind == "join" then
-			addFeedLine(`{emoji} {text}`, color)
+			addFeedLine(text, color)
 			return
 		elseif kind == "power" then
-			-- Items and powers: the text says it all ("❄️ Bolt froze Sparky!"), with "you" for you. Yours get a
+			-- Items and powers: the text says it all ("Bolt froze Sparky!"), with "you" for you. Yours get a
 			-- popup too.
 			local line = personal(text, localPlayer.DisplayName)
 			addFeedLine(line, color)
@@ -189,14 +182,14 @@ function Announcer.start()
 			return
 		elseif kind == "demo" then
 			-- Demolitions: a popup whether you did the smashing or got smashed.
-			local line, aboutMe = personal(`{EMOJI.demo} {text}`, localPlayer.DisplayName)
+			local line, aboutMe = personal(text, localPlayer.DisplayName)
 			addFeedLine(line, color)
 			if aboutMe then
 				Announcer.popup(line, color)
 			end
 			return
 		end
-		addFeedLine(if who then `{emoji} {text}  {who}` else `{emoji} {text}`, color)
+		addFeedLine(if who then `{text}  {who}` else text, color)
 		-- Only the big moments get a popup, and your own moments always do.
 		local mine = who ~= nil and who == localPlayer.DisplayName
 		if kind == "mega" or kind == "save" or mine then

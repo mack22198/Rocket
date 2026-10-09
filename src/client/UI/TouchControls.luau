@@ -63,9 +63,9 @@ local function makeButton(
 	table.insert(placements, { button = button, fromRight = fromRight, fromBottom = fromBottom })
 	Theme.scaled(button)
 	button.BackgroundColor3 = color
-	button.BackgroundTransparency = 0.15
+	button.BackgroundTransparency = 0.1
 	button.Text = text
-	button.Font = Theme.Title
+	button.Font = Theme.Display
 	button.TextScaled = true
 	button.TextColor3 = C.Text
 	button.AutoButtonColor = false
@@ -73,7 +73,8 @@ local function makeButton(
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0.5, 0)
 	corner.Parent = button
-	Theme.stroke(button, Color3.new(1, 1, 1), 3).Transparency = 0.4
+	Theme.stroke(button, C.Ink, 3)
+	Theme.outline(button, 2)
 	local padding = Instance.new("UIPadding")
 	padding.PaddingTop = UDim.new(0.25, 0)
 	padding.PaddingBottom = UDim.new(0.25, 0)
@@ -96,7 +97,7 @@ local function holdButton(button: TextButton, onChange: (boolean) -> ())
 	UserInputService.InputEnded:Connect(function(input)
 		if input == active then
 			active = nil
-			button.BackgroundTransparency = 0.15
+			button.BackgroundTransparency = 0.1
 			onChange(false)
 		end
 	end)
@@ -169,7 +170,9 @@ local function build()
 		position = UDim2.new(0.5, 0, 1, 10),
 		anchor = Vector2.new(0.5, 0),
 		text = "DRAG TO DRIVE",
-		font = Enum.Font.GothamBlack,
+		font = Theme.Caps,
+		color = C.Text,
+		stroke = true,
 	})
 
 	stickZone.InputBegan:Connect(function(input)
@@ -202,14 +205,16 @@ local function build()
 	end)
 
 	-- The BOOST button also shows how much boost is left.
-	local boost = makeButton("Boost", "0", Color3.fromRGB(255, 140, 30), 126, 100, 118)
+	local boost = makeButton("Boost", "0", C.Mega, 126, 100, 118)
 	local boostCaption = Theme.label(boost, {
 		name = "Caption",
 		size = UDim2.fromScale(1, 0.3),
 		position = UDim2.fromScale(0.5, 1.42),
 		anchor = Vector2.new(0.5, 1),
 		text = "BOOST",
-		font = Enum.Font.GothamBlack,
+		font = Theme.Caps,
+		color = C.Text,
+		stroke = true,
 	})
 	boostCaption.ZIndex = 2
 	holdButton(boost, function(held)
@@ -220,25 +225,25 @@ local function build()
 		local amount = if car then car:GetAttribute(MatchState.CarAttr.Boost) else nil
 		boost.Text = tostring(math.floor(if type(amount) == "number" then amount else 0))
 	end)
-	local jump = makeButton("Jump", "JUMP", Color3.fromRGB(60, 160, 255), 108, 238, 76)
+	local jump = makeButton("Jump", "JUMP", C.Sky, 108, 238, 76)
 	holdButton(jump, function(held)
 		InputController.setTouchButton("jump", held)
 	end)
-	local cam = makeButton("BallCam", "CAM", Color3.fromRGB(90, 90, 120), 54, 62, 395)
+	local cam = makeButton("BallCam", "CAM", C.Panel, 54, 62, 395)
 	cam.Activated:Connect(function()
 		CameraController.toggleBallCam()
 	end)
 
 	-- ITEM shows the item you're holding; POWER shows your car's power and counts down while it recharges.
-	local item = makeButton("Item", "?", Color3.fromRGB(70, 80, 120), 88, 112, 268)
+	local item = makeButton("Item", "?", C.Panel, 88, 112, 268)
 	item.Activated:Connect(function()
 		InputController.ItemPressed:Fire()
 	end)
-	local power = makeButton("Power", "", Color3.fromRGB(70, 80, 120), 88, 250, 215)
+	local power = makeButton("Power", "", C.Panel, 88, 250, 215)
 	power.Activated:Connect(function()
 		InputController.PowerPressed:Fire()
 	end)
-	local horn = makeButton("Horn", "📯", Color3.fromRGB(90, 90, 120), 50, 360, 140)
+	local horn = makeButton("Horn", "HORN", C.Panel, 50, 360, 140)
 	horn.Activated:Connect(function()
 		InputController.HornPressed:Fire()
 	end)
@@ -255,7 +260,9 @@ local function build()
 			position = UDim2.fromScale(0.5, 1.58),
 			anchor = Vector2.new(0.5, 0),
 			text = entry.text,
-			font = Enum.Font.GothamBlack,
+			font = Theme.Caps,
+			color = C.Text,
+			stroke = true,
 		})
 		caption.ZIndex = 2
 	end
@@ -270,14 +277,16 @@ local function build()
 		local itemDef = if type(held) == "string" then Powers.item(held) else nil
 		local readyAt = car:GetAttribute(A.ItemReadyAt)
 		local spinning = itemDef ~= nil and type(readyAt) == "number" and now < readyAt
-		item.Text = if itemDef and not spinning then itemDef.Emoji elseif spinning then "…" else "?"
-		item.BackgroundColor3 = if itemDef and not spinning then itemDef.Color else Color3.fromRGB(70, 80, 120)
+		item.Text = if itemDef and not spinning then itemDef.Emoji elseif spinning then "..." else "?"
+		item.Font = if itemDef and not spinning then Theme.Title else Theme.Display
+		item.BackgroundColor3 = if itemDef and not spinning then itemDef.Color else C.Panel
 		local carId = car:GetAttribute(A.CarId)
 		local powerDef = Powers.forCar(if type(carId) == "string" then carId else "")
 		local powerReadyAt = car:GetAttribute(A.PowerReadyAt)
 		local left = if type(powerReadyAt) == "number" then powerReadyAt - now else 0
 		power.Text = if left > 0 then tostring(math.ceil(left)) else powerDef.Emoji
-		power.BackgroundColor3 = if left > 0 then Color3.fromRGB(70, 80, 120) else powerDef.Color
+		power.Font = if left > 0 then Theme.Display else Theme.Title
+		power.BackgroundColor3 = if left > 0 then C.Panel else powerDef.Color
 	end)
 	placeAll(Theme.getScale())
 	Theme.onScaleChanged(placeAll)

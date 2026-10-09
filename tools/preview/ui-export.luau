@@ -404,6 +404,9 @@ local fakeInput = {
 		return true
 	end,
 	setEasySteer = function() end,
+	assist = function()
+		return true
+	end,
 	ChatPressed = signal(),
 	start = function() end,
 }
@@ -438,6 +441,9 @@ harness.globals.__event = function(object, name: string)
 	events[object] = events[object] or {}
 	events[object][name] = events[object][name] or signal()
 	return events[object][name]
+end
+harness.globals.__absoluteSize = function(_)
+	return Vector2.new(0, 0)
 end
 harness.globals.__pivotTo = function(model, target)
 	local primary = model.PrimaryPart
@@ -493,6 +499,8 @@ do
 		-- (Browsers can't draw Roblox's Robux icon.)
 		source = string.gsub(source, "utf8%.char%(0xE002%)", '"R$"')
 		source = string.gsub(source, "([%w_%.]+):PivotTo%(", "__pivotTo(%1, ")
+		-- (Pretend instances aren't laid out, so they have no size on screen.)
+		source = string.gsub(source, "([%w_]+)%.AbsoluteSize", "__absoluteSize(%1)")
 		return (string.gsub(source, "([%w_%.]+):GetPropertyChangedSignal%(([^)]*)%)", "__event(%1, %2)"))
 	end
 end

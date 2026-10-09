@@ -1,5 +1,5 @@
 --!strict
--- "How to play": six picture cards that explain the whole game in a few words, plus the controls for
+-- "How to play": six numbered cards that explain the whole game in a few words, plus the controls for
 -- keyboard, gamepad and touch. Opened from the main menu and the in-match menu.
 
 local Players = game:GetService("Players")
@@ -14,53 +14,41 @@ local rgb = Color3.fromRGB
 
 local CARDS = {
 	{
-		icon = "⚽",
 		title = "SCORE GOALS",
 		text = "Hold W and your car helps you hit the ball at the other team's goal. Most goals at 0:00 wins!",
 		color = C.Good,
 	},
 	{
-		icon = "🚀",
-		title = "BOOST & JUMP",
+		title = "BOOST AND JUMP",
 		text = "Boost to go super fast. Ball in the air? Jump at it, then jump again to flip into it. Smash cars at full boost - POOF!",
-		color = C.Boost,
+		color = C.Gold,
 	},
 	{
-		icon = "🎁",
 		title = "ITEM BOXES",
 		text = "Drive through a ? box to grab an item, like a Magnet or Freeze Ray. Losing? You get better ones!",
-		color = rgb(120, 200, 255),
+		color = C.Sky,
 	},
 	{
-		icon = "⚡",
 		title = "CAR POWERS",
 		text = "Every car has its own power, like Cheese Trap or Ground Pound. It charges back up after each use!",
-		color = rgb(255, 214, 90),
+		color = C.Shop,
 	},
 	{
-		icon = "💥",
 		title = "MEGA SHOT",
 		text = "Touching the ball fills your Mega meter. When it's full, press Mega and your next hit blasts the ball!",
 		color = C.Mega,
 	},
 	{
-		icon = "🔩",
-		title = "UNLOCK & EVOLVE",
+		title = "UNLOCK AND EVOLVE",
 		text = "Matches earn Scrap for new cars and season rewards (more with friends!). Drive a car to make it evolve!",
 		color = C.Evolve,
 	},
 }
 
 local CONTROLS = {
-	{
-		"⌨️",
-		"WASD drive · SPACE jump · SHIFT boost · R item · G power · F mega · H horn · C cam · T chat · M menu",
-	},
-	{
-		"🎮",
-		"RT/LT drive · A jump · B boost · RB item · LB power · X mega · D-pad horn/chat · Y cam · VIEW menu",
-	},
-	{ "📱", "Drag toward where you want to go, then JUMP, BOOST, ITEM and POWER. Mega Shot arms itself!" },
+	{ "KEYBOARD", "W S drive, A D steer, SPACE jump, SHIFT boost, R item, G power, F mega, T chat, M menu" },
+	{ "GAMEPAD", "RT LT drive, A jump, B boost, RB item, LB power, X mega, D-pad chat, Y cam, VIEW menu" },
+	{ "TOUCH", "Drag toward where you want to go, then JUMP, BOOST, ITEM and POWER. Mega Shot arms itself!" },
 }
 
 local gui: ScreenGui
@@ -69,43 +57,38 @@ local closeButton: TextButton
 local onClosed: (() -> ())? = nil
 
 local function card(parent: Instance, info: typeof(CARDS[1]), order: number)
-	local frame = Instance.new("Frame")
-	frame.Name = `Card{order}`
+	local frame = Theme.well(parent, `Card{order}`, UDim2.new(), UDim2.new())
 	frame.LayoutOrder = order
-	frame.BackgroundColor3 = C.PanelDark
-	frame.BackgroundTransparency = 0.2
-	frame.Parent = parent
-	Theme.corner(frame, 14)
-	Theme.stroke(frame, info.color, 2).Transparency = 0.35
-	local icon = Theme.label(frame, {
-		name = "Icon",
-		size = UDim2.fromOffset(62, 62),
-		position = UDim2.fromOffset(12, 14),
-		text = info.icon,
-		stroke = false,
+	local number = Theme.heading(frame, {
+		name = "Number",
+		size = UDim2.fromOffset(44, 44),
+		position = UDim2.fromOffset(14, 14),
+		text = tostring(order),
+		color = if Theme.isLight(info.color) then C.Ink else C.Text,
+		textSize = 28,
 	})
-	icon.BackgroundColor3 = info.color
-	icon.BackgroundTransparency = 0.75
-	Theme.corner(icon, 31)
+	number.BackgroundColor3 = info.color
+	number.BackgroundTransparency = 0
+	Theme.corner(number, 22)
+	Theme.stroke(number, C.Ink, 3)
 	Theme.label(frame, {
 		name = "Title",
-		size = UDim2.new(1, -96, 0, 26),
-		position = UDim2.fromOffset(86, 14),
+		size = UDim2.new(1, -86, 0, 22),
+		position = UDim2.fromOffset(72, 14),
 		text = info.title,
-		color = info.color,
+		textSize = 18,
 		align = Enum.TextXAlignment.Left,
 	})
 	local body = Theme.label(frame, {
 		name = "Text",
-		size = UDim2.new(1, -96, 0, 72),
-		position = UDim2.fromOffset(86, 44),
+		size = UDim2.new(1, -86, 0, 74),
+		position = UDim2.fromOffset(72, 40),
 		text = info.text,
 		font = Theme.Body,
-		color = C.Text,
+		color = C.InkMuted,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 		scaled = false,
-		textSize = 15,
+		textSize = 14,
 	})
 	body.TextYAlignment = Enum.TextYAlignment.Top
 end
@@ -119,37 +102,39 @@ local function build()
 	dim.Text = ""
 	dim.AutoButtonColor = false
 	dim.Size = UDim2.fromScale(1, 1)
-	dim.BackgroundColor3 = rgb(0, 0, 0)
+	dim.BackgroundColor3 = rgb(6, 8, 18)
 	dim.BackgroundTransparency = 0.4
 	dim.Parent = gui
 
-	panel = Theme.panel(gui, "HowToPlay", UDim2.fromOffset(940, 540), UDim2.fromScale(0.5, 0.53), Vector2.new(0.5, 0.5))
+	panel = Theme.card(gui, "HowToPlay", UDim2.fromOffset(940, 556), UDim2.fromScale(0.5, 0.53), Vector2.new(0.5, 0.5))
 	Theme.scaled(panel)
-	Theme.padding(panel, 20)
-	Theme.label(panel, {
+	Theme.padding(panel, 24)
+	Theme.heading(panel, {
 		name = "Heading",
-		size = UDim2.new(1, 0, 0, 46),
+		size = UDim2.new(1, 0, 0, 44),
 		text = "HOW TO PLAY",
-		color = C.Gold,
+		textSize = 44,
+		align = Enum.TextXAlignment.Left,
 	})
 	Theme.label(panel, {
 		name = "Subheading",
 		size = UDim2.new(1, 0, 0, 18),
-		position = UDim2.fromOffset(0, 48),
-		text = "3 vs 3 CAR SOCCER - YOUR TEAM IS BLUE OR ORANGE",
-		font = Theme.Caps,
-		color = C.Muted,
-		stroke = false,
+		position = UDim2.fromOffset(2, 48),
+		text = "Three against three. Your team is blue or orange.",
+		font = Theme.Body,
+		color = C.InkMuted,
+		textSize = 16,
+		align = Enum.TextXAlignment.Left,
 	})
 
 	local grid = Instance.new("Frame")
 	grid.Name = "Cards"
-	grid.Size = UDim2.new(1, 0, 0, 260)
-	grid.Position = UDim2.fromOffset(0, 80)
+	grid.Size = UDim2.new(1, 0, 0, 268)
+	grid.Position = UDim2.fromOffset(0, 84)
 	grid.BackgroundTransparency = 1
 	grid.Parent = panel
 	local layout = Instance.new("UIGridLayout")
-	layout.CellSize = UDim2.fromOffset(292, 124)
+	layout.CellSize = UDim2.fromOffset(289, 126)
 	layout.CellPadding = UDim2.fromOffset(12, 12)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -160,30 +145,36 @@ local function build()
 
 	local controls = Instance.new("Frame")
 	controls.Name = "Controls"
-	controls.Size = UDim2.new(1, 0, 0, 78)
-	controls.Position = UDim2.fromOffset(0, 352)
+	controls.Size = UDim2.new(1, -200, 0, 96)
+	controls.Position = UDim2.fromOffset(0, 372)
 	controls.BackgroundTransparency = 1
 	controls.Parent = panel
 	for i, row in CONTROLS do
+		local y = (i - 1) * 32
+		Theme.pill(controls, {
+			name = `Device{i}`,
+			size = UDim2.fromOffset(96, 24),
+			position = UDim2.fromOffset(0, y),
+			text = row[1],
+		})
 		Theme.label(controls, {
 			name = `Controls{i}`,
-			size = UDim2.new(1, -170, 0, 22),
-			position = UDim2.fromOffset(0, (i - 1) * 25),
-			text = `{row[1]}  {row[2]}`,
+			size = UDim2.new(1, -110, 0, 24),
+			position = UDim2.fromOffset(110, y),
+			text = row[2],
 			font = Theme.Body,
-			color = C.Muted,
+			textSize = 13,
 			align = Enum.TextXAlignment.Left,
-			stroke = false,
 		})
 	end
 
 	closeButton = Theme.button(panel, {
 		name = "GotIt",
-		size = UDim2.fromOffset(170, 56),
+		size = UDim2.fromOffset(180, 62),
 		position = UDim2.fromScale(1, 1),
 		anchor = Vector2.new(1, 1),
 		text = "GOT IT!",
-		color = C.Good,
+		textSize = 30,
 	})
 	closeButton.Activated:Connect(function()
 		HowToPlay.close()

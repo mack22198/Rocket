@@ -56,7 +56,7 @@ local HINTS: { Hint } = {
 			return s.sinceKickoff < 4
 		end,
 		text = function()
-			return "🚗 Drive into the ball to knock it toward the other goal!"
+			return "Drive into the ball to knock it toward the other goal!"
 		end,
 	},
 	{
@@ -65,7 +65,7 @@ local HINTS: { Hint } = {
 			return s.sinceKickoff > 6 and s.boost > 30 and s.speed > 15 and s.speed < 70
 		end,
 		text = function(_, keys)
-			return `🚀 Hold {keys.boost} to boost - it's super fast!`
+			return `Hold {keys.boost} to boost. It's super fast!`
 		end,
 	},
 	{
@@ -74,7 +74,7 @@ local HINTS: { Hint } = {
 			return s.ballHigh
 		end,
 		text = function(_, keys)
-			return `⬆️ Ball in the air? Press {keys.jump} to jump - twice to flip into it!`
+			return `Ball in the air? Press {keys.jump} to jump, then again to flip into it!`
 		end,
 	},
 	{
@@ -85,7 +85,7 @@ local HINTS: { Hint } = {
 		text = function(s, keys)
 			local def = Powers.item(s.item or "")
 			local name = if def then `{def.Emoji} {def.Name}` else "an item"
-			return `🎁 You got a {name}! Press {keys.item} to use it.`
+			return `You got a {name}! Press {keys.item} to use it.`
 		end,
 	},
 	{
@@ -94,7 +94,7 @@ local HINTS: { Hint } = {
 			return s.sinceKickoff > 20 and s.powerReady
 		end,
 		text = function(s, keys)
-			return `⚡ Press {keys.power} for your car's power: {s.power}!`
+			return `Press {keys.power} for your car's power: {s.power}!`
 		end,
 	},
 }
@@ -143,7 +143,7 @@ local function show(hint: Hint, situation: Situation)
 	pill.Text = hint.text(situation, keys())
 	pill.Visible = true
 	pill.TextTransparency = 0
-	pill.BackgroundTransparency = 0.15
+	pill.BackgroundTransparency = 0
 	pill.Position = UDim2.fromScale(0.5, 0.76)
 	TweenService:Create(pill, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		Position = UDim2.fromScale(0.5, 0.72),
@@ -212,16 +212,18 @@ function Coach.start()
 	gui = Theme.screen("TurboCoach", 6)
 	pill = Theme.pill(gui, {
 		name = "Hint",
-		size = UDim2.fromOffset(640, 44),
+		size = UDim2.fromOffset(640, 46),
 		position = UDim2.fromScale(0.5, 0.72),
 		anchor = Vector2.new(0.5, 0.5),
 		text = "",
 		font = Theme.Title,
-		background = C.PanelDark,
-		transparency = 0.15,
+		background = C.Card,
 	})
 	pill.Visible = false
-	Theme.stroke(pill, C.Gold, 2).Transparency = 0.2
+	local stroke = pill:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Thickness = 3
+	end
 	Theme.scaled(pill)
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
 

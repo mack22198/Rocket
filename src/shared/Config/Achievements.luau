@@ -392,9 +392,10 @@ function Achievements.title(id: string): TitleDef?
 end
 
 -- "🧤 Brick Wall" (or "" for an unknown title).
+-- A title as it's shown (under names, on the profile).
 function Achievements.titleText(id: string): string
 	local title = titlesById[id]
-	return if title then `{title.Emoji} {title.Text}` else ""
+	return if title then title.Text else ""
 end
 
 -- Has someone at `level` with these achievements (and VIP or not) unlocked this title?

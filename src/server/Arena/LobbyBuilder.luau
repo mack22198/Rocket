@@ -151,7 +151,7 @@ local function showroomStand(folder: Instance, def: CarCatalog.CarDef, position:
 	title.Name = "Title"
 	title.Size = UDim2.fromScale(1, 0.6)
 	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.FredokaOne
+	title.Font = Enum.Font.LuckiestGuy
 	title.TextScaled = true
 	title.TextColor3 = Color3.new(1, 1, 1)
 	title.TextStrokeTransparency = 0.3

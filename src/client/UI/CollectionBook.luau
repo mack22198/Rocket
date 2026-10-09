@@ -74,9 +74,9 @@ local function carEntries(): { Entry }
 				name = CarCatalog.stageName(def, stage),
 				owned = have,
 				hint = if not owned and def.Fusion
-					then "🧬 Fuse in the Garage"
-					elseif not owned then `🔒 Unlock for 🔩{Theme.formatNumber(def.Price)}`
-					else "✨ Evolve to reveal",
+					then "Fuse it in the Garage"
+					elseif not owned then `Unlock for {Theme.formatNumber(def.Price)} Scrap`
+					else "Evolve to reveal",
 				color = CarCatalog.Rarities[def.Rarity].Color,
 				model = function(): Model
 					return CarModelBuilder.build(def, { preview = true, stage = stage })
@@ -89,7 +89,7 @@ end
 
 local function seasonName(themeId: string): string
 	local theme = Season.theme(themeId)
-	return if theme then `{theme.Emoji} {theme.Name}` else "A"
+	return if theme then theme.Name else "A"
 end
 
 -- A page for one kind of style item (hats, horns or goal parties).
@@ -106,11 +106,11 @@ local function styleEntries(kind: Cosmetics.Kind): () -> { Entry }
 				name = item.Name,
 				owned = owned[item.Id] == true,
 				hint = if item.Vip
-					then "💎 Comes with VIP"
-					elseif item.Season and item.Gold then `🏆 {seasonName(item.Season)} Gold Pass`
-					elseif item.Season then `🏆 {seasonName(item.Season)} season reward`
-					else `🔩 {Theme.formatNumber(item.Price)} in the Garage`,
-				color = if item.Vip then rgb(120, 210, 255) elseif item.Season then C.Evolve else C.Gold,
+					then "Comes with VIP"
+					elseif item.Season and item.Gold then `{seasonName(item.Season)} Gold Pass`
+					elseif item.Season then `{seasonName(item.Season)} season reward`
+					else `{Theme.formatNumber(item.Price)} Scrap in the Garage`,
+				color = if item.Vip then C.Shop elseif item.Season then C.Evolve else C.Gold,
 				emoji = item.Emoji,
 			})
 		end
@@ -152,17 +152,17 @@ local function makeCell(entry: Entry, order: number): Cell
 	local frame = Instance.new("Frame")
 	frame.Name = entry.key
 	frame.LayoutOrder = order
-	frame.BackgroundColor3 = C.PanelDark
+	frame.BackgroundColor3 = C.CardShade
 	frame.Parent = grid
 	Theme.corner(frame, 12)
-	local stroke = Theme.stroke(frame, entry.color, 2)
+	local stroke = Theme.stroke(frame, C.Ink, 2)
 	local viewport: ViewportFrame? = nil
 	local emoji: TextLabel? = nil
 	if entry.model then
 		local view = Instance.new("ViewportFrame")
 		view.Size = UDim2.new(1, -12, 0, 78)
 		view.Position = UDim2.fromOffset(6, 6)
-		view.BackgroundColor3 = rgb(40, 48, 84)
+		view.BackgroundColor3 = rgb(64, 72, 116)
 		view.Ambient = rgb(170, 172, 196)
 		view.LightColor = rgb(255, 255, 255)
 		view.LightDirection = Vector3.new(-1, -2, -1)
@@ -181,17 +181,16 @@ local function makeCell(entry: Entry, order: number): Cell
 		emoji = Theme.label(frame, {
 			size = UDim2.new(1, -12, 0, 72),
 			position = UDim2.fromOffset(6, 8),
-			text = entry.emoji or "⭐",
-			stroke = false,
+			text = entry.emoji or "?",
+			textSize = 60,
 		})
 	end
 	local name = Theme.label(frame, {
 		name = "Name",
-		size = UDim2.new(1, -10, 0, 18),
-		position = UDim2.fromOffset(5, 88),
+		size = UDim2.new(1, -10, 0, 16),
+		position = UDim2.fromOffset(5, 89),
 		text = "",
-		font = Theme.Body,
-		stroke = false,
+		textSize = 14,
 	})
 	local hint = Theme.label(frame, {
 		name = "Hint",
@@ -199,8 +198,8 @@ local function makeCell(entry: Entry, order: number): Cell
 		position = UDim2.fromOffset(5, 106),
 		text = "",
 		font = Theme.Body,
-		color = C.Muted,
-		stroke = false,
+		color = C.InkMuted,
+		textSize = 11,
 	})
 	return {
 		frame = frame,
@@ -220,20 +219,25 @@ local function showCell(cell: Cell, entry: Entry)
 		cell.viewport.ImageColor3 = if entry.owned then rgb(255, 255, 255) else rgb(0, 0, 0)
 		cell.viewport.ImageTransparency = if entry.owned then 0 else 0.15
 	end
-	if cell.emoji then
-		cell.emoji.TextTransparency = if entry.owned then 0 else 0.85
+	local emoji = cell.emoji
+	if emoji then
+		-- A question mark until you've got it.
+		emoji.Text = if entry.owned then entry.emoji or "?" else "?"
+		emoji.Font = if entry.owned then Theme.Title else Theme.Display
+		emoji.TextColor3 = if entry.owned then C.Ink else C.CardLine
 	end
 	cell.name.Text = if entry.owned then entry.name else "???"
-	cell.name.TextColor3 = if entry.owned then C.Text else C.Muted
-	cell.hint.Text = if entry.owned then "✅ COLLECTED" else entry.hint
-	cell.hint.TextColor3 = if entry.owned then C.Good else C.Muted
-	cell.stroke.Transparency = if entry.owned then 0 else 0.6
+	cell.name.TextColor3 = if entry.owned then C.Ink else C.InkMuted
+	cell.hint.Text = if entry.owned then "COLLECTED" else entry.hint
+	cell.hint.Font = if entry.owned then Theme.Caps else Theme.Body
+	cell.hint.TextColor3 = if entry.owned then C.GoodText else C.InkMuted
+	cell.frame.BackgroundColor3 = if entry.owned then C.Card else C.CardShade
 end
 
 local function showPage(index: number)
 	currentPage = index
 	for i, tab in tabs do
-		Theme.setButtonColor(tab, if i == index then C.Gold else C.PanelLight, if i == index then nil else C.Text)
+		Theme.setButtonColor(tab, if i == index then C.Gold else C.CardShade)
 	end
 	for _, cell in cells do
 		cell.frame.Visible = false
@@ -252,7 +256,7 @@ local function showPage(index: number)
 		showCell(cell, entry)
 	end
 	local have, total = CollectionBook.count()
-	countLabel.Text = `{have} / {total} COLLECTED`
+	countLabel.Text = `{have}/{total} COLLECTED`
 	countBar.set(have / math.max(total, 1))
 end
 
@@ -264,11 +268,11 @@ local function rebuildTabs()
 	for i, page in pages do
 		local tab = Theme.button(tabBar, {
 			name = `Tab{i}`,
-			size = UDim2.fromOffset(170, 40),
-			position = UDim2.fromOffset((i - 1) * 180, 0),
-			text = page.title,
-			color = C.PanelLight,
-			textColor = C.Text,
+			size = UDim2.fromOffset(150, 42),
+			position = UDim2.fromOffset((i - 1) * 160, 0),
+			text = Theme.noEmoji(page.title),
+			color = C.CardShade,
+			textSize = 20,
 		})
 		tab.Activated:Connect(function()
 			showPage(i)
@@ -285,38 +289,38 @@ local function build()
 	dim.Text = ""
 	dim.AutoButtonColor = false
 	dim.Size = UDim2.fromScale(1, 1)
-	dim.BackgroundColor3 = rgb(0, 0, 0)
-	dim.BackgroundTransparency = 0.35
+	dim.BackgroundColor3 = rgb(6, 8, 18)
+	dim.BackgroundTransparency = 0.4
 	dim.Parent = gui
 
-	panel = Theme.panel(gui, "Book", UDim2.fromOffset(1000, 620), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
+	panel = Theme.card(gui, "Book", UDim2.fromOffset(1000, 624), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
 	Theme.scaled(panel)
-	Theme.padding(panel, 18)
-	Theme.label(panel, {
+	Theme.padding(panel, 20)
+	Theme.heading(panel, {
 		name = "Title",
-		size = UDim2.fromOffset(400, 46),
-		text = "📖 COLLECTION",
-		color = C.Gold,
+		size = UDim2.fromOffset(340, 46),
+		text = "COLLECTION",
+		textSize = 44,
 		align = Enum.TextXAlignment.Left,
 	})
 	countLabel = Theme.label(panel, {
 		name = "Count",
-		size = UDim2.fromOffset(260, 20),
-		position = UDim2.fromOffset(420, 6),
+		size = UDim2.fromOffset(260, 16),
+		position = UDim2.fromOffset(350, 6),
 		text = "",
 		font = Theme.Caps,
+		textSize = 14,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 	})
-	countBar = Theme.bar(panel, UDim2.fromOffset(260, 12), UDim2.fromOffset(420, 30), C.Evolve)
+	countBar = Theme.bar(panel, UDim2.fromOffset(260, 14), UDim2.fromOffset(350, 28), C.Evolve, C.CardLine)
 	local close = Theme.button(panel, {
 		name = "Close",
-		size = UDim2.fromOffset(140, 48),
+		size = UDim2.fromOffset(120, 50),
 		position = UDim2.fromScale(1, 0),
 		anchor = Vector2.new(1, 0),
-		text = "◀ BACK",
-		color = C.PanelLight,
-		textColor = C.Text,
+		text = "BACK",
+		color = C.Panel,
+		textSize = 22,
 	})
 	close.Activated:Connect(function()
 		CollectionBook.close()
@@ -324,18 +328,19 @@ local function build()
 
 	tabBar = Instance.new("Frame")
 	tabBar.Name = "Tabs"
-	tabBar.Size = UDim2.new(1, 0, 0, 40)
-	tabBar.Position = UDim2.fromOffset(0, 58)
+	tabBar.Size = UDim2.new(1, 0, 0, 42)
+	tabBar.Position = UDim2.fromOffset(0, 60)
 	tabBar.BackgroundTransparency = 1
 	tabBar.Parent = panel
 
 	grid = Instance.new("ScrollingFrame")
 	grid.Name = "Grid"
-	grid.Size = UDim2.new(1, 0, 1, -110)
-	grid.Position = UDim2.fromOffset(0, 110)
+	grid.Size = UDim2.new(1, 6, 1, -118)
+	grid.Position = UDim2.fromOffset(0, 118)
 	grid.BackgroundTransparency = 1
 	grid.BorderSizePixel = 0
 	grid.ScrollBarThickness = 6
+	grid.ScrollBarImageColor3 = C.Ink
 	grid.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	grid.CanvasSize = UDim2.new()
 	grid.Parent = panel
@@ -372,7 +377,7 @@ end
 
 function CollectionBook.start()
 	build()
-	CollectionBook.addPage({ title = "🚗 CARS", entries = carEntries })
+	CollectionBook.addPage({ title = "CARS", entries = carEntries })
 	for _, kind in Cosmetics.Kinds do
 		CollectionBook.addPage({ title = Cosmetics.KindNames[kind], entries = styleEntries(kind :: Cosmetics.Kind) })
 	end

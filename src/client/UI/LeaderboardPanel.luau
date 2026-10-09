@@ -20,7 +20,8 @@ local C = Theme.Colors
 local rgb = Color3.fromRGB
 local localPlayer = Players.LocalPlayer
 
-local MEDALS = { "🥇", "🥈", "🥉" }
+-- Gold, silver and bronze for the top three.
+local MEDALS = { rgb(255, 202, 40), rgb(200, 208, 222), rgb(222, 140, 76) }
 
 local gui: ScreenGui
 local panel: Frame
@@ -38,37 +39,41 @@ local function clearRows()
 	end
 end
 
-local function addRow(order: number, rank: string, name: string, score: string, isMe: boolean)
+local function addRow(order: number, name: string, score: number, isMe: boolean)
 	local row = Instance.new("Frame")
 	row.Name = `Row{order}`
 	row.LayoutOrder = order
-	row.Size = UDim2.new(1, -8, 0, 36)
-	row.BackgroundColor3 = if isMe then C.Gold elseif order % 2 == 0 then C.PanelLight else C.PanelDark
-	row.BackgroundTransparency = if isMe then 0.55 else 0.35
+	row.Size = UDim2.new(1, -10, 0, 40)
+	row.BackgroundColor3 = if isMe then C.Gold elseif order % 2 == 0 then C.Card else C.CardShade
 	row.Parent = list
-	Theme.corner(row, 8)
-	Theme.label(row, {
+	Theme.corner(row, 10)
+	if isMe then
+		Theme.stroke(row, C.Ink, 2)
+	end
+	local medal = MEDALS[order]
+	local rank = Theme.heading(row, {
 		name = "Rank",
-		size = UDim2.fromOffset(60, 28),
-		position = UDim2.fromOffset(8, 4),
-		text = rank,
-		color = if order <= 3 then C.Gold else C.Muted,
+		size = UDim2.fromOffset(if medal then 30 else 56, 30),
+		position = UDim2.fromOffset(if medal then 14 else 4, 5),
+		text = if medal then tostring(order) else `#{order}`,
+		color = C.Ink,
+		textSize = if medal then 20 else 18,
 	})
+	if medal then
+		rank.BackgroundColor3 = medal
+		rank.BackgroundTransparency = 0
+		Theme.corner(rank, 15)
+		Theme.stroke(rank, C.Ink, 2)
+	end
 	Theme.label(row, {
 		name = "Name",
-		size = UDim2.new(1, -230, 0, 26),
-		position = UDim2.fromOffset(78, 5),
+		size = UDim2.new(1, -230, 0, 20),
+		position = UDim2.fromOffset(70, 10),
 		text = name,
+		textSize = 17,
 		align = Enum.TextXAlignment.Left,
 	})
-	Theme.label(row, {
-		name = "Score",
-		size = UDim2.fromOffset(140, 26),
-		position = UDim2.new(1, -150, 0, 5),
-		text = score,
-		color = C.Scrap,
-		align = Enum.TextXAlignment.Right,
-	})
+	Theme.amount(row, 24, UDim2.new(1, -14, 0.5, 0), Vector2.new(1, 0.5)).set(score)
 end
 
 local function timeLeft(seconds: number): string
@@ -101,20 +106,14 @@ local function load()
 		end
 		local top = if type(board.top) == "table" then board.top else {}
 		message.Visible = #top == 0
-		message.Text = "Nobody's on the board yet this week - win a match to be first!"
+		message.Text = "Nobody's on the board yet this week. Win a match to be first!"
 		for order, entry in top do
 			local isMe = entry.userId == localPlayer.UserId
-			addRow(
-				order,
-				MEDALS[order] or `#{order}`,
-				tostring(entry.name),
-				`🔩 {Theme.formatNumber(tonumber(entry.score) or 0)}`,
-				isMe
-			)
+			addRow(order, tostring(entry.name), tonumber(entry.score) or 0, isMe)
 		end
-		mineLabel.Text = `YOU THIS WEEK: 🔩 {Theme.formatNumber(tonumber(board.mine) or 0)}`
+		mineLabel.Text = `YOU THIS WEEK: {Theme.formatNumber(tonumber(board.mine) or 0)} SCRAP`
 		if type(board.secondsLeft) == "number" then
-			endsLabel.Text = `⏳ NEW WEEK IN {timeLeft(board.secondsLeft)}`
+			endsLabel.Text = `NEW WEEK IN {string.upper(timeLeft(board.secondsLeft))}`
 		end
 	end)
 end
@@ -127,70 +126,66 @@ local function build()
 	dim.Text = ""
 	dim.AutoButtonColor = false
 	dim.Size = UDim2.fromScale(1, 1)
-	dim.BackgroundColor3 = rgb(0, 0, 0)
-	dim.BackgroundTransparency = 0.35
+	dim.BackgroundColor3 = rgb(6, 8, 18)
+	dim.BackgroundTransparency = 0.4
 	dim.Parent = gui
 
 	panel =
-		Theme.panel(gui, "Leaderboard", UDim2.fromOffset(720, 600), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
+		Theme.card(gui, "Leaderboard", UDim2.fromOffset(720, 610), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
 	Theme.scaled(panel)
-	Theme.padding(panel, 18)
-	Theme.label(panel, {
+	Theme.padding(panel, 20)
+	Theme.heading(panel, {
 		name = "Title",
 		size = UDim2.fromOffset(480, 46),
-		text = "🏆 TOP 50 THIS WEEK",
-		color = C.Gold,
+		text = "TOP 50 THIS WEEK",
+		textSize = 44,
 		align = Enum.TextXAlignment.Left,
 	})
 	Theme.label(panel, {
 		name = "Subtitle",
-		size = UDim2.fromOffset(520, 20),
-		position = UDim2.fromOffset(2, 48),
+		size = UDim2.fromOffset(520, 18),
+		position = UDim2.fromOffset(2, 50),
 		text = "Win Scrap in matches to climb. Everyone starts again on Monday!",
 		font = Theme.Body,
-		color = C.Muted,
+		color = C.InkMuted,
+		textSize = 15,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 	})
 	local close = Theme.button(panel, {
 		name = "Close",
-		size = UDim2.fromOffset(140, 48),
+		size = UDim2.fromOffset(120, 50),
 		position = UDim2.fromScale(1, 0),
 		anchor = Vector2.new(1, 0),
-		text = "◀ BACK",
-		color = C.PanelLight,
-		textColor = C.Text,
+		text = "BACK",
+		color = C.Panel,
+		textSize = 22,
 	})
 	close.Activated:Connect(function()
 		LeaderboardPanel.close()
 	end)
 	mineLabel = Theme.pill(panel, {
 		name = "Mine",
-		size = UDim2.fromOffset(330, 32),
-		position = UDim2.fromOffset(0, 80),
+		size = UDim2.fromOffset(320, 30),
+		position = UDim2.fromOffset(0, 84),
 		text = "",
-		font = Theme.Caps,
-		color = C.Gold,
-		transparency = 0.3,
+		background = C.Gold,
 	})
 	endsLabel = Theme.pill(panel, {
 		name = "Ends",
-		size = UDim2.fromOffset(260, 32),
-		position = UDim2.new(1, 0, 0, 80),
+		size = UDim2.fromOffset(240, 30),
+		position = UDim2.new(1, 0, 0, 84),
 		anchor = Vector2.new(1, 0),
 		text = "",
-		font = Theme.Caps,
-		color = C.Text,
-		transparency = 0.3,
 	})
 
 	list = Instance.new("ScrollingFrame")
 	list.Name = "List"
-	list.Size = UDim2.new(1, 0, 1, -126)
-	list.Position = UDim2.fromOffset(0, 126)
+	list.Size = UDim2.new(1, 0, 1, -130)
+	list.Position = UDim2.fromOffset(0, 130)
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
 	list.ScrollBarThickness = 6
+	list.ScrollBarImageColor3 = C.Ink
 	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	list.CanvasSize = UDim2.new()
 	list.Parent = panel
@@ -205,8 +200,8 @@ local function build()
 		anchor = Vector2.new(0.5, 0.5),
 		text = "",
 		font = Theme.Body,
-		color = C.Muted,
-		stroke = false,
+		color = C.InkMuted,
+		textSize = 18,
 	})
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
 end

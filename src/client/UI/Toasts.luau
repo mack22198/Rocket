@@ -15,32 +15,37 @@ local Theme = require(script.Parent.Theme)
 
 local Toasts = {}
 
-export type Toast = { emoji: string, title: string, text: string, reward: number?, color: Color3 }
+export type Toast = {
+	badge: string, -- what's in the square on the left: a level number, or an achievement's picture
+	picture: boolean?, -- (true when the badge is an emoji picture rather than a number)
+	title: string,
+	text: string,
+	reward: number?,
+	color: Color3,
+}
 
 local C = Theme.Colors
 local SHOW_FOR = 3.2
-local HIDDEN = UDim2.new(0.5, 0, 0, -110)
-local SHOWN = UDim2.new(0.5, 0, 0, 14)
+local HIDDEN = UDim2.new(0.5, 0, 0, -120)
+local SHOWN = UDim2.new(0.5, 0, 0, 16)
 
 local gui: ScreenGui
 local card: Frame
-local stroke: UIStroke
-local icon: TextLabel
+local badge: TextLabel
 local titleLabel: TextLabel
 local textLabel: TextLabel
-local rewardLabel: TextLabel
+local reward: Theme.Amount
 local queue: { Toast } = {}
 local running = false
 
 local function present(toast: Toast)
-	icon.Text = toast.emoji
-	icon.BackgroundColor3 = toast.color
+	badge.Text = toast.badge
+	badge.Font = if toast.picture then Theme.Title else Theme.Display
+	badge.BackgroundColor3 = toast.color
 	titleLabel.Text = toast.title
-	titleLabel.TextColor3 = toast.color
 	textLabel.Text = toast.text
-	rewardLabel.Visible = toast.reward ~= nil and toast.reward > 0
-	rewardLabel.Text = `+🔩{Theme.formatNumber(toast.reward or 0)}`
-	stroke.Color = toast.color
+	reward.frame.Visible = toast.reward ~= nil and toast.reward > 0
+	reward.set(toast.reward or 0, "+")
 	gui.Enabled = true
 	card.Position = HIDDEN
 	TweenService:Create(card, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
@@ -72,11 +77,12 @@ end
 
 -- An achievement the server says is done: { emoji, name, text, reward, title? }.
 function Toasts.achievement(info: { [string]: any })
-	local title = if type(info.title) == "string" then `   ·   New title: {info.title}` else ""
+	local title = if type(info.title) == "string" then ` New title: {Theme.noEmoji(info.title)}!` else ""
 	Toasts.push({
-		emoji = tostring(info.emoji or "🏅"),
+		badge = tostring(info.emoji or "?"),
+		picture = true,
 		title = `ACHIEVEMENT: {string.upper(tostring(info.name or ""))}`,
-		text = `{info.text or ""}{title}`,
+		text = `{info.text or ""}.{title}`,
 		reward = if type(info.reward) == "number" then info.reward else nil,
 		color = C.Gold,
 	})
@@ -85,10 +91,10 @@ end
 -- A level reached: { level, scrap, title? }.
 function Toasts.levelUp(info: { [string]: any })
 	Toasts.push({
-		emoji = "⭐",
+		badge = tostring(info.level or "?"),
 		title = `LEVEL UP! YOU'RE LEVEL {info.level or "?"}`,
 		text = if type(info.title) == "string"
-			then `New title: {info.title}`
+			then `New title: {Theme.noEmoji(info.title)}!`
 			else "Keep playing to reach the next one!",
 		reward = if type(info.scrap) == "number" then info.scrap else nil,
 		color = C.Evolve,
@@ -98,47 +104,42 @@ end
 function Toasts.start()
 	gui = Theme.screen("TurboToasts", 60)
 	gui.Enabled = false
-	card = Theme.panel(gui, "Toast", UDim2.fromOffset(560, 84), HIDDEN, Vector2.new(0.5, 0))
+	card = Theme.card(gui, "Toast", UDim2.fromOffset(580, 88), HIDDEN, Vector2.new(0.5, 0))
 	Theme.scaled(card)
-	stroke = Theme.stroke(card, C.Gold, 3)
-	icon = Theme.label(card, {
-		name = "Icon",
-		size = UDim2.fromOffset(64, 64),
-		position = UDim2.fromOffset(10, 10),
+	badge = Theme.heading(card, {
+		name = "Badge",
+		size = UDim2.fromOffset(62, 62),
+		position = UDim2.fromOffset(12, 10),
 		text = "",
-		stroke = false,
+		color = C.Text,
+		textSize = 40,
+		stroke = true,
 	})
-	icon.BackgroundTransparency = 0.6
-	Theme.corner(icon, 32)
-	titleLabel = Theme.label(card, {
+	badge.BackgroundTransparency = 0
+	Theme.corner(badge, 14)
+	Theme.stroke(badge, C.Ink, 3)
+	titleLabel = Theme.heading(card, {
 		name = "Title",
-		size = UDim2.fromOffset(360, 30),
-		position = UDim2.fromOffset(86, 10),
+		size = UDim2.fromOffset(370, 26),
+		position = UDim2.fromOffset(88, 14),
 		text = "",
+		textSize = 24,
 		align = Enum.TextXAlignment.Left,
 	})
+	titleLabel.TextWrapped = false
 	textLabel = Theme.label(card, {
 		name = "Text",
-		size = UDim2.fromOffset(360, 34),
-		position = UDim2.fromOffset(86, 42),
+		size = UDim2.fromOffset(370, 34),
+		position = UDim2.fromOffset(88, 44),
 		text = "",
 		font = Theme.Body,
-		color = C.Text,
-		align = Enum.TextXAlignment.Left,
-		stroke = false,
+		color = C.InkMuted,
 		scaled = false,
-		textSize = 15,
+		textSize = 14,
+		align = Enum.TextXAlignment.Left,
 	})
 	textLabel.TextYAlignment = Enum.TextYAlignment.Top
-	rewardLabel = Theme.label(card, {
-		name = "Reward",
-		size = UDim2.fromOffset(100, 36),
-		position = UDim2.new(1, -110, 0.5, 0),
-		anchor = Vector2.new(0, 0.5),
-		text = "",
-		color = C.Scrap,
-	})
-	rewardLabel.TextWrapped = false
+	reward = Theme.amount(card, 28, UDim2.new(1, -16, 0.5, -3), Vector2.new(1, 0.5))
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	-- Achievements finished outside a match (in the garage, from the daily rewards...). A match's own level-ups

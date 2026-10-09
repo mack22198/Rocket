@@ -16,8 +16,13 @@ layouts and proportions from anywhere (including CI machines).
 `podium` (or pass `pos=x,y,z&at=x,y,z`).
 
 UI scenarios: `menu`, `queued`, `live`, `garage`, `evolve`, `style`, `fuse`, `howto`, `streak`, `chest`,
-`collection`, `season`, `match`, `twist`, `pause`, `touch`, `goal`, `replay`, `podium`, `results`. Add
-`bg=<image>` to draw them on top of a screenshot of the game (for example a showroom render saved as `bg-menu.png`).
+`collection`, `season`, `match`, `twist`, `pause`, `touch`, `goal`, `replay`, `podium`, `results`, `chat`,
+`profile`, `titles`, `toast`, `gifts`, `leaderboard`, `shop`. Add `bg=<image>` to draw them on top of a screenshot
+of the game (for example a showroom render saved as `bg-menu.png`).
+
+The UI is drawn with open-source copies of the fonts Roblox uses (Luckiest Guy, and Montserrat standing in for
+Gotham). Download them once with `sh get-fonts.sh` (from `tools/preview`); without them the text falls back to
+plain fonts and the sizes will be a little off.
 
 To save PNGs of any of these with headless Chromium:
 

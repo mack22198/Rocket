@@ -65,7 +65,7 @@ function PropBuilder.itemBox(folder: Instance, position: Vector3, index: number)
 		mark.Size = UDim2.fromScale(1, 1)
 		mark.BackgroundTransparency = 1
 		mark.Text = "?"
-		mark.Font = Enum.Font.FredokaOne
+		mark.Font = Enum.Font.LuckiestGuy
 		mark.TextScaled = true
 		mark.TextColor3 = rgb(255, 255, 255)
 		mark.TextStrokeTransparency = 0

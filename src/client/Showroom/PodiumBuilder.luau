@@ -73,7 +73,7 @@ local function nameTag(chassis: BasePart, rank: number, entry: Entry)
 	local color = if teamInfo then teamInfo.Color else rgb(255, 255, 255)
 	local lines: { { text: string, color: Color3, height: number } } = {}
 	if rank == 1 then
-		table.insert(lines, { text = "👑 MVP", color = rgb(255, 214, 90), height = 30 })
+		table.insert(lines, { text = "MVP", color = rgb(255, 214, 90), height = 30 })
 	end
 	table.insert(lines, { text = entry.name, color = color, height = 30 })
 	table.insert(lines, { text = `{entry.points} pts`, color = rgb(235, 240, 255), height = 22 })
@@ -84,7 +84,7 @@ local function nameTag(chassis: BasePart, rank: number, entry: Entry)
 		label.Size = UDim2.new(1, 0, 0, line.height)
 		label.Position = UDim2.fromOffset(0, y)
 		label.BackgroundTransparency = 1
-		label.Font = Enum.Font.FredokaOne
+		label.Font = Enum.Font.LuckiestGuy
 		label.TextScaled = true
 		label.TextColor3 = line.color
 		label.TextStrokeTransparency = 0.15
@@ -143,7 +143,7 @@ function PodiumBuilder.build(parent: Instance, entries: { Entry }): Podium
 		back + Vector3.new(18, backTop - 0.6, 0),
 		plain("Banner")
 	)
-	PartKit.sign(banner, Enum.NormalId.Front, { "🏆 WINNERS 🏆" }, {
+	PartKit.sign(banner, Enum.NormalId.Front, { "WINNERS" }, {
 		color = rgb(255, 214, 90),
 		background = screenColor,
 		pixelsPerStud = 12,

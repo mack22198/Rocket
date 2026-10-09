@@ -416,7 +416,7 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 	elseif kind == "hotsauce" then
 		E.burst(at, rgb(255, 80, 30), 44, 32, 1.8, 0.7)
 		E.flash(at, rgb(255, 80, 40), 40, 5, 0.5)
-		shout(extra, "🌶️ HOT!", rgb(255, 110, 40))
+		shout(extra, "HOT!", rgb(255, 110, 40))
 		E.play("Whoosh", 0.9, 0.8)
 	elseif kind == "quack" then
 		E.shockwave(at, rgb(255, 224, 80), T.QuackRadius, 0.5)

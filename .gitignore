@@ -32,3 +32,6 @@ tools/preview/showroom*.json
 
 # Intermediate file for tools/meshes/build_meshes.py (made by tools/meshes/export_parts)
 tools/meshes/parts.json
+
+# Fonts for the UI preview (downloaded by tools/preview/get-fonts.sh)
+tools/preview/fonts/

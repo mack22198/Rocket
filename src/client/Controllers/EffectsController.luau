@@ -350,16 +350,19 @@ local function decorateCar(model: Instance)
 		label.Name = "Name"
 		label.Size = UDim2.fromScale(1, 0.64)
 		label.BackgroundTransparency = 1
-		label.Font = Enum.Font.FredokaOne
+		label.Font = Enum.Font.GothamBlack
 		label.TextScaled = true
 		label.RichText = true
-		label.TextStrokeTransparency = 0.2
+		local outline = Instance.new("UIStroke")
+		outline.Color = Color3.fromRGB(16, 18, 34)
+		outline.Thickness = 2
+		outline.Parent = label
 		local name = model:GetAttribute(A.DriverName)
 		local level = model:GetAttribute(A.Level)
 		local shown = if type(name) == "string" then name else "Driver"
 		shown = string.gsub(string.gsub(string.gsub(shown, "&", "&amp;"), "<", "&lt;"), ">", "&gt;")
 		if model:GetAttribute(A.Vip) == true then
-			shown = `💎 {shown}`
+			shown = `<font color="#FF56A4">VIP</font> {shown}`
 		end
 		label.Text = if type(level) == "number" then `<font color="#FFCC33">{level}</font>  {shown}` else shown
 		label.TextColor3 = teamColor(model:GetAttribute(A.Team))
@@ -373,7 +376,10 @@ local function decorateCar(model: Instance)
 			titleLabel.BackgroundTransparency = 1
 			titleLabel.Font = Enum.Font.GothamBold
 			titleLabel.TextScaled = true
-			titleLabel.TextStrokeTransparency = 0.3
+			local titleOutline = Instance.new("UIStroke")
+			titleOutline.Color = Color3.fromRGB(16, 18, 34)
+			titleOutline.Thickness = 1.5
+			titleOutline.Parent = titleLabel
 			titleLabel.TextColor3 = Color3.fromRGB(255, 226, 150)
 			titleLabel.Text = title
 			titleLabel.Parent = tag

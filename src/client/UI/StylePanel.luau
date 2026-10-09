@@ -21,7 +21,6 @@ local StylePanel = {}
 StylePanel.PreviewChanged = Signal.new() :: Signal.Signal<>
 
 local C = Theme.Colors
-local rgb = Color3.fromRGB
 
 type Tile = { def: Cosmetics.CosmeticDef, button: TextButton, status: TextLabel }
 
@@ -78,40 +77,39 @@ end
 function StylePanel.refresh()
 	local data = PlayerDataClient.get()
 	for k, tab in kindTabs do
-		Theme.setButtonColor(tab, if k == kind then C.Gold else C.PanelLight, if k == kind then nil else C.Text)
+		Theme.setButtonColor(tab, if k == kind then C.Gold else C.CardShade)
 	end
 	for _, tile in tiles do
 		local def = tile.def
 		tile.button.Visible = def.Kind == kind
 		local owned = data.style.owned[def.Id] == true
 		local on = equippedOf(def.Kind) == def.Id
+		local picked = def.Id == selectedId
 		if on then
-			tile.status.Text = "✅ ON"
-			tile.status.TextColor3 = C.Good
+			tile.status.Text = "WEARING"
+			tile.status.TextColor3 = if picked then C.Ink else C.GoodText
 		elseif owned then
 			tile.status.Text = "OWNED"
-			tile.status.TextColor3 = C.Text
+			tile.status.TextColor3 = C.InkMuted
 		elseif def.Vip then
-			tile.status.Text = "💎 VIP"
-			tile.status.TextColor3 = rgb(120, 210, 255)
+			tile.status.Text = "VIP"
+			tile.status.TextColor3 = C.Shop
 		elseif def.Season and def.Gold then
-			tile.status.Text = "🏆 GOLD PASS"
-			tile.status.TextColor3 = C.Gold
+			tile.status.Text = "GOLD PASS"
+			tile.status.TextColor3 = C.InkMuted
 		elseif def.Season then
 			local theme = Season.theme(def.Season)
-			tile.status.Text = if theme then `🏆 {string.upper(theme.Name)}` else "🏆 SEASON"
+			tile.status.Text = if theme then string.upper(theme.Name) else "SEASON"
 			tile.status.TextColor3 = C.Evolve
 		else
-			tile.status.Text = `🔩 {Theme.formatNumber(def.Price)}`
-			tile.status.TextColor3 = if data.scrap >= def.Price then C.Gold else C.Muted
+			tile.status.Text = `{Theme.formatNumber(def.Price)} SCRAP`
+			tile.status.TextColor3 = if data.scrap >= def.Price then C.Ink else C.InkMuted
 		end
 		local stroke = tile.button:FindFirstChildOfClass("UIStroke")
 		if stroke then
-			stroke.Color = if def.Id == selectedId then C.Gold else rgb(255, 255, 255)
-			stroke.Thickness = if def.Id == selectedId then 4 else 2
-			stroke.Transparency = if def.Id == selectedId then 0 else 0.8
+			stroke.Thickness = if picked then 4 else 2
 		end
-		tile.button.BackgroundColor3 = if def.Id == selectedId then rgb(58, 70, 120) else C.PanelLight
+		tile.button.BackgroundColor3 = if picked then C.Gold else C.CardShade
 	end
 
 	local def = selected()
@@ -123,39 +121,39 @@ function StylePanel.refresh()
 	bigEmoji.Text = def.Emoji
 	nameLabel.Text = def.Name
 	kindLabel.Text = if def.Kind == "topper"
-		then "HAT · SITS ON YOUR ROOF"
-		elseif def.Kind == "horn" then "HORN · PRESS H (OR D-PAD UP) IN A MATCH"
-		else "GOAL PARTY · WHEN YOU SCORE"
+		then "HAT: SITS ON YOUR ROOF"
+		elseif def.Kind == "horn" then "HORN: PRESS H (OR D-PAD UP) IN A MATCH"
+		else "GOAL PARTY: WHEN YOU SCORE"
 	descriptionLabel.Text = def.Description
 	hearButton.Visible = def.Kind == "horn"
 	if on then
 		statusLabel.Text = "You're using this one."
-		primaryButton.Text = "✅ EQUIPPED"
-		Theme.setButtonColor(primaryButton, C.PanelLight, C.Muted)
+		primaryButton.Text = "USING THIS ONE"
+		Theme.setButtonColor(primaryButton, C.CardLine, C.InkMuted)
 	elseif owned then
 		statusLabel.Text = "You own this."
 		primaryButton.Text = "USE THIS"
 		Theme.setButtonColor(primaryButton, C.Good)
 	elseif def.Vip then
-		statusLabel.Text = "Comes with VIP - see the 🛒 SHOP in the menu."
-		primaryButton.Text = "💎 VIP ONLY"
-		Theme.setButtonColor(primaryButton, C.PanelLight, C.Muted)
+		statusLabel.Text = "Comes with VIP. See the SHOP in the menu."
+		primaryButton.Text = "VIP ONLY"
+		Theme.setButtonColor(primaryButton, C.CardLine, C.InkMuted)
 	elseif def.Season then
 		local theme = Season.theme(def.Season)
-		local name = if theme then `{theme.Emoji} {theme.Name}` else "season"
+		local name = if theme then theme.Name else "season"
 		statusLabel.Text = if def.Gold
 			then `A Gold Season Pass reward on the {name} track.`
-			else `A reward on the {name} season track - keep playing to earn it!`
-		primaryButton.Text = if def.Gold then "🏆 GOLD PASS REWARD" else "🏆 SEASON REWARD"
-		Theme.setButtonColor(primaryButton, C.PanelLight, C.Muted)
+			else `A reward on the {name} season track. Keep playing to earn it!`
+		primaryButton.Text = if def.Gold then "GOLD PASS REWARD" else "SEASON REWARD"
+		Theme.setButtonColor(primaryButton, C.CardLine, C.InkMuted)
 	elseif data.scrap >= def.Price then
-		statusLabel.Text = "Fixed price - no surprises."
-		primaryButton.Text = `BUY  🔩 {Theme.formatNumber(def.Price)}`
+		statusLabel.Text = "Fixed price. No surprises."
+		primaryButton.Text = `BUY: {Theme.formatNumber(def.Price)} SCRAP`
 		Theme.setButtonColor(primaryButton, C.Gold)
 	else
 		statusLabel.Text = `You need {Theme.formatNumber(def.Price - data.scrap)} more Scrap.`
-		primaryButton.Text = `🔒 🔩 {Theme.formatNumber(def.Price)}`
-		Theme.setButtonColor(primaryButton, C.PanelLight, C.Muted)
+		primaryButton.Text = `{Theme.formatNumber(def.Price)} SCRAP`
+		Theme.setButtonColor(primaryButton, C.CardLine, C.InkMuted)
 	end
 end
 
@@ -214,19 +212,19 @@ function StylePanel.build(leftParent: Frame, rightGroup: Frame, showToast: (stri
 
 	left = Instance.new("Frame")
 	left.Name = "Style"
-	left.Size = UDim2.new(1, 0, 1, -46)
-	left.Position = UDim2.fromOffset(0, 46)
+	left.Size = UDim2.new(1, 0, 1, -54)
+	left.Position = UDim2.fromOffset(0, 54)
 	left.BackgroundTransparency = 1
 	left.Visible = false
 	left.Parent = leftParent
 	for i, k in Cosmetics.Kinds do
 		local tab = Theme.button(left, {
 			name = `Kind{i}`,
-			size = UDim2.fromOffset(96, 30),
+			size = UDim2.fromOffset(94, 34),
 			position = UDim2.fromOffset((i - 1) * 100, 0),
-			text = Cosmetics.KindNames[k],
-			color = C.PanelLight,
-			textColor = C.Text,
+			text = Theme.noEmoji(Cosmetics.KindNames[k]),
+			color = C.CardShade,
+			textSize = 15,
 		})
 		tab.Activated:Connect(function()
 			showKind(k :: Cosmetics.Kind)
@@ -235,11 +233,12 @@ function StylePanel.build(leftParent: Frame, rightGroup: Frame, showToast: (stri
 	end
 	grid = Instance.new("ScrollingFrame")
 	grid.Name = "Items"
-	grid.Size = UDim2.new(1, 0, 1, -40)
-	grid.Position = UDim2.fromOffset(0, 40)
+	grid.Size = UDim2.new(1, 4, 1, -46)
+	grid.Position = UDim2.fromOffset(0, 46)
 	grid.BackgroundTransparency = 1
 	grid.BorderSizePixel = 0
-	grid.ScrollBarThickness = 5
+	grid.ScrollBarThickness = 6
+	grid.ScrollBarImageColor3 = C.Ink
 	grid.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	grid.CanvasSize = UDim2.new()
 	grid.Parent = left
@@ -253,30 +252,29 @@ function StylePanel.build(leftParent: Frame, rightGroup: Frame, showToast: (stri
 		button.Name = def.Id
 		button.LayoutOrder = order
 		button.Text = ""
-		button.BackgroundColor3 = C.PanelLight
+		button.BackgroundColor3 = C.CardShade
 		button.Parent = grid
 		Theme.corner(button, 12)
-		Theme.stroke(button, rgb(255, 255, 255), 2)
+		Theme.stroke(button, C.Ink, 2)
 		Theme.pop(button)
 		Theme.label(button, {
-			size = UDim2.new(1, 0, 0, 46),
-			position = UDim2.fromOffset(0, 6),
+			size = UDim2.new(1, 0, 0, 44),
+			position = UDim2.fromOffset(0, 8),
 			text = def.Emoji,
-			stroke = false,
+			textSize = 38,
 		})
 		Theme.label(button, {
-			size = UDim2.new(1, -10, 0, 18),
-			position = UDim2.fromOffset(5, 56),
+			size = UDim2.new(1, -10, 0, 16),
+			position = UDim2.fromOffset(5, 58),
 			text = def.Name,
-			font = Theme.Body,
-			stroke = false,
+			textSize = 13,
 		})
 		local status = Theme.label(button, {
-			size = UDim2.new(1, -10, 0, 15),
-			position = UDim2.fromOffset(5, 78),
+			size = UDim2.new(1, -10, 0, 13),
+			position = UDim2.fromOffset(5, 79),
 			text = "",
 			font = Theme.Caps,
-			stroke = false,
+			textSize = 11,
 		})
 		button.Activated:Connect(function()
 			choose(def.Id)
@@ -287,69 +285,68 @@ function StylePanel.build(leftParent: Frame, rightGroup: Frame, showToast: (stri
 		table.insert(tiles, { def = def, button = button, status = status })
 	end
 
-	right = Theme.panel(rightGroup, "Style", UDim2.fromOffset(372, 572), UDim2.fromOffset(396, 126), Vector2.new(1, 0))
-	right.BackgroundTransparency = 0.15
+	right = Theme.card(rightGroup, "Style", UDim2.fromOffset(372, 572), UDim2.fromOffset(396, 126), Vector2.new(1, 0))
 	right.Visible = false
 	Theme.padding(right, 16)
-	bigEmoji = Theme.label(right, {
+	local stage = Theme.well(right, "Picture", UDim2.new(1, 0, 0, 150), UDim2.new())
+	bigEmoji = Theme.label(stage, {
 		name = "Emoji",
 		size = UDim2.fromOffset(120, 120),
-		position = UDim2.new(0.5, 0, 0, 10),
-		anchor = Vector2.new(0.5, 0),
+		position = UDim2.fromScale(0.5, 0.5),
+		anchor = Vector2.new(0.5, 0.5),
 		text = "",
-		stroke = false,
+		textSize = 100,
 	})
-	nameLabel = Theme.label(right, {
+	nameLabel = Theme.heading(right, {
 		name = "ItemName",
-		size = UDim2.new(1, 0, 0, 38),
-		position = UDim2.fromOffset(0, 140),
+		size = UDim2.new(1, 0, 0, 36),
+		position = UDim2.fromOffset(0, 164),
 		text = "",
+		textSize = 34,
 	})
 	kindLabel = Theme.label(right, {
 		name = "Kind",
-		size = UDim2.new(1, 0, 0, 15),
-		position = UDim2.fromOffset(0, 182),
+		size = UDim2.new(1, 0, 0, 14),
+		position = UDim2.fromOffset(0, 204),
 		text = "",
 		font = Theme.Caps,
-		color = C.Evolve,
-		stroke = false,
+		color = C.InkMuted,
+		textSize = 12,
 	})
 	descriptionLabel = Theme.label(right, {
 		name = "Description",
 		size = UDim2.new(1, 0, 0, 44),
-		position = UDim2.fromOffset(0, 210),
+		position = UDim2.fromOffset(0, 230),
 		text = "",
 		font = Theme.Body,
-		color = C.Text,
-		stroke = false,
 		scaled = false,
-		textSize = 20,
+		textSize = 17,
 	})
 	statusLabel = Theme.label(right, {
 		name = "Status",
-		size = UDim2.new(1, 0, 0, 40),
-		position = UDim2.fromOffset(0, 262),
+		size = UDim2.new(1, 0, 0, 36),
+		position = UDim2.fromOffset(0, 282),
 		text = "",
 		font = Theme.Body,
-		color = C.Muted,
-		stroke = false,
+		color = C.InkMuted,
 		scaled = false,
-		textSize = 16,
+		textSize = 14,
 	})
 	primaryButton = Theme.button(right, {
 		name = "Primary",
 		size = UDim2.new(1, 0, 0, 62),
-		position = UDim2.new(0, 0, 1, -122),
+		position = UDim2.new(0, 0, 1, -124),
 		text = "",
+		textSize = 26,
 	})
 	primaryButton.Activated:Connect(onPrimary)
 	hearButton = Theme.button(right, {
 		name = "Hear",
-		size = UDim2.new(1, 0, 0, 52),
-		position = UDim2.new(0, 0, 1, -52),
-		text = "🔊 HEAR IT",
-		color = C.Blue,
-		textColor = C.Text,
+		size = UDim2.new(1, 0, 0, 54),
+		position = UDim2.new(0, 0, 1, -54),
+		text = "HEAR IT",
+		color = C.Sky,
+		textSize = 24,
 	})
 	hearButton.Activated:Connect(function()
 		local def = selected()

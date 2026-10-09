@@ -18,7 +18,7 @@ const outDir = process.argv[2] || "shots";
 const views = process.argv.slice(3);
 fs.mkdirSync(outDir, { recursive: true });
 
-const types = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".png": "image/png" };
+const types = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".png": "image/png", ".ttf": "font/ttf" };
 const server = http.createServer((req, res) => {
   const file = path.join(root, decodeURIComponent(new URL(req.url, "http://x").pathname));
   fs.readFile(file, (err, data) => {

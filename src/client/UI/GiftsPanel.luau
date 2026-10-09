@@ -25,7 +25,7 @@ local C = Theme.Colors
 local rgb = Color3.fromRGB
 local localPlayer = Players.LocalPlayer
 
-type Card = { frame: Frame, stroke: UIStroke, icon: TextLabel, button: TextButton }
+type Card = { frame: Frame, stroke: UIStroke, icon: TextLabel, coin: Frame, button: TextButton }
 
 local gui: ScreenGui
 local panel: Frame
@@ -62,9 +62,10 @@ local function open(index: number)
 	opening = false
 	if ok and type(result) == "table" and result.ok then
 		Toasts.push({
-			emoji = "🎁",
+			badge = "🎁",
+			picture = true,
 			title = "GIFT OPENED!",
-			text = `{result.emoji or ""} {result.text or ""}`,
+			text = Theme.noEmoji(tostring(result.text or "")),
 			color = C.Good,
 		})
 	else
@@ -78,23 +79,28 @@ local function refresh()
 		local gift = Gifts.Ladder[index]
 		local ready = Gifts.ready(index, played, opened)
 		if opened[index] then
-			card.button.Text = "✅ OPENED"
-			Theme.setButtonColor(card.button, C.PanelLight, C.Muted)
-			card.stroke.Transparency = 0.8
+			card.button.Text = "OPENED"
+			Theme.setButtonColor(card.button, C.CardLine, C.InkMuted)
+			card.frame.BackgroundTransparency = 0.5
 			card.icon.TextTransparency = 0.5
 		elseif ready then
 			card.button.Text = "OPEN!"
 			local pulse = math.floor(os.clock() * 3) % 2 == 0
-			Theme.setButtonColor(card.button, if pulse then C.Good else rgb(140, 240, 160))
-			card.stroke.Transparency = 0
+			Theme.setButtonColor(card.button, if pulse then C.Good else rgb(140, 236, 160))
+			card.frame.BackgroundColor3 = C.Card
+			card.frame.BackgroundTransparency = 0
 			card.icon.TextTransparency = 0
-			card.icon.Rotation = math.sin(os.clock() * 8 + index) * 8
+			local wiggle = math.sin(os.clock() * 8 + index) * 8
+			card.icon.Rotation = wiggle
+			card.coin.Rotation = wiggle
 		else
-			card.button.Text = `⏳ {clock(gift.Minutes * 60 - played)}`
-			Theme.setButtonColor(card.button, C.PanelLight, C.Text)
-			card.stroke.Transparency = 0.6
+			card.button.Text = clock(gift.Minutes * 60 - played)
+			Theme.setButtonColor(card.button, C.Panel)
+			card.frame.BackgroundColor3 = C.CardShade
+			card.frame.BackgroundTransparency = 0
 			card.icon.TextTransparency = 0
 			card.icon.Rotation = 0
+			card.coin.Rotation = 0
 		end
 	end
 end
@@ -107,38 +113,38 @@ local function build()
 	dim.Text = ""
 	dim.AutoButtonColor = false
 	dim.Size = UDim2.fromScale(1, 1)
-	dim.BackgroundColor3 = rgb(0, 0, 0)
-	dim.BackgroundTransparency = 0.35
+	dim.BackgroundColor3 = rgb(6, 8, 18)
+	dim.BackgroundTransparency = 0.4
 	dim.Parent = gui
 
-	panel = Theme.panel(gui, "Gifts", UDim2.fromOffset(820, 500), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
+	panel = Theme.card(gui, "Gifts", UDim2.fromOffset(820, 516), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
 	Theme.scaled(panel)
-	Theme.padding(panel, 18)
-	Theme.label(panel, {
+	Theme.padding(panel, 20)
+	Theme.heading(panel, {
 		name = "Title",
 		size = UDim2.fromOffset(500, 46),
-		text = "🎁 PLAYTIME GIFTS",
-		color = C.Good,
+		text = "PLAYTIME GIFTS",
+		textSize = 44,
 		align = Enum.TextXAlignment.Left,
 	})
 	Theme.label(panel, {
 		name = "Subtitle",
-		size = UDim2.fromOffset(600, 20),
-		position = UDim2.fromOffset(2, 48),
+		size = UDim2.fromOffset(600, 18),
+		position = UDim2.fromOffset(2, 50),
 		text = "Free gifts for playing! They start again next time you join.",
 		font = Theme.Body,
-		color = C.Muted,
+		color = C.InkMuted,
+		textSize = 15,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 	})
 	local close = Theme.button(panel, {
 		name = "Close",
-		size = UDim2.fromOffset(140, 48),
+		size = UDim2.fromOffset(120, 50),
 		position = UDim2.fromScale(1, 0),
 		anchor = Vector2.new(1, 0),
-		text = "◀ BACK",
-		color = C.PanelLight,
-		textColor = C.Text,
+		text = "BACK",
+		color = C.Panel,
+		textSize = 22,
 	})
 	close.Activated:Connect(function()
 		GiftsPanel.close()
@@ -146,8 +152,8 @@ local function build()
 
 	local grid = Instance.new("Frame")
 	grid.Name = "Grid"
-	grid.Size = UDim2.new(1, 0, 1, -86)
-	grid.Position = UDim2.fromOffset(0, 86)
+	grid.Size = UDim2.new(1, 0, 1, -90)
+	grid.Position = UDim2.fromOffset(0, 90)
 	grid.BackgroundTransparency = 1
 	grid.Parent = panel
 	local layout = Instance.new("UIGridLayout")
@@ -156,51 +162,51 @@ local function build()
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = grid
 	for index, gift in Gifts.Ladder do
-		local frame = Instance.new("Frame")
-		frame.Name = `Gift{index}`
+		local frame = Theme.well(grid, `Gift{index}`, UDim2.new(), UDim2.new())
 		frame.LayoutOrder = index
-		frame.BackgroundColor3 = C.PanelDark
-		frame.Parent = grid
-		Theme.corner(frame, 14)
-		local stroke = Theme.stroke(frame, C.Good, 2)
+		local stroke = Theme.stroke(frame, C.Ink, 2)
 		Theme.label(frame, {
 			name = "When",
-			size = UDim2.new(1, -16, 0, 18),
-			position = UDim2.fromOffset(8, 8),
+			size = UDim2.new(1, -16, 0, 14),
+			position = UDim2.fromOffset(8, 12),
 			text = `{gift.Minutes} MIN`,
 			font = Theme.Caps,
-			color = C.Muted,
-			stroke = false,
+			color = C.InkMuted,
+			textSize = 13,
 		})
 		local emoji, text = Gifts.describe(gift)
+		local scrap = gift.Kind ~= "boost"
 		local icon = Theme.label(frame, {
 			name = "Icon",
-			size = UDim2.fromOffset(60, 52),
-			position = UDim2.new(0.5, 0, 0, 30),
+			size = UDim2.fromOffset(60, 46),
+			position = UDim2.new(0.5, 0, 0, 32),
 			anchor = Vector2.new(0.5, 0),
 			text = emoji,
-			stroke = false,
+			textSize = 40,
 		})
+		icon.Visible = not scrap
+		local coin = Theme.scrapIcon(frame, 42, UDim2.new(0.5, 0, 0, 34), Vector2.new(0.5, 0))
+		coin.Visible = scrap
 		Theme.label(frame, {
 			name = "Prize",
-			size = UDim2.new(1, -16, 0, 24),
+			size = UDim2.new(1, -16, 0, 18),
 			position = UDim2.fromOffset(8, 86),
-			text = text,
-			color = if gift.Kind == "boost" then C.Evolve else C.Scrap,
+			text = Theme.noEmoji(text),
+			textSize = 15,
 		})
 		local button = Theme.button(frame, {
 			name = "Open",
-			size = UDim2.new(1, -20, 0, 40),
+			size = UDim2.new(1, -20, 0, 44),
 			position = UDim2.new(0.5, 0, 1, -10),
 			anchor = Vector2.new(0.5, 1),
 			text = "",
-			color = C.PanelLight,
-			textColor = C.Text,
+			color = C.Panel,
+			textSize = 20,
 		})
 		button.Activated:Connect(function()
 			open(index)
 		end)
-		table.insert(cards, { frame = frame, stroke = stroke, icon = icon, button = button })
+		table.insert(cards, { frame = frame, stroke = stroke, icon = icon, coin = coin, button = button })
 	end
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
 end

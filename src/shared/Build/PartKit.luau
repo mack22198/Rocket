@@ -136,7 +136,7 @@ function PartKit.sign(part: BasePart, face: Enum.NormalId, lines: { string }, op
 		label.Text = text
 		label.TextColor3 = o.color or Color3.new(1, 1, 1)
 		label.TextScaled = true
-		label.Font = if i == 1 then (o.font or Enum.Font.FredokaOne) else Enum.Font.GothamBold
+		label.Font = if i == 1 then (o.font or Enum.Font.LuckiestGuy) else Enum.Font.GothamBold
 		label.Parent = frame
 	end
 	return gui
@@ -157,7 +157,7 @@ function PartKit.banner(part: BasePart, face: Enum.NormalId, items: { BannerItem
 		label.Text = item.text
 		label.TextColor3 = item.color
 		label.TextScaled = true
-		label.Font = o.font or Enum.Font.FredokaOne
+		label.Font = o.font or Enum.Font.LuckiestGuy
 		label.Parent = frame
 	end
 	return gui
@@ -184,7 +184,7 @@ function PartKit.label(
 	label.Text = text
 	label.TextColor3 = color
 	label.TextScaled = true
-	label.Font = font or Enum.Font.FredokaOne
+	label.Font = font or Enum.Font.LuckiestGuy
 	label.Parent = frame
 	return label
 end

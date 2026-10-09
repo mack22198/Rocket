@@ -129,11 +129,14 @@ local function scorerTag(copy: Model, scorer: string)
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
+	label.Font = Enum.Font.LuckiestGuy
 	label.TextScaled = true
-	label.TextColor3 = Color3.fromRGB(255, 214, 90)
-	label.TextStrokeTransparency = 0.1
-	label.Text = `⚽ {scorer}`
+	label.TextColor3 = Color3.fromRGB(255, 202, 40)
+	local outline = Instance.new("UIStroke")
+	outline.Color = Color3.fromRGB(16, 18, 34)
+	outline.Thickness = 3
+	outline.Parent = label
+	label.Text = scorer
 	label.Parent = tag
 	tag.Parent = chassis
 end

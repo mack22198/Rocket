@@ -28,19 +28,22 @@ local CARD_WIDTH = 132
 local CARD_GAP = 10
 local FREE_HEIGHT = 170
 local GOLD_HEIGHT = 140
-local GOLD_COLOR = Color3.fromRGB(255, 196, 60)
+local GOLD_CARD = rgb(255, 224, 140) -- the Gold Pass row
 
 type Card = {
 	frame: Frame,
+	free: Frame,
 	stroke: UIStroke,
 	tier: TextLabel,
 	icon: TextLabel,
+	coin: Frame,
 	name: TextLabel,
 	status: TextLabel,
 	ribbon: TextLabel,
 	gold: Frame,
 	goldStroke: UIStroke,
 	goldIcon: TextLabel,
+	goldCoin: Frame,
 	goldName: TextLabel,
 	goldStatus: TextLabel,
 	goldRibbon: TextLabel,
@@ -61,50 +64,36 @@ local bonusText: TextLabel
 local goldButton: TextButton
 local howItWorks: TextLabel
 
--- The Gold Pass reward under a tier's free one.
-local function makeGoldCard(column: Frame): (Frame, UIStroke, TextLabel, TextLabel, TextLabel, TextLabel)
-	local gold = Instance.new("Frame")
-	gold.Name = "Gold"
-	gold.Size = UDim2.new(1, 0, 0, GOLD_HEIGHT)
-	gold.Position = UDim2.fromOffset(0, FREE_HEIGHT + 12)
-	gold.BackgroundColor3 = rgb(58, 46, 18)
-	gold.Parent = column
-	Theme.corner(gold, 12)
-	local stroke = Theme.stroke(gold, GOLD_COLOR, 2)
-	local icon = Theme.label(gold, {
+-- Is this reward Scrap (shown with the Scrap coin rather than a picture)?
+local function isScrap(reward: Season.Reward): boolean
+	return reward.Kind ~= "boost" and reward.Kind ~= "style"
+end
+
+-- The picture, name and status of one reward (the free one or the gold one under it).
+local function rewardFace(parent: Frame, top: number): (TextLabel, Frame, TextLabel, TextLabel)
+	local icon = Theme.label(parent, {
 		name = "Icon",
-		size = UDim2.new(1, 0, 0, 46),
-		position = UDim2.fromOffset(0, 16),
+		size = UDim2.new(1, 0, 0, 50),
+		position = UDim2.fromOffset(0, top),
 		text = "",
+		textSize = 42,
 	})
-	local name = Theme.label(gold, {
+	local coin = Theme.scrapIcon(parent, 44, UDim2.new(0.5, 0, 0, top + 3), Vector2.new(0.5, 0))
+	local name = Theme.label(parent, {
 		name = "Reward",
-		size = UDim2.new(1, -14, 0, 34),
-		position = UDim2.fromOffset(7, 66),
+		size = UDim2.new(1, -14, 0, 32),
+		position = UDim2.fromOffset(7, top + 56),
 		text = "",
-		font = Theme.Body,
+		textSize = 14,
 	})
-	local status = Theme.label(gold, {
+	local status = Theme.pill(parent, {
 		name = "Status",
-		size = UDim2.new(1, -14, 0, 16),
-		position = UDim2.new(0, 7, 1, -24),
+		size = UDim2.fromOffset(84, 22),
+		position = UDim2.new(0.5, 0, 1, -12),
+		anchor = Vector2.new(0.5, 1),
 		text = "",
-		font = Theme.Caps,
-		stroke = false,
 	})
-	local ribbon = Theme.pill(gold, {
-		name = "Ribbon",
-		size = UDim2.new(1, -16, 0, 18),
-		position = UDim2.new(0.5, 0, 0, -9),
-		anchor = Vector2.new(0.5, 0),
-		text = "🏆 GOLD",
-		font = Theme.Caps,
-		color = C.Ink,
-		background = GOLD_COLOR,
-		transparency = 0,
-	})
-	ribbon.ZIndex = 3
-	return gold, stroke, icon, name, status, ribbon
+	return icon, coin, name, status
 end
 
 local function makeCard(order: number): Card
@@ -114,67 +103,55 @@ local function makeCard(order: number): Card
 	column.Size = UDim2.fromOffset(CARD_WIDTH, FREE_HEIGHT + 12 + GOLD_HEIGHT)
 	column.BackgroundTransparency = 1
 	column.Parent = track
-	local frame = Instance.new("Frame")
-	frame.Name = "Free"
-	frame.Size = UDim2.new(1, 0, 0, FREE_HEIGHT)
-	frame.BackgroundColor3 = C.PanelLight
-	frame.Parent = column
-	Theme.corner(frame, 12)
-	local stroke = Theme.stroke(frame, C.Muted, 2)
-	local tier = Theme.label(frame, {
+	local free = Theme.well(column, "Free", UDim2.new(1, 0, 0, FREE_HEIGHT), UDim2.new())
+	local stroke = Theme.stroke(free, C.Ink, 2)
+	local tier = Theme.label(free, {
 		name = "Tier",
-		size = UDim2.new(1, -12, 0, 18),
-		position = UDim2.fromOffset(6, 8),
+		size = UDim2.new(1, -12, 0, 14),
+		position = UDim2.fromOffset(6, 12),
 		text = `TIER {order}`,
 		font = Theme.Caps,
-		color = C.Muted,
-		stroke = false,
+		color = C.InkMuted,
+		textSize = 13,
 	})
-	local icon = Theme.label(frame, {
-		name = "Icon",
-		size = UDim2.new(1, 0, 0, 52),
-		position = UDim2.fromOffset(0, 30),
-		text = "",
-	})
-	local name = Theme.label(frame, {
-		name = "Reward",
-		size = UDim2.new(1, -14, 0, 36),
-		position = UDim2.fromOffset(7, 88),
-		text = "",
-		font = Theme.Body,
-	})
-	local status = Theme.label(frame, {
-		name = "Status",
-		size = UDim2.new(1, -14, 0, 18),
-		position = UDim2.new(0, 7, 1, -30),
-		text = "",
-		font = Theme.Caps,
-		stroke = false,
-	})
-	local ribbon = Theme.pill(frame, {
+	local icon, coin, name, status = rewardFace(free, 32)
+	local ribbon = Theme.pill(free, {
 		name = "Ribbon",
-		size = UDim2.new(1, -16, 0, 18),
-		position = UDim2.new(0.5, 0, 0, -9),
+		size = UDim2.new(1, -16, 0, 20),
+		position = UDim2.new(0.5, 0, 0, -10),
 		anchor = Vector2.new(0.5, 0),
 		text = "SEASON ONLY",
-		font = Theme.Caps,
-		color = C.Ink,
 		background = C.Evolve,
-		transparency = 0,
 	})
 	ribbon.ZIndex = 3
-	local gold, goldStroke, goldIcon, goldName, goldStatus, goldRibbon = makeGoldCard(column)
+
+	local gold = Theme.well(column, "Gold", UDim2.new(1, 0, 0, GOLD_HEIGHT), UDim2.fromOffset(0, FREE_HEIGHT + 12))
+	gold.BackgroundColor3 = GOLD_CARD
+	local goldStroke = Theme.stroke(gold, C.Ink, 2)
+	local goldIcon, goldCoin, goldName, goldStatus = rewardFace(gold, 16)
+	local goldRibbon = Theme.pill(gold, {
+		name = "Ribbon",
+		size = UDim2.new(1, -16, 0, 20),
+		position = UDim2.new(0.5, 0, 0, -10),
+		anchor = Vector2.new(0.5, 0),
+		text = "GOLD",
+		background = C.Gold,
+	})
+	goldRibbon.ZIndex = 3
 	return {
 		frame = column,
+		free = free,
 		stroke = stroke,
 		tier = tier,
 		icon = icon,
+		coin = coin,
 		name = name,
 		status = status,
 		ribbon = ribbon,
 		gold = gold,
 		goldStroke = goldStroke,
 		goldIcon = goldIcon,
+		goldCoin = goldCoin,
 		goldName = goldName,
 		goldStatus = goldStatus,
 		goldRibbon = goldRibbon,
@@ -192,6 +169,16 @@ local function ensureCards(count: number)
 	bonusCard.LayoutOrder = count + 1
 end
 
+-- Shows a reward on a card: its picture (or the Scrap coin) and its name.
+local function showReward(icon: TextLabel, coin: Frame, name: TextLabel, reward: Season.Reward)
+	local emoji, text = Season.describe(reward)
+	local scrap = isScrap(reward)
+	icon.Visible = not scrap
+	coin.Visible = scrap
+	icon.Text = emoji
+	name.Text = Theme.noEmoji(text)
+end
+
 local function refresh()
 	local data = PlayerDataClient.get()
 	local day = PlayerDataClient.today()
@@ -203,18 +190,17 @@ local function refresh()
 	local xp = if current then state.xp else 0
 	local hasGold = current and state.gold
 
-	titleLabel.Text = `{theme.Emoji} SEASON {info.number}: {string.upper(theme.Name)}`
-	titleLabel.TextColor3 = theme.Color
+	titleLabel.Text = `SEASON {info.number}: {string.upper(theme.Name)}`
 	descriptionLabel.Text = theme.Description
 	local days = Season.daysLeft(day)
-	daysPill.Text = if days <= 1 then "⏳ LAST DAY!" else `⏳ {days} DAYS LEFT`
-	daysPill.TextColor3 = if days <= 3 then C.Bad else C.Text
+	daysPill.Text = if days <= 1 then "LAST DAY!" else `{days} DAYS LEFT`
+	daysPill.BackgroundColor3 = if days <= 3 then C.Bad else C.Ink
 
-	tierLabel.Text = `⭐ TIER {tier}`
+	tierLabel.Text = `TIER {tier}`
 	local into = xp - tier * Season.XpPerTier
 	xpBar.set(into / Season.XpPerTier)
 	xpBar.fill.BackgroundColor3 = theme.Color
-	xpLabel.Text = `{Theme.formatNumber(into)} / {Theme.formatNumber(Season.XpPerTier)} XP TO TIER {tier + 1}`
+	xpLabel.Text = `{Theme.formatNumber(into)}/{Theme.formatNumber(Season.XpPerTier)} XP TO TIER {tier + 1}`
 
 	local count = #theme.Rewards
 	ensureCards(count)
@@ -222,46 +208,34 @@ local function refresh()
 	for i = 1, count do
 		local card = cards[i]
 		local reward = Season.rewardFor(theme, i)
-		local emoji, text = Season.describe(reward)
-		local exclusive = reward.Kind == "style"
 		local got = i <= tier
 		local isNext = i == tier + 1
-		card.icon.Text = emoji
-		card.name.Text = text
-		card.ribbon.Visible = exclusive
-		local free = card.frame:FindFirstChild("Free") :: Frame
-		free.BackgroundColor3 = if got then rgb(34, 70, 60) elseif isNext then rgb(70, 60, 30) else C.PanelLight
-		free.BackgroundTransparency = if got then 0.15 else 0
-		card.stroke.Color = if isNext then C.Gold elseif exclusive then C.Evolve elseif got then C.Good else C.Muted
+		showReward(card.icon, card.coin, card.name, reward)
+		card.ribbon.Visible = reward.Kind == "style"
+		card.free.BackgroundColor3 = if isNext then C.Gold elseif got then C.Card else C.CardShade
 		card.stroke.Thickness = if isNext then (if pulse then 4 else 3) else 2
-		card.stroke.Transparency = if isNext or exclusive then 0 else 0.5
-		card.status.Text = if got then "✅ GOT IT" elseif isNext then "⭐ NEXT" else "🔒"
-		card.status.TextColor3 = if got then C.Good elseif isNext then C.Gold else C.Muted
-		card.tier.TextColor3 = if isNext then C.Gold else C.Muted
+		card.status.Visible = got or isNext
+		card.status.Text = if got then "GOT IT" else "NEXT"
+		card.status.BackgroundColor3 = if got then C.Good else C.Ink
+		card.tier.TextColor3 = if isNext then C.Ink else C.InkMuted
 		card.icon.TextTransparency = if got or isNext then 0 else 0.35
 
 		-- The gold reward underneath.
 		local goldReward = Season.goldRewardFor(theme, i)
-		local goldEmoji, goldText = Season.describe(goldReward)
-		card.goldIcon.Text = goldEmoji
-		card.goldName.Text = goldText
-		card.goldRibbon.Text = if goldReward.Kind == "style" then "🏆 GOLD ONLY" else "🏆 GOLD"
+		showReward(card.goldIcon, card.goldCoin, card.goldName, goldReward)
+		card.goldRibbon.Text = if goldReward.Kind == "style" then "GOLD ONLY" else "GOLD"
 		local goldGot = hasGold and got
-		card.gold.BackgroundTransparency = if hasGold then 0 else 0.35
-		card.goldStroke.Transparency = if hasGold then 0 else 0.5
+		card.gold.BackgroundTransparency = if hasGold then 0 else 0.45
 		card.goldStroke.Thickness = if hasGold and isNext then (if pulse then 4 else 3) else 2
 		card.goldIcon.TextTransparency = if hasGold then 0 else 0.45
 		card.goldName.TextTransparency = if hasGold then 0 else 0.4
-		card.goldStatus.Text = if goldGot
-			then "✅ GOT IT"
-			elseif hasGold then (if isNext then "⭐ NEXT" else "")
-			else "🔒 GOLD PASS"
-		card.goldStatus.TextColor3 = if goldGot then C.Good elseif hasGold then C.Gold else C.Muted
+		card.goldStatus.Visible = goldGot or not hasGold or isNext
+		card.goldStatus.Text = if goldGot then "GOT IT" elseif hasGold then "NEXT" else "GOLD PASS"
+		card.goldStatus.BackgroundColor3 = if goldGot then C.Good else C.Ink
 	end
-	bonusText.Text =
-		`Every tier after {count}: 🔩 {Season.BonusScrap} Scrap (and 🔩 {Season.GoldBonusScrap} more with Gold)`
+	bonusText.Text = `Every tier after {count}: {Season.BonusScrap} Scrap, and {Season.GoldBonusScrap} more with Gold`
 	goldButton.Visible = not hasGold
-	howItWorks.Size = if hasGold then UDim2.new(1, 0, 0, 40) else UDim2.new(1, -270, 0, 40)
+	howItWorks.Size = if hasGold then UDim2.new(1, 0, 0, 40) else UDim2.new(1, -300, 0, 40)
 end
 
 local function build()
@@ -272,79 +246,79 @@ local function build()
 	dim.Text = ""
 	dim.AutoButtonColor = false
 	dim.Size = UDim2.fromScale(1, 1)
-	dim.BackgroundColor3 = rgb(0, 0, 0)
-	dim.BackgroundTransparency = 0.35
+	dim.BackgroundColor3 = rgb(6, 8, 18)
+	dim.BackgroundTransparency = 0.4
 	dim.Parent = gui
 
-	panel = Theme.panel(gui, "Season", UDim2.fromOffset(1000, 604), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
+	panel = Theme.card(gui, "Season", UDim2.fromOffset(1000, 616), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
 	Theme.scaled(panel)
-	Theme.padding(panel, 18)
-	titleLabel = Theme.label(panel, {
+	Theme.padding(panel, 20)
+	titleLabel = Theme.heading(panel, {
 		name = "Title",
-		size = UDim2.fromOffset(640, 44),
+		size = UDim2.fromOffset(600, 42),
 		text = "",
+		textSize = 40,
 		align = Enum.TextXAlignment.Left,
 	})
 	descriptionLabel = Theme.label(panel, {
 		name = "Description",
-		size = UDim2.fromOffset(640, 20),
+		size = UDim2.fromOffset(640, 18),
 		position = UDim2.fromOffset(2, 48),
 		text = "",
 		font = Theme.Body,
-		color = C.Muted,
+		color = C.InkMuted,
+		textSize = 15,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 	})
 	local close = Theme.button(panel, {
 		name = "Close",
-		size = UDim2.fromOffset(140, 48),
+		size = UDim2.fromOffset(120, 50),
 		position = UDim2.fromScale(1, 0),
 		anchor = Vector2.new(1, 0),
-		text = "◀ BACK",
-		color = C.PanelLight,
-		textColor = C.Text,
+		text = "BACK",
+		color = C.Panel,
+		textSize = 22,
 	})
 	close.Activated:Connect(function()
 		SeasonTrack.close()
 	end)
 	daysPill = Theme.pill(panel, {
 		name = "Days",
-		size = UDim2.fromOffset(180, 32),
-		position = UDim2.new(1, -156, 0, 8),
+		size = UDim2.fromOffset(150, 30),
+		position = UDim2.new(1, -136, 0, 10),
 		anchor = Vector2.new(1, 0),
 		text = "",
-		font = Theme.Caps,
-		transparency = 0.2,
 	})
 
 	-- Your progress this season.
-	tierLabel = Theme.label(panel, {
+	tierLabel = Theme.heading(panel, {
 		name = "Tier",
-		size = UDim2.fromOffset(180, 36),
-		position = UDim2.fromOffset(0, 82),
+		size = UDim2.fromOffset(180, 34),
+		position = UDim2.fromOffset(0, 80),
 		text = "",
-		color = C.Gold,
+		textSize = 34,
 		align = Enum.TextXAlignment.Left,
 	})
-	xpBar = Theme.bar(panel, UDim2.new(1, -200, 0, 16), UDim2.fromOffset(196, 86), C.Gold)
+	xpBar = Theme.bar(panel, UDim2.new(1, -200, 0, 18), UDim2.fromOffset(196, 82), C.Gold, C.CardLine)
 	xpLabel = Theme.label(panel, {
 		name = "Xp",
-		size = UDim2.new(1, -200, 0, 16),
+		size = UDim2.new(1, -200, 0, 14),
 		position = UDim2.fromOffset(196, 106),
 		text = "",
 		font = Theme.Caps,
-		color = C.Muted,
+		color = C.InkMuted,
+		textSize = 12,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 	})
 
 	track = Instance.new("ScrollingFrame")
 	track.Name = "Track"
 	track.Size = UDim2.new(1, 0, 0, FREE_HEIGHT + GOLD_HEIGHT + 52)
-	track.Position = UDim2.fromOffset(0, 140)
+	track.Position = UDim2.fromOffset(0, 138)
 	track.BackgroundTransparency = 1
 	track.BorderSizePixel = 0
 	track.ScrollBarThickness = 8
+	track.ScrollBarImageColor3 = C.Ink
 	track.ScrollingDirection = Enum.ScrollingDirection.X
 	track.AutomaticCanvasSize = Enum.AutomaticSize.X
 	track.CanvasSize = UDim2.new()
@@ -360,44 +334,36 @@ local function build()
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = track
 
-	bonusCard = Instance.new("Frame")
-	bonusCard.Name = "Bonus"
-	bonusCard.Size = UDim2.fromOffset(CARD_WIDTH, FREE_HEIGHT + 12 + GOLD_HEIGHT)
-	bonusCard.BackgroundColor3 = C.PanelDark
-	bonusCard.BackgroundTransparency = 0.2
-	bonusCard.Parent = track
-	Theme.corner(bonusCard, 12)
-	Theme.stroke(bonusCard, C.Scrap, 2).Transparency = 0.4
-	Theme.label(bonusCard, {
-		size = UDim2.new(1, 0, 0, 58),
-		position = UDim2.fromOffset(0, 32),
-		text = "🔩",
-	})
+	bonusCard = Theme.well(track, "Bonus", UDim2.fromOffset(CARD_WIDTH, FREE_HEIGHT + 12 + GOLD_HEIGHT), UDim2.new())
+	Theme.stroke(bonusCard, C.Ink, 2)
+	Theme.scrapIcon(bonusCard, 56, UDim2.new(0.5, 0, 0, 40), Vector2.new(0.5, 0))
 	bonusText = Theme.label(bonusCard, {
-		size = UDim2.new(1, -14, 0, 60),
-		position = UDim2.fromOffset(7, 96),
+		size = UDim2.new(1, -16, 0, 90),
+		position = UDim2.fromOffset(8, 110),
 		text = "",
 		font = Theme.Body,
-		color = C.Scrap,
+		textSize = 14,
 	})
 
 	howItWorks = Theme.label(panel, {
 		name = "HowItWorks",
 		size = UDim2.new(1, 0, 0, 40),
 		position = UDim2.new(0, 0, 1, -40),
-		text = "Every match earns season XP - as much as the Scrap you win. Rewards arrive on their own the moment "
+		text = "Every match earns season XP: as much as the Scrap you win. Rewards arrive on their own the moment "
 			.. "you reach a tier. Style marked SEASON ONLY can't be bought with Scrap!",
 		font = Theme.Body,
-		color = C.Muted,
-		stroke = false,
+		color = C.InkMuted,
+		textSize = 14,
+		align = Enum.TextXAlignment.Left,
 	})
 	goldButton = Theme.button(panel, {
 		name = "GetGold",
-		size = UDim2.fromOffset(250, 46),
+		size = UDim2.fromOffset(280, 56),
 		position = UDim2.fromScale(1, 1),
 		anchor = Vector2.new(1, 1),
-		text = "🏆 GET THE GOLD PASS",
-		color = GOLD_COLOR,
+		text = "GET THE GOLD PASS",
+		color = C.Gold,
+		textSize = 24,
 	})
 	goldButton.Activated:Connect(function()
 		SeasonTrack.GoldPressed:Fire()

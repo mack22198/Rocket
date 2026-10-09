@@ -1,5 +1,5 @@
 --!strict
--- Quick chat (see QuickChat). The 💬 CHAT button next to ☰ MENU opens a list of friendly phrases: tap one to say
+-- Quick chat (see QuickChat). The CHAT button next to MENU opens a list of friendly phrases: tap one to say
 -- it. Keys 1-8 say them straight away (T opens the list) and the gamepad's D-pad has three of them. Whatever
 -- anyone says pops up in a speech bubble over their car and in the feed. It's only there for players whose
 -- Roblox settings allow chat (the server says so with the player's QuickChat attribute).
@@ -24,7 +24,6 @@ local Theme = require(script.Parent.Theme)
 local QuickChatPanel = {}
 
 local C = Theme.Colors
-local rgb = Color3.fromRGB
 local localPlayer = Players.LocalPlayer
 
 local ROW_HEIGHT = 34
@@ -115,10 +114,10 @@ local function showBubble(car: Model, text: string, team: string)
 	box.Size = UDim2.fromOffset(0, 40)
 	box.Position = UDim2.fromScale(0.5, 0.42)
 	box.AnchorPoint = Vector2.new(0.5, 0.5)
-	box.BackgroundColor3 = rgb(255, 255, 255)
+	box.BackgroundColor3 = C.Card
 	box.Parent = tag
 	Theme.corner(box, 16)
-	Theme.stroke(box, Theme.teamColor(team), 3)
+	Theme.stroke(box, Theme.teamColor(team), 4)
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft = UDim.new(0, 14)
 	padding.PaddingRight = UDim.new(0, 14)
@@ -140,7 +139,7 @@ local function showBubble(car: Model, text: string, team: string)
 	tail.Position = UDim2.new(0.5, 0, 1, -2)
 	tail.AnchorPoint = Vector2.new(0.5, 0.5)
 	tail.Rotation = 45
-	tail.BackgroundColor3 = rgb(255, 255, 255)
+	tail.BackgroundColor3 = C.Card
 	tail.BorderSizePixel = 0
 	tail.ZIndex = 0
 	tail.Parent = box
@@ -178,7 +177,7 @@ local function onShown(car: unknown, index: unknown, name: unknown, team: unknow
 	showBubble(car, `{phrase.Emoji} {phrase.Text}`, side)
 	local mine = car:GetAttribute(MatchState.CarAttr.OwnerUserId) == localPlayer.UserId
 	local who = if mine then "You" elseif type(name) == "string" then name else "?"
-	Announcer.feed(`💬 {who}: {phrase.Emoji} {phrase.Text}`, Theme.teamColor(side))
+	Announcer.feed(`{who}: {phrase.Text}`, Theme.teamColor(side))
 	SoundController.play("Click", 0.35, if mine then 1.1 else 1.4)
 end
 
@@ -190,12 +189,12 @@ local function buildList()
 	list = Theme.panel(gui, "QuickChatList", UDim2.fromOffset(LIST_WIDTH, listHeight(false)), UDim2.fromOffset(16, 116))
 	list.Visible = false
 	Theme.scaled(list)
-	Theme.label(list, {
+	Theme.heading(list, {
 		name = "Title",
 		size = UDim2.new(1, -24, 0, 26),
-		position = UDim2.fromOffset(12, 10),
-		text = "💬 QUICK CHAT",
-		color = C.Gold,
+		position = UDim2.fromOffset(14, 12),
+		text = "QUICK CHAT",
+		textSize = 24,
 		align = Enum.TextXAlignment.Left,
 	})
 	for index, phrase in QuickChat.Phrases do
@@ -203,8 +202,7 @@ local function buildList()
 		row.Name = `Phrase{index}`
 		row.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
 		row.Position = UDim2.fromOffset(10, 44 + (index - 1) * (ROW_HEIGHT + ROW_GAP))
-		row.BackgroundColor3 = C.PanelLight
-		row.BackgroundTransparency = 0.2
+		row.BackgroundColor3 = C.CardShade
 		row.AutoButtonColor = true
 		row.Text = ""
 		row.Parent = list
@@ -215,10 +213,10 @@ local function buildList()
 			position = UDim2.fromOffset(6, 5),
 			text = tostring(index),
 			font = Theme.Caps,
-			color = C.Ink,
-			stroke = false,
+			color = C.Text,
+			textSize = 14,
 		})
-		key.BackgroundColor3 = C.Muted
+		key.BackgroundColor3 = C.Ink
 		key.BackgroundTransparency = 0
 		Theme.corner(key, 6)
 		table.insert(keyLabels, key)
@@ -226,31 +224,29 @@ local function buildList()
 			name = "Text",
 			size = UDim2.new(1, -46, 1, 0),
 			position = UDim2.fromOffset(38, 0),
-			text = `{phrase.Emoji}  {phrase.Text}`,
-			color = C.Text,
+			text = phrase.Text,
 			align = Enum.TextXAlignment.Left,
 			scaled = false,
-			textSize = 20,
+			textSize = 18,
 		})
 		text.TextWrapped = false
 		row.Activated:Connect(function()
 			say(index)
 		end)
 	end
-	local function emojiFor(id: string): string
+	local function keyFor(id: string): string
 		local index = QuickChat.indexOf(id)
-		local phrase = if index then QuickChat.phrase(index) else nil
-		return if phrase then phrase.Emoji else "?"
+		return if index then tostring(index) else "?"
 	end
 	local pad = QuickChat.Gamepad
 	gamepadHint = Theme.label(list, {
 		name = "Gamepad",
-		size = UDim2.new(1, -24, 0, 20),
-		position = UDim2.new(0, 12, 1, -28),
-		text = `🎮 D-PAD  ◀ {emojiFor(pad.Left)}   ▶ {emojiFor(pad.Right)}   ▼ {emojiFor(pad.Down)}`,
-		font = Theme.Body,
-		color = C.Muted,
-		stroke = false,
+		size = UDim2.new(1, -24, 0, 18),
+		position = UDim2.new(0, 12, 1, -30),
+		text = `D-PAD: LEFT {keyFor(pad.Left)}, RIGHT {keyFor(pad.Right)}, DOWN {keyFor(pad.Down)}`,
+		font = Theme.Caps,
+		color = C.InkMuted,
+		textSize = 12,
 	})
 end
 
@@ -270,19 +266,18 @@ function QuickChatPanel.start()
 
 	buttonHolder = Instance.new("Frame")
 	buttonHolder.Name = "Chat"
-	buttonHolder.Size = UDim2.fromOffset(118, 42)
-	buttonHolder.Position = UDim2.fromOffset(142, 66)
+	buttonHolder.Size = UDim2.fromOffset(104, 46)
+	buttonHolder.Position = UDim2.fromOffset(132, 64)
 	buttonHolder.BackgroundTransparency = 1
 	buttonHolder.Parent = gui
 	Theme.scaled(buttonHolder)
 	local button = Theme.button(buttonHolder, {
 		name = "ChatButton",
 		size = UDim2.fromScale(1, 1),
-		text = "💬  CHAT",
+		text = "CHAT",
 		color = C.Panel,
-		textColor = C.Text,
+		textSize = 20,
 	})
-	button.BackgroundTransparency = 0.15
 	button.Activated:Connect(function()
 		setOpen(not list.Visible)
 	end)

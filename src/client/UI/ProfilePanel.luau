@@ -29,20 +29,20 @@ type AchievementCell = {
 	icon: TextLabel,
 	bar: Theme.Bar,
 	count: TextLabel,
-	reward: TextLabel,
+	reward: Theme.Amount,
 }
 
 type TitleCell = { button: TextButton, stroke: UIStroke, name: TextLabel, note: TextLabel }
 
-local STATS: { { key: string, emoji: string, label: string } } = {
-	{ key = "matches", emoji = "🎮", label = "MATCHES" },
-	{ key = "wins", emoji = "🏆", label = "WINS" },
-	{ key = "goals", emoji = "⚽", label = "GOALS" },
-	{ key = "assists", emoji = "🤝", label = "ASSISTS" },
-	{ key = "saves", emoji = "🧤", label = "SAVES" },
-	{ key = "demos", emoji = "💥", label = "DEMOS" },
-	{ key = "mvps", emoji = "⭐", label = "MVPS" },
-	{ key = "bestStreak", emoji = "🔥", label = "BEST STREAK" },
+local STATS: { { key: string, label: string } } = {
+	{ key = "matches", label = "MATCHES" },
+	{ key = "wins", label = "WINS" },
+	{ key = "goals", label = "GOALS" },
+	{ key = "assists", label = "ASSISTS" },
+	{ key = "saves", label = "SAVES" },
+	{ key = "demos", label = "DEMOS" },
+	{ key = "mvps", label = "MVPS" },
+	{ key = "bestStreak", label = "BEST STREAK" },
 }
 
 local gui: ScreenGui
@@ -64,59 +64,51 @@ local page = 1
 local choosing = false
 
 local function makeAchievementCell(def: Achievements.AchievementDef, order: number): AchievementCell
-	local frame = Instance.new("Frame")
-	frame.Name = def.Id
+	local frame = Theme.well(achievementGrid, def.Id, UDim2.new(), UDim2.new())
 	frame.LayoutOrder = order
-	frame.BackgroundColor3 = C.PanelDark
-	frame.Parent = achievementGrid
-	Theme.corner(frame, 12)
-	local stroke = Theme.stroke(frame, C.Gold, 2)
+	local stroke = Theme.stroke(frame, C.Ink, 2)
 	local icon = Theme.label(frame, {
 		name = "Icon",
 		size = UDim2.fromOffset(54, 54),
-		position = UDim2.fromOffset(10, 12),
+		position = UDim2.fromOffset(12, 14),
 		text = def.Emoji,
-		stroke = false,
+		textSize = 34,
 	})
-	icon.BackgroundColor3 = C.PanelLight
-	icon.BackgroundTransparency = 0.3
-	Theme.corner(icon, 27)
+	icon.BackgroundColor3 = C.Card
+	icon.BackgroundTransparency = 0
+	Theme.corner(icon, 12)
+	Theme.stroke(icon, C.Ink, 2)
 	Theme.label(frame, {
 		name = "Name",
-		size = UDim2.new(1, -150, 0, 22),
-		position = UDim2.fromOffset(74, 8),
+		size = UDim2.new(1, -170, 0, 18),
+		position = UDim2.fromOffset(78, 12),
 		text = def.Name,
+		textSize = 16,
 		align = Enum.TextXAlignment.Left,
 	})
 	Theme.label(frame, {
 		name = "Text",
-		size = UDim2.new(1, -84, 0, 16),
-		position = UDim2.fromOffset(74, 32),
-		text = if def.Title then `{def.Text}  ·  🏷️ {def.Title}` else def.Text,
+		size = UDim2.new(1, -90, 0, 14),
+		position = UDim2.fromOffset(78, 34),
+		text = if def.Title then `{def.Text}. Unlocks the title {def.Title}.` else `{def.Text}.`,
 		font = Theme.Body,
-		color = C.Muted,
+		color = C.InkMuted,
+		textSize = 12,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 	})
-	local bar = Theme.bar(frame, UDim2.new(1, -150, 0, 12), UDim2.fromOffset(74, 58), C.Gold)
+	local bar = Theme.bar(frame, UDim2.new(1, -170, 0, 12), UDim2.fromOffset(78, 58), C.Gold, C.CardLine)
 	local count = Theme.label(frame, {
 		name = "Count",
-		size = UDim2.fromOffset(64, 16),
-		position = UDim2.new(1, -72, 0, 56),
+		size = UDim2.fromOffset(70, 14),
+		position = UDim2.new(1, -82, 0, 57),
 		text = "",
 		font = Theme.Caps,
-		color = C.Muted,
-		align = Enum.TextXAlignment.Right,
-		stroke = false,
-	})
-	local reward = Theme.label(frame, {
-		name = "Reward",
-		size = UDim2.fromOffset(70, 20),
-		position = UDim2.new(1, -78, 0, 8),
-		text = `🔩{def.Reward}`,
-		color = C.Scrap,
+		color = C.InkMuted,
+		textSize = 12,
 		align = Enum.TextXAlignment.Right,
 	})
+	local reward = Theme.amount(frame, 20, UDim2.new(1, -12, 0, 12), Vector2.new(1, 0))
+	reward.set(def.Reward)
 	return { frame = frame, stroke = stroke, icon = icon, bar = bar, count = count, reward = reward }
 end
 
@@ -130,7 +122,7 @@ local function chooseTitle(id: string)
 	end)
 	choosing = false
 	if ok and type(result) == "table" and result.ok ~= true and type(result.message) == "string" then
-		message.Text = `🔒 {result.message}`
+		message.Text = Theme.noEmoji(result.message)
 	end
 end
 
@@ -138,26 +130,27 @@ local function makeTitleCell(id: string, text: string, order: number): TitleCell
 	local button = Instance.new("TextButton")
 	button.Name = if id == "" then "Auto" else id
 	button.LayoutOrder = order
-	button.BackgroundColor3 = C.PanelDark
+	button.BackgroundColor3 = C.CardShade
 	button.AutoButtonColor = true
 	button.Text = ""
 	button.Parent = titleGrid
 	Theme.corner(button, 12)
-	local stroke = Theme.stroke(button, C.Gold, 2)
+	local stroke = Theme.stroke(button, C.Ink, 2)
 	local name = Theme.label(button, {
 		name = "Name",
-		size = UDim2.new(1, -16, 0, 26),
-		position = UDim2.fromOffset(8, 10),
+		size = UDim2.new(1, -16, 0, 20),
+		position = UDim2.fromOffset(8, 12),
 		text = text,
+		textSize = 17,
 	})
 	local note = Theme.label(button, {
 		name = "Note",
-		size = UDim2.new(1, -16, 0, 16),
-		position = UDim2.fromOffset(8, 42),
+		size = UDim2.new(1, -16, 0, 14),
+		position = UDim2.fromOffset(8, 40),
 		text = "",
 		font = Theme.Body,
-		color = C.Muted,
-		stroke = false,
+		color = C.InkMuted,
+		textSize = 12,
 	})
 	button.Activated:Connect(function()
 		chooseTitle(id)
@@ -170,13 +163,13 @@ local function refresh()
 	local level, into, need = Levels.levelFor(data.xp)
 	levelBadge.Text = tostring(level)
 	local wearing = if data.title ~= "" then data.title else Achievements.levelTitle(level)
-	titleLine.Text = Achievements.titleText(wearing)
+	titleLine.Text = Theme.noEmoji(Achievements.titleText(wearing))
 	levelBar.set(into / need)
-	levelText.Text = `LEVEL {level}  ·  {into} / {need} XP TO LEVEL {level + 1}`
+	levelText.Text = `LEVEL {level}: {into}/{need} XP TO LEVEL {level + 1}`
 	streakLine.Text = if data.winStreak >= 2
-		then `🔥 {data.winStreak} WINS IN A ROW!`
-		elseif data.winStreak == 1 then "🔥 1 WIN - WIN THE NEXT ONE FOR A STREAK!"
-		else "🔥 WIN 2 IN A ROW FOR A STREAK BONUS"
+		then `{data.winStreak} WINS IN A ROW!`
+		elseif data.winStreak == 1 then "1 WIN. WIN THE NEXT FOR A STREAK!"
+		else "WIN 2 IN A ROW FOR A STREAK BONUS"
 	for key, label in statValues do
 		local value = data.stats[key]
 		label.Text = Theme.formatNumber(if type(value) == "number" then value else 0)
@@ -214,34 +207,34 @@ local function refresh()
 		local progress, target = Achievements.progress(def, view)
 		if row.isDone then
 			cell.bar.set(1)
-			cell.count.Text = "✅ DONE"
-			cell.count.TextColor3 = C.Good
-			cell.stroke.Transparency = 0
+			cell.count.Text = "DONE"
+			cell.count.TextColor3 = C.GoodText
+			cell.frame.BackgroundColor3 = C.Card
 			cell.icon.TextTransparency = 0
-			cell.reward.TextTransparency = 0.5
+			cell.reward.label.TextTransparency = 0.5
 		else
 			cell.bar.set(progress / target)
 			cell.count.Text = `{progress}/{target}`
-			cell.count.TextColor3 = C.Muted
-			cell.stroke.Transparency = 0.75
+			cell.count.TextColor3 = C.InkMuted
+			cell.frame.BackgroundColor3 = C.CardShade
 			cell.icon.TextTransparency = 0.4
-			cell.reward.TextTransparency = 0
+			cell.reward.label.TextTransparency = 0
 		end
 	end
-	countLabel.Text = `🏅 {done} / {#Achievements.List} ACHIEVEMENTS`
+	countLabel.Text = `{done}/{#Achievements.List} ACHIEVEMENTS`
 
 	-- Titles: "automatic" first, then every title (the ones you've got first).
 	local entries: { { id: string, text: string, owned: boolean } } = {
 		{
 			id = "",
-			text = `✨ Best level title`,
+			text = "Best level title",
 			owned = true,
 		},
 	}
 	for _, title in Achievements.Titles do
 		table.insert(entries, {
 			id = title.Id,
-			text = `{title.Emoji} {title.Text}`,
+			text = title.Text,
 			owned = Achievements.ownsTitle(title.Id, level, data.achievements, data.vip),
 		})
 	end
@@ -253,14 +246,15 @@ local function refresh()
 		end
 		local worn = entry.id == data.title
 		cell.button.LayoutOrder = if entry.owned then order else order + 1000
+		cell.button.BackgroundColor3 = if worn then C.Gold elseif entry.owned then C.Card else C.CardShade
 		cell.name.TextTransparency = if entry.owned then 0 else 0.5
-		cell.stroke.Transparency = if worn then 0 elseif entry.owned then 0.6 else 0.9
-		cell.stroke.Color = if worn then C.Good else C.Gold
+		cell.stroke.Thickness = if worn then 4 else 2
 		cell.note.Text = if worn
-			then "✅ WEARING"
+			then "WEARING"
 			elseif entry.owned then "TAP TO WEAR"
-			else `🔒 {Achievements.howToUnlock(entry.id)}`
-		cell.note.TextColor3 = if worn then C.Good elseif entry.owned then C.Gold else C.Muted
+			else Theme.noEmoji(Achievements.howToUnlock(entry.id))
+		cell.note.Font = if worn or entry.owned then Theme.Caps else Theme.Body
+		cell.note.TextColor3 = if worn or entry.owned then C.Ink else C.InkMuted
 	end
 end
 
@@ -269,7 +263,7 @@ local function showPage(index: number)
 	achievementGrid.Visible = index == 1
 	titleGrid.Visible = index == 2
 	for i, tab in tabs do
-		Theme.setButtonColor(tab, if i == index then C.Gold else C.PanelLight, if i == index then nil else C.Text)
+		Theme.setButtonColor(tab, if i == index then C.Gold else C.CardShade)
 	end
 	message.Text = ""
 end
@@ -277,11 +271,12 @@ end
 local function grid(name: string, cellSize: UDim2): ScrollingFrame
 	local frame = Instance.new("ScrollingFrame")
 	frame.Name = name
-	frame.Size = UDim2.new(1, 0, 1, -262)
-	frame.Position = UDim2.fromOffset(0, 262)
+	frame.Size = UDim2.new(1, 6, 1, -264)
+	frame.Position = UDim2.fromOffset(0, 264)
 	frame.BackgroundTransparency = 1
 	frame.BorderSizePixel = 0
 	frame.ScrollBarThickness = 6
+	frame.ScrollBarImageColor3 = C.Ink
 	frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	frame.CanvasSize = UDim2.new()
 	frame.Parent = panel
@@ -301,80 +296,79 @@ local function build()
 	dim.Text = ""
 	dim.AutoButtonColor = false
 	dim.Size = UDim2.fromScale(1, 1)
-	dim.BackgroundColor3 = rgb(0, 0, 0)
-	dim.BackgroundTransparency = 0.35
+	dim.BackgroundColor3 = rgb(6, 8, 18)
+	dim.BackgroundTransparency = 0.4
 	dim.Parent = gui
 
-	panel = Theme.panel(gui, "Profile", UDim2.fromOffset(1000, 620), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
+	panel = Theme.card(gui, "Profile", UDim2.fromOffset(1000, 624), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
 	Theme.scaled(panel)
-	Theme.padding(panel, 18)
+	Theme.padding(panel, 20)
 
 	-- You.
 	local avatar = Instance.new("ImageLabel")
 	avatar.Name = "Avatar"
-	avatar.Size = UDim2.fromOffset(84, 84)
-	avatar.BackgroundColor3 = C.PanelLight
+	avatar.Size = UDim2.fromOffset(88, 88)
+	avatar.BackgroundColor3 = C.CardShade
 	avatar.Image = `rbxthumb://type=AvatarHeadShot&id={localPlayer.UserId}&w=150&h=150`
 	avatar.Parent = panel
-	Theme.corner(avatar, 42)
-	Theme.stroke(avatar, C.Gold, 3)
-	levelBadge = Theme.label(panel, {
+	Theme.corner(avatar, 18)
+	Theme.stroke(avatar, C.Ink, 3)
+	levelBadge = Theme.heading(panel, {
 		name = "Level",
-		size = UDim2.fromOffset(38, 38),
-		position = UDim2.fromOffset(56, 54),
+		size = UDim2.fromOffset(40, 36),
+		position = UDim2.fromOffset(62, 62),
 		text = "1",
-		color = C.Ink,
-		stroke = false,
+		textSize = 24,
 		zIndex = 3,
 	})
 	levelBadge.BackgroundColor3 = C.Gold
 	levelBadge.BackgroundTransparency = 0
-	Theme.corner(levelBadge, 19)
-	Theme.stroke(levelBadge, C.Ink, 2)
-	Theme.label(panel, {
+	Theme.corner(levelBadge, 10)
+	Theme.stroke(levelBadge, C.Ink, 3)
+	Theme.heading(panel, {
 		name = "PlayerName",
-		size = UDim2.fromOffset(460, 40),
-		position = UDim2.fromOffset(104, 0),
+		size = UDim2.fromOffset(460, 38),
+		position = UDim2.fromOffset(110, 2),
 		text = localPlayer.DisplayName,
+		textSize = 36,
 		align = Enum.TextXAlignment.Left,
 	})
 	titleLine = Theme.label(panel, {
 		name = "Wearing",
-		size = UDim2.fromOffset(460, 22),
-		position = UDim2.fromOffset(105, 40),
+		size = UDim2.fromOffset(460, 18),
+		position = UDim2.fromOffset(111, 42),
 		text = "",
-		color = C.Gold,
+		color = C.InkMuted,
+		textSize = 16,
 		align = Enum.TextXAlignment.Left,
 	})
-	levelBar = Theme.bar(panel, UDim2.fromOffset(480, 14), UDim2.fromOffset(105, 70), C.Blue)
+	levelBar = Theme.bar(panel, UDim2.fromOffset(480, 16), UDim2.fromOffset(111, 68), C.Sky, C.CardLine)
 	levelText = Theme.label(panel, {
 		name = "LevelText",
-		size = UDim2.fromOffset(420, 16),
-		position = UDim2.fromOffset(105, 88),
+		size = UDim2.fromOffset(420, 14),
+		position = UDim2.fromOffset(111, 90),
 		text = "",
 		font = Theme.Caps,
-		color = C.Muted,
+		color = C.InkMuted,
+		textSize = 12,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 	})
 	streakLine = Theme.pill(panel, {
 		name = "Streak",
-		size = UDim2.fromOffset(330, 30),
-		position = UDim2.new(1, -152, 0, 10),
+		size = UDim2.fromOffset(310, 30),
+		position = UDim2.new(1, -136, 0, 10),
 		anchor = Vector2.new(1, 0),
 		text = "",
-		font = Theme.Caps,
-		color = C.Mega,
-		transparency = 0.3,
+		background = C.Mega,
 	})
 	local close = Theme.button(panel, {
 		name = "Close",
-		size = UDim2.fromOffset(140, 48),
+		size = UDim2.fromOffset(120, 50),
 		position = UDim2.fromScale(1, 0),
 		anchor = Vector2.new(1, 0),
-		text = "◀ BACK",
-		color = C.PanelLight,
-		textColor = C.Text,
+		text = "BACK",
+		color = C.Panel,
+		textSize = 22,
 	})
 	close.Activated:Connect(function()
 		ProfilePanel.close()
@@ -383,8 +377,8 @@ local function build()
 	-- Lifetime stats.
 	local statsRow = Instance.new("Frame")
 	statsRow.Name = "Stats"
-	statsRow.Size = UDim2.new(1, 0, 0, 74)
-	statsRow.Position = UDim2.fromOffset(0, 116)
+	statsRow.Size = UDim2.new(1, 0, 0, 72)
+	statsRow.Position = UDim2.fromOffset(0, 118)
 	statsRow.BackgroundTransparency = 1
 	statsRow.Parent = panel
 	local statsLayout = Instance.new("UIGridLayout")
@@ -393,27 +387,23 @@ local function build()
 	statsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	statsLayout.Parent = statsRow
 	for order, stat in STATS do
-		local chip = Instance.new("Frame")
-		chip.Name = stat.key
+		local chip = Theme.well(statsRow, stat.key, UDim2.new(), UDim2.new())
 		chip.LayoutOrder = order
-		chip.BackgroundColor3 = C.PanelDark
-		chip.BackgroundTransparency = 0.2
-		chip.Parent = statsRow
-		Theme.corner(chip, 10)
-		statValues[stat.key] = Theme.label(chip, {
+		statValues[stat.key] = Theme.heading(chip, {
 			name = "Value",
-			size = UDim2.new(1, -8, 0, 34),
-			position = UDim2.fromOffset(4, 6),
+			size = UDim2.new(1, -8, 0, 32),
+			position = UDim2.fromOffset(4, 8),
 			text = "0",
+			textSize = 30,
 		})
 		Theme.label(chip, {
 			name = "Label",
-			size = UDim2.new(1, -8, 0, 16),
+			size = UDim2.new(1, -8, 0, 12),
 			position = UDim2.fromOffset(4, 48),
-			text = `{stat.emoji} {stat.label}`,
+			text = stat.label,
 			font = Theme.Caps,
-			color = C.Muted,
-			stroke = false,
+			color = C.InkMuted,
+			textSize = 11,
 		})
 	end
 
@@ -424,14 +414,14 @@ local function build()
 	tabBar.Position = UDim2.fromOffset(0, 206)
 	tabBar.BackgroundTransparency = 1
 	tabBar.Parent = panel
-	for i, text in { "🏅 ACHIEVEMENTS", "🏷️ TITLES" } do
+	for i, text in { "ACHIEVEMENTS", "TITLES" } do
 		local tab = Theme.button(tabBar, {
 			name = `Tab{i}`,
-			size = UDim2.fromOffset(220, 44),
-			position = UDim2.fromOffset((i - 1) * 232, 0),
+			size = UDim2.fromOffset(210, 44),
+			position = UDim2.fromOffset((i - 1) * 222, 0),
 			text = text,
-			color = C.PanelLight,
-			textColor = C.Text,
+			color = C.CardShade,
+			textSize = 20,
 		})
 		tab.Activated:Connect(function()
 			showPage(i)
@@ -440,27 +430,26 @@ local function build()
 	end
 	countLabel = Theme.label(tabBar, {
 		name = "Count",
-		size = UDim2.fromOffset(300, 24),
+		size = UDim2.fromOffset(300, 16),
 		position = UDim2.fromScale(1, 0.5),
 		anchor = Vector2.new(1, 0.5),
 		text = "",
 		font = Theme.Caps,
-		color = C.Gold,
+		textSize = 14,
 		align = Enum.TextXAlignment.Right,
-		stroke = false,
 	})
 	message = Theme.label(tabBar, {
 		name = "Message",
-		size = UDim2.fromOffset(300, 20),
-		position = UDim2.fromOffset(480, 12),
+		size = UDim2.fromOffset(300, 16),
+		position = UDim2.fromOffset(460, 14),
 		text = "",
 		font = Theme.Body,
 		color = C.Bad,
+		textSize = 14,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 	})
 	achievementGrid = grid("Achievements", UDim2.new(0.5, -5, 0, 84))
-	titleGrid = grid("Titles", UDim2.new(0.25, -8, 0, 66))
+	titleGrid = grid("Titles", UDim2.new(0.25, -8, 0, 64))
 
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
 end

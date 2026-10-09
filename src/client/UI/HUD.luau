@@ -1,6 +1,6 @@
 --!strict
 -- The in-game HUD: the scoreboard and clock, a boost dial, the Mega Shot meter, your item and car power, big
--- centre text (countdown, GO!, GOAL!) and the ☰ MENU button. It's only shown during matches - the menus have
+-- centre text (countdown, GO!, GOAL!) and the MENU button. It's only shown during matches - the menus have
 -- their own screens.
 --
 -- Everything stays clear of Roblox's own buttons in the top corners.
@@ -25,7 +25,7 @@ local Theme = require(script.Parent.Theme)
 
 local HUD = {}
 
--- The ☰ MENU button was pressed.
+-- The MENU button was pressed.
 HUD.MenuRequested = Signal.new() :: Signal.Signal<>
 
 local C = Theme.Colors
@@ -105,8 +105,8 @@ end
 local function buildScoreboard()
 	scoreboard = Instance.new("Frame")
 	scoreboard.Name = "Scoreboard"
-	scoreboard.Size = UDim2.fromOffset(420, 96)
-	scoreboard.Position = UDim2.new(0.5, 0, 0, 8)
+	scoreboard.Size = UDim2.fromOffset(392, 100)
+	scoreboard.Position = UDim2.new(0.5, 0, 0, 10)
 	scoreboard.AnchorPoint = Vector2.new(0.5, 0)
 	scoreboard.BackgroundTransparency = 1
 	scoreboard.Parent = gui
@@ -114,144 +114,113 @@ local function buildScoreboard()
 	local function teamBlock(team: string, color: Color3, x: number): TextLabel
 		local block = Instance.new("Frame")
 		block.Name = team
-		block.Size = UDim2.fromOffset(100, 66)
+		block.Size = UDim2.fromOffset(96, 66)
 		block.Position = UDim2.fromOffset(x, 0)
 		block.BackgroundColor3 = color
 		block.Parent = scoreboard
-		Theme.corner(block, 16)
-		Theme.stroke(block, color:Lerp(rgb(0, 0, 0), 0.55), 3)
-		Theme.gradient(block, rgb(255, 255, 255), rgb(200, 200, 200))
-		Theme.label(block, {
-			name = "Team",
-			size = UDim2.fromScale(1, 0.24),
-			position = UDim2.fromScale(0, 0.72),
-			text = string.upper(team),
-			font = Enum.Font.GothamBlack,
-			stroke = false,
-		})
-		return Theme.label(block, {
+		Theme.corner(block, 14)
+		Theme.stroke(block, C.Ink, 3)
+		Theme.lip(block, 6)
+		return Theme.heading(block, {
 			name = "Score",
-			size = UDim2.fromScale(1, 0.72),
-			position = UDim2.fromScale(0, 0.02),
+			size = UDim2.new(1, 0, 1, -8),
+			position = UDim2.fromOffset(0, 2),
 			text = "0",
+			color = C.Text,
+			textSize = 50,
+			stroke = true,
 		})
 	end
 	blueScore = teamBlock("Blue", C.Blue, 0)
-	orangeScore = teamBlock("Orange", C.Orange, 320)
+	orangeScore = teamBlock("Orange", C.Orange, 296)
 
-	local clock = Instance.new("Frame")
-	clock.Name = "Clock"
-	clock.Size = UDim2.fromOffset(200, 58)
-	clock.Position = UDim2.fromOffset(110, 4)
-	clock.BackgroundColor3 = C.Panel
-	clock.Parent = scoreboard
-	Theme.corner(clock, 14)
-	Theme.stroke(clock, rgb(255, 255, 255), 2).Transparency = 0.8
-	clockLabel = Theme.label(clock, {
-		size = UDim2.new(1, -20, 0.84, 0),
-		position = UDim2.new(0, 10, 0.08, 0),
+	local clock = Theme.slab(scoreboard, "Clock", UDim2.fromOffset(180, 58), UDim2.fromOffset(106, 4))
+	clockLabel = Theme.heading(clock, {
+		size = UDim2.new(1, -20, 1, -10),
+		position = UDim2.fromOffset(10, 3),
 		text = MatchState.formatClock(GameConfig.Match.Length),
-		stroke = false,
+		color = C.Text,
+		textSize = 42,
 	})
 	clockNote = Theme.pill(scoreboard, {
 		name = "Note",
-		size = UDim2.fromOffset(240, 26),
-		position = UDim2.fromOffset(90, 68),
+		size = UDim2.fromOffset(300, 28),
+		position = UDim2.fromOffset(46, 72),
 		text = "",
-		color = C.Gold,
-		font = Enum.Font.GothamBlack,
+		background = C.Gold,
 	})
 	youTag = Theme.pill(scoreboard, {
 		name = "You",
-		size = UDim2.fromOffset(64, 24),
-		position = UDim2.fromOffset(18, 70),
-		text = "▲ YOU",
-		font = Enum.Font.GothamBlack,
+		size = UDim2.fromOffset(60, 24),
+		position = UDim2.fromOffset(18, 72),
+		text = "YOU",
 		background = C.Text,
-		color = C.Ink,
-		transparency = 0,
 	})
 end
 
 local function buildBoostDial()
 	dial = Instance.new("Frame")
 	dial.Name = "Boost"
-	dial.Size = UDim2.fromOffset(156, 156)
-	dial.Position = UDim2.new(1, -22, 1, -22)
+	dial.Size = UDim2.fromOffset(150, 150)
+	dial.Position = UDim2.new(1, -24, 1, -24)
 	dial.AnchorPoint = Vector2.new(1, 1)
 	dial.BackgroundColor3 = C.Panel
-	dial.BackgroundTransparency = 0.12
 	dial.Parent = gui
-	Theme.corner(dial, 78)
-	Theme.stroke(dial, rgb(255, 255, 255), 2).Transparency = 0.8
+	Theme.corner(dial, 75)
+	Theme.stroke(dial, C.Ink, 4)
 	-- A 270 degree arc of segments, like a speedometer.
 	for i = 1, DIAL_SEGMENTS do
 		local t = (i - 0.5) / DIAL_SEGMENTS
 		local angle = math.rad(-135 + 270 * t)
 		local segment = Instance.new("Frame")
 		segment.Name = `Segment{i}`
-		segment.Size = UDim2.fromOffset(10, 22)
+		segment.Size = UDim2.fromOffset(10, 20)
 		segment.AnchorPoint = Vector2.new(0.5, 0.5)
-		segment.Position = UDim2.new(0.5, math.sin(angle) * 60, 0.5, -math.cos(angle) * 60)
+		segment.Position = UDim2.new(0.5, math.sin(angle) * 57, 0.5, -math.cos(angle) * 57)
 		segment.Rotation = math.deg(angle)
 		segment.BorderSizePixel = 0
 		segment.Parent = dial
-		Theme.corner(segment, 4)
+		Theme.corner(segment, 3)
 		table.insert(dialSegments, segment)
-		table.insert(dialColors, rgb(255, 236, 110):Lerp(rgb(255, 84, 30), t))
+		table.insert(dialColors, rgb(255, 226, 80):Lerp(rgb(255, 96, 30), t))
 	end
-	boostNumber = Theme.label(dial, {
-		size = UDim2.fromOffset(90, 54),
-		position = UDim2.new(0.5, 0, 0.5, -4),
+	boostNumber = Theme.heading(dial, {
+		size = UDim2.fromOffset(90, 50),
+		position = UDim2.new(0.5, 0, 0.5, -2),
 		anchor = Vector2.new(0.5, 0.5),
 		text = "0",
+		color = C.Text,
+		textSize = 48,
 	})
 	Theme.label(dial, {
-		size = UDim2.fromOffset(80, 18),
-		position = UDim2.new(0.5, 0, 1, -24),
+		size = UDim2.fromOffset(80, 16),
+		position = UDim2.new(0.5, 0, 1, -22),
 		anchor = Vector2.new(0.5, 1),
 		text = "BOOST",
-		font = Enum.Font.GothamBlack,
+		font = Theme.Caps,
 		color = C.Boost,
-		stroke = false,
+		textSize = 14,
 	})
 	camPill = Theme.pill(gui, {
 		name = "BallCam",
-		size = UDim2.fromOffset(170, 30),
-		position = UDim2.new(1, -22, 1, -190),
+		size = UDim2.fromOffset(150, 28),
+		position = UDim2.new(1, -24, 1, -186),
 		anchor = Vector2.new(1, 1),
 		text = "",
-		font = Enum.Font.GothamBold,
 		color = C.Muted,
 	})
 end
 
 local function buildMegaMeter()
-	megaPanel = Instance.new("Frame")
-	megaPanel.Name = "Mega"
-	megaPanel.Size = UDim2.fromOffset(400, 54)
-	megaPanel.Position = UDim2.new(0.5, 0, 1, -20)
-	megaPanel.AnchorPoint = Vector2.new(0.5, 1)
-	megaPanel.BackgroundColor3 = C.Panel
-	megaPanel.BackgroundTransparency = 0.12
-	megaPanel.Parent = gui
-	Theme.corner(megaPanel, 27)
-	Theme.stroke(megaPanel, rgb(255, 255, 255), 2).Transparency = 0.8
-	local icon = Theme.label(megaPanel, {
-		name = "Icon",
-		size = UDim2.fromOffset(46, 46),
-		position = UDim2.fromOffset(4, 4),
-		text = "💥",
-		stroke = false,
-	})
-	icon.BackgroundColor3 = C.Mega
-	icon.BackgroundTransparency = 0
-	Theme.corner(icon, 23)
-	megaBar = Theme.bar(megaPanel, UDim2.new(1, -70, 0, 30), UDim2.fromOffset(58, 12), C.Mega)
-	megaLabel = Theme.label(megaPanel, {
-		size = UDim2.new(1, -86, 0, 24),
-		position = UDim2.fromOffset(66, 15),
+	megaPanel = Theme.slab(gui, "Mega", UDim2.fromOffset(400, 50), UDim2.new(0.5, 0, 1, -24), Vector2.new(0.5, 1))
+	megaBar = Theme.bar(megaPanel, UDim2.new(1, -20, 0, 28), UDim2.fromOffset(10, 8), C.Mega)
+	megaLabel = Theme.heading(megaPanel, {
+		size = UDim2.new(1, -40, 0, 22),
+		position = UDim2.fromOffset(20, 11),
 		text = "MEGA SHOT",
+		color = C.Text,
+		textSize = 22,
+		stroke = true,
 		zIndex = 3,
 	})
 end
@@ -259,81 +228,74 @@ end
 local function buildMenuButton()
 	local holder = Instance.new("Frame")
 	holder.Name = "Menu"
-	holder.Size = UDim2.fromOffset(118, 42)
-	holder.Position = UDim2.fromOffset(16, 66)
+	holder.Size = UDim2.fromOffset(104, 46)
+	holder.Position = UDim2.fromOffset(16, 64)
 	holder.BackgroundTransparency = 1
 	holder.Parent = gui
 	Theme.scaled(holder)
 	menuButton = Theme.button(holder, {
 		name = "MenuButton",
 		size = UDim2.fromScale(1, 1),
-		text = "☰  MENU",
+		text = "MENU",
 		color = C.Panel,
-		textColor = C.Text,
+		textSize = 20,
 	})
-	menuButton.BackgroundTransparency = 0.15
 	menuButton.Activated:Connect(function()
 		HUD.MenuRequested:Fire()
 	end)
 end
 
--- One square slot (the item or the power) with a big emoji, its key in the corner and its name below.
+-- One square slot (the item or the power) with a big picture, its key in the corner and its name below.
 local function buildSlot(name: string, x: number): Slot
-	local frame = Instance.new("Frame")
-	frame.Name = name
-	frame.Size = UDim2.fromOffset(92, 92)
-	frame.Position = UDim2.fromOffset(x, 8)
-	frame.BackgroundColor3 = C.Panel
-	frame.BackgroundTransparency = 0.12
-	frame.Parent = powerPanel
-	Theme.corner(frame, 20)
-	local stroke = Theme.stroke(frame, rgb(255, 255, 255), 3)
-	stroke.Transparency = 0.7
+	local frame = Theme.slab(powerPanel, name, UDim2.fromOffset(88, 88), UDim2.fromOffset(x, 10))
+	local stroke = frame:FindFirstChildOfClass("UIStroke") :: UIStroke
 	local icon = Theme.label(frame, {
 		name = "Icon",
-		size = UDim2.fromOffset(62, 62),
-		position = UDim2.fromScale(0.5, 0.47),
+		size = UDim2.fromOffset(58, 58),
+		position = UDim2.new(0.5, 0, 0.5, -3),
 		anchor = Vector2.new(0.5, 0.5),
 		text = "",
-		stroke = false,
+		color = C.Text,
 		zIndex = 2,
 	})
 	local cooldown = Instance.new("Frame")
 	cooldown.Name = "Cooldown"
 	cooldown.Size = UDim2.fromScale(1, 0)
-	cooldown.BackgroundColor3 = rgb(0, 0, 0)
-	cooldown.BackgroundTransparency = 0.45
+	cooldown.BackgroundColor3 = C.Ink
+	cooldown.BackgroundTransparency = 0.3
 	cooldown.BorderSizePixel = 0
 	cooldown.ZIndex = 3
 	cooldown.Parent = frame
-	Theme.corner(cooldown, 20)
-	local timer = Theme.label(frame, {
+	Theme.corner(cooldown, 14)
+	local timer = Theme.heading(frame, {
 		name = "Timer",
 		size = UDim2.fromOffset(60, 40),
 		position = UDim2.fromScale(0.5, 0.5),
 		anchor = Vector2.new(0.5, 0.5),
 		text = "",
+		color = C.Text,
+		textSize = 36,
+		stroke = true,
 		zIndex = 4,
 	})
 	local caption = Theme.label(powerPanel, {
 		name = `{name}Caption`,
-		size = UDim2.fromOffset(108, 16),
-		position = UDim2.fromOffset(x + 46, 106),
+		size = UDim2.fromOffset(112, 16),
+		position = UDim2.fromOffset(x + 44, 104),
 		anchor = Vector2.new(0.5, 0),
 		text = "",
 		font = Theme.Caps,
-		stroke = false,
+		color = C.Text,
+		textSize = 13,
+		stroke = true,
 	})
 	local key = Theme.pill(frame, {
 		name = "Key",
-		size = UDim2.fromOffset(38, 24),
-		position = UDim2.new(1, 8, 0, -8),
+		size = UDim2.fromOffset(36, 24),
+		position = UDim2.new(1, 8, 0, -10),
 		anchor = Vector2.new(1, 0),
 		text = "",
-		font = Theme.Caps,
 		background = C.Text,
-		color = C.Ink,
-		transparency = 0,
 	})
 	key.ZIndex = 5
 	return {
@@ -350,61 +312,57 @@ end
 local function buildPowerPanel()
 	powerPanel = Instance.new("Frame")
 	powerPanel.Name = "Powers"
-	powerPanel.Size = UDim2.fromOffset(222, 124)
-	powerPanel.Position = UDim2.new(0, 22, 1, -22)
+	powerPanel.Size = UDim2.fromOffset(216, 124)
+	powerPanel.Position = UDim2.new(0, 24, 1, -20)
 	powerPanel.AnchorPoint = Vector2.new(0, 1)
 	powerPanel.BackgroundTransparency = 1
 	powerPanel.Parent = gui
 	itemSlot = buildSlot("Item", 0)
-	powerSlot = buildSlot("Power", 122)
+	powerSlot = buildSlot("Power", 120)
 	statusPill = Theme.pill(gui, {
 		name = "Status",
 		size = UDim2.fromOffset(340, 34),
 		position = UDim2.new(0.5, 0, 1, -86),
 		anchor = Vector2.new(0.5, 1),
 		text = "",
-		font = Theme.Caps,
 	})
 	statusPill.Visible = false
 end
 
--- "✨ MATCH TWIST ✨ - 🏀 GIANT BALL": shown big at the first kickoff, then as a small pill all match.
+-- "MATCH TWIST: GIANT BALL": shown big at the first kickoff, then as a small tag under the scoreboard all match.
 local function buildTwist()
-	twistBanner =
-		Theme.panel(gui, "Twist", UDim2.fromOffset(560, 116), UDim2.fromScale(0.5, 0.58), Vector2.new(0.5, 0.5))
-	twistBanner.BackgroundTransparency = 0.1
-	Theme.stroke(twistBanner, C.Gold, 3)
+	twistBanner = Theme.card(gui, "Twist", UDim2.fromOffset(540, 128), UDim2.fromScale(0.5, 0.6), Vector2.new(0.5, 0.5))
 	Theme.label(twistBanner, {
-		size = UDim2.new(1, 0, 0, 18),
-		position = UDim2.fromOffset(0, 10),
-		text = "✨ MATCH TWIST ✨",
+		size = UDim2.new(1, 0, 0, 16),
+		position = UDim2.fromOffset(0, 14),
+		text = "MATCH TWIST",
 		font = Theme.Caps,
-		color = C.Gold,
-		stroke = false,
+		color = C.InkMuted,
+		textSize = 14,
 	})
-	twistName = Theme.label(twistBanner, {
+	twistName = Theme.heading(twistBanner, {
 		name = "Name",
 		size = UDim2.new(1, -20, 0, 48),
-		position = UDim2.fromOffset(10, 30),
+		position = UDim2.fromOffset(10, 34),
 		text = "",
+		textSize = 46,
 	})
 	twistText = Theme.label(twistBanner, {
 		name = "Text",
-		size = UDim2.new(1, -30, 0, 22),
-		position = UDim2.fromOffset(15, 82),
+		size = UDim2.new(1, -40, 0, 20),
+		position = UDim2.fromOffset(20, 88),
 		text = "",
 		font = Theme.Body,
-		color = C.Muted,
-		stroke = false,
+		color = C.InkMuted,
+		textSize = 17,
 	})
 	twistBanner.Visible = false
 	twistPill = Theme.pill(gui, {
 		name = "TwistPill",
-		size = UDim2.fromOffset(230, 28),
-		position = UDim2.new(0.5, 0, 0, 108),
+		size = UDim2.fromOffset(200, 28),
+		position = UDim2.new(0.5, 0, 0, 116),
 		anchor = Vector2.new(0.5, 0),
 		text = "",
-		font = Theme.Caps,
 		color = C.Gold,
 	})
 	twistPill.Visible = false
@@ -420,24 +378,23 @@ local function build()
 	buildMenuButton()
 
 	-- Centre messages.
-	bigText = Theme.label(gui, {
+	bigText = Theme.heading(gui, {
 		name = "BigText",
 		size = UDim2.fromOffset(700, 140),
 		position = UDim2.fromScale(0.5, 0.3),
 		anchor = Vector2.new(0.5, 0.5),
 		text = "",
+		color = C.Text,
 		zIndex = 5,
 	})
 	bigText.Visible = false
-	Theme.stroke(bigText, rgb(0, 0, 0), 5).ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	Theme.outline(bigText, 6)
 	subText = Theme.pill(gui, {
 		name = "SubText",
-		size = UDim2.fromOffset(760, 42),
+		size = UDim2.fromOffset(720, 40),
 		position = UDim2.new(0.5, 0, 0.3, 84),
 		anchor = Vector2.new(0.5, 0),
 		text = "",
-		background = C.PanelDark,
-		transparency = 0.25,
 	})
 	subText.ZIndex = 5
 	subText.Visible = false
@@ -466,21 +423,21 @@ end
 local function statusText(car: Model): (string?, Color3)
 	local spin, slow, freeze = CarController.effects()
 	if car:GetAttribute(CarAttr.Frozen) == true or freeze > 0 then
-		return "❄️ FROZEN!", rgb(170, 230, 255)
+		return "FROZEN!", rgb(170, 230, 255)
 	elseif spin > 0 then
-		return "🌀 SPUN OUT!", rgb(255, 230, 90)
+		return "SPUN OUT!", rgb(255, 230, 90)
 	elseif slow > 0 then
-		return "🧀 STUCK IN CHEESE!", rgb(255, 200, 60)
+		return "STUCK IN CHEESE!", rgb(255, 200, 60)
 	elseif car:GetAttribute(CarAttr.Shield) == true then
-		return "🛡️ BUBBLE SHIELD", rgb(140, 190, 255)
+		return "BUBBLE SHIELD", rgb(140, 190, 255)
 	elseif car:GetAttribute(CarAttr.Ghost) == true then
-		return "🌊 SHARK DIVE - UNTOUCHABLE", rgb(110, 220, 255)
+		return "SHARK DIVE: UNTOUCHABLE", rgb(110, 220, 255)
 	elseif car:GetAttribute(CarAttr.Rocket) == true then
-		return "🚀 ROCKET FUEL - BOOST FOREVER!", rgb(255, 180, 70)
+		return "ROCKET FUEL: BOOST FOREVER!", rgb(255, 180, 70)
 	elseif car:GetAttribute(CarAttr.Pull) == "magnet" then
-		return "🧲 MAGNET ON", rgb(255, 120, 130)
+		return "MAGNET ON", rgb(255, 120, 130)
 	elseif car:GetAttribute(CarAttr.Pull) == "beam" then
-		return "🛸 TRACTOR BEAM", rgb(150, 255, 130)
+		return "TRACTOR BEAM", rgb(150, 255, 130)
 	end
 	return nil, C.Text
 end
@@ -500,32 +457,29 @@ local function updatePowers(car: Model, now: number, pulse: boolean)
 	itemSlot.timer.Text = ""
 	if not itemDef then
 		itemSlot.icon.Text = "?"
-		itemSlot.icon.TextTransparency = 0.6
+		itemSlot.icon.Font = Theme.Display
+		itemSlot.icon.TextTransparency = 0.5
 		itemSlot.caption.Text = "GRAB A ? BOX"
 		itemSlot.caption.TextColor3 = C.Muted
 		itemSlot.frame.BackgroundColor3 = C.Panel
-		itemSlot.stroke.Color = rgb(255, 255, 255)
-		itemSlot.stroke.Transparency = 0.7
 		itemSlot.key.Visible = false
 	elseif now < itemReadyAt then
 		local order = Powers.ItemOrder
 		local spinning = Powers.Items[order[math.floor(os.clock() * 14) % #order + 1]]
 		itemSlot.icon.Text = spinning.Emoji
+		itemSlot.icon.Font = Theme.Title
 		itemSlot.icon.TextTransparency = 0
 		itemSlot.caption.Text = "..."
 		itemSlot.caption.TextColor3 = C.Gold
 		itemSlot.frame.BackgroundColor3 = spinning.Color:Lerp(C.Panel, 0.5)
-		itemSlot.stroke.Color = C.Gold
-		itemSlot.stroke.Transparency = 0
 		itemSlot.key.Visible = false
 	else
 		itemSlot.icon.Text = itemDef.Emoji
+		itemSlot.icon.Font = Theme.Title
 		itemSlot.icon.TextTransparency = 0
 		itemSlot.caption.Text = string.upper(itemDef.Name)
 		itemSlot.caption.TextColor3 = itemDef.Color
-		itemSlot.frame.BackgroundColor3 = itemDef.Color:Lerp(C.Panel, if pulse then 0.35 else 0.5)
-		itemSlot.stroke.Color = itemDef.Color
-		itemSlot.stroke.Transparency = 0
+		itemSlot.frame.BackgroundColor3 = itemDef.Color:Lerp(C.Panel, if pulse then 0.2 else 0.4)
 		itemSlot.key.Visible = true
 	end
 
@@ -543,16 +497,12 @@ local function updatePowers(car: Model, now: number, pulse: boolean)
 		powerSlot.timer.Text = tostring(math.ceil(left))
 		powerSlot.caption.TextColor3 = C.Muted
 		powerSlot.frame.BackgroundColor3 = C.Panel
-		powerSlot.stroke.Color = rgb(255, 255, 255)
-		powerSlot.stroke.Transparency = 0.7
 		powerSlot.key.Visible = false
 	else
 		powerSlot.cooldown.Size = UDim2.fromScale(1, 0)
 		powerSlot.timer.Text = ""
 		powerSlot.caption.TextColor3 = power.Color
-		powerSlot.frame.BackgroundColor3 = power.Color:Lerp(C.Panel, if pulse then 0.35 else 0.5)
-		powerSlot.stroke.Color = power.Color
-		powerSlot.stroke.Transparency = 0
+		powerSlot.frame.BackgroundColor3 = power.Color:Lerp(C.Panel, if pulse then 0.2 else 0.4)
 		powerSlot.key.Visible = true
 	end
 
@@ -611,13 +561,13 @@ local function update()
 	if twist and phase == Phases.Countdown and twistShownFor ~= matchId then
 		twistShownFor = matchId
 		twistBannerUntil = os.clock() + 4.5
-		twistName.Text = `{twist.Emoji} {string.upper(twist.Name)}`
+		twistName.Text = string.upper(twist.Name)
 		twistText.Text = twist.Description
 	end
 	twistBanner.Visible = twist ~= nil and os.clock() < twistBannerUntil and inMatchPhase
 	twistPill.Visible = twist ~= nil and scoreboard.Visible and not twistBanner.Visible
 	if twist then
-		twistPill.Text = `{twist.Emoji} {string.upper(twist.Name)}`
+		twistPill.Text = string.upper(twist.Name)
 	end
 
 	if os.clock() > messageUntil then
@@ -641,8 +591,7 @@ local function update()
 		local lit = math.floor(boostValue / 100 * DIAL_SEGMENTS + 0.5)
 		for i, segment in dialSegments do
 			local on = i <= lit
-			segment.BackgroundColor3 = if on then dialColors[i] else C.Text
-			segment.BackgroundTransparency = if on then 0 else 0.82
+			segment.BackgroundColor3 = if on then dialColors[i] else C.PanelLight
 		end
 
 		local mega = car:GetAttribute(CarAttr.Mega)
@@ -655,7 +604,7 @@ local function update()
 			else "PRESS F"
 		local pulse = math.floor(os.clock() * 4) % 2 == 0
 		if armed then
-			megaLabel.Text = "🔥 ARMED - HIT THE BALL!"
+			megaLabel.Text = "ARMED! HIT THE BALL!"
 			megaLabel.TextColor3 = C.Gold
 			megaBar.fill.BackgroundColor3 = C.Gold
 		elseif megaValue >= GameConfig.Mega.Max then
@@ -667,7 +616,7 @@ local function update()
 			megaLabel.TextColor3 = C.Text
 			megaBar.fill.BackgroundColor3 = C.Mega
 		end
-		camPill.Text = if CameraController.isBallCam() then "📷 BALL CAM: ON" else "📷 BALL CAM: OFF"
+		camPill.Text = if CameraController.isBallCam() then "BALL CAM: ON" else "BALL CAM: OFF"
 		updatePowers(car, now, pulse)
 
 		local team = car:GetAttribute(CarAttr.Team)

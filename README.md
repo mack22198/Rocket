@@ -242,6 +242,11 @@ Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
 - [`Cosmetics.luau`](src/shared/Config/Cosmetics.luau): hats, horns and goal parties, and their prices.
 - `GameConfig.Evolution`: how much XP each evolution stage needs.
 
+The screens share one look, set in [`Theme.luau`](src/client/UI/Theme.luau): cream cards and dark slabs with
+thick dark outlines, chunky buttons with a lip along the bottom, one colour per job (yellow for the main button,
+green for buying and "done", purple for evolving, pink for the shop), Luckiest Guy for titles and buttons and
+Gotham for the rest, and no emoji in the middle of text (Scrap has its own coin).
+
 Car looks (and every evolution stage) are built from plain parts in
 [`CarModelBuilder.luau`](src/shared/Cars/CarModelBuilder.luau), so new cars need no uploaded models. The stadium,
 lobby and scenery are built the same way in [`src/server/Arena`](src/server/Arena), and the menu showroom in

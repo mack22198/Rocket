@@ -50,10 +50,8 @@ local function build()
 		name = "Badge",
 		size = UDim2.fromOffset(170, 40),
 		position = UDim2.new(0, 24, BAR, 14),
-		text = "⟲ REPLAY",
-		font = Theme.Caps,
+		text = "REPLAY",
 		background = C.Bad,
-		transparency = 0,
 	})
 	Theme.scaled(badge)
 
@@ -65,31 +63,34 @@ local function build()
 	bottom.BackgroundTransparency = 1
 	bottom.Parent = gui
 	Theme.scaled(bottom)
-	banner = Theme.label(bottom, {
+	banner = Theme.heading(bottom, {
 		name = "Scorer",
-		size = UDim2.fromOffset(760, 44),
+		size = UDim2.fromOffset(760, 42),
 		position = UDim2.new(0.5, 0, 0, 6),
 		anchor = Vector2.new(0.5, 0),
 		text = "",
+		textSize = 40,
+		stroke = true,
 	})
 	comboLabel = Theme.label(bottom, {
 		name = "Combo",
-		size = UDim2.fromOffset(600, 24),
-		position = UDim2.new(0.5, 0, 0, 50),
+		size = UDim2.fromOffset(600, 20),
+		position = UDim2.new(0.5, 0, 0, 52),
 		anchor = Vector2.new(0.5, 0),
 		text = "",
 		font = Theme.Caps,
 		color = C.Gold,
-		stroke = false,
+		textSize = 18,
+		stroke = true,
 	})
 	skipButton = Theme.button(bottom, {
 		name = "Skip",
-		size = UDim2.fromOffset(150, 50),
+		size = UDim2.fromOffset(130, 52),
 		position = UDim2.new(1, -24, 0.5, 0),
 		anchor = Vector2.new(1, 0.5),
-		text = "SKIP ▶",
-		color = C.PanelLight,
-		textColor = C.Text,
+		text = "SKIP",
+		color = C.Card,
+		textSize = 24,
 	})
 	skipButton.Activated:Connect(function()
 		ReplayScreen.SkipPressed:Fire()
@@ -113,11 +114,9 @@ local function flashWhite()
 end
 
 function ReplayScreen.show(scorer: string, team: string, combo: string)
-	banner.Text = if scorer ~= ""
-		then `⚽ {scorer} scores for {string.upper(team)}!`
-		else `⚽ {string.upper(team)} scores!`
+	banner.Text = if scorer ~= "" then `{scorer} scores for {string.upper(team)}!` else `{string.upper(team)} scores!`
 	banner.TextColor3 = Theme.teamColor(team)
-	comboLabel.Text = combo
+	comboLabel.Text = Theme.noEmoji(combo)
 	gui.Enabled = true
 	shownAt = os.clock()
 	flashWhite()

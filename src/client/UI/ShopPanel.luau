@@ -46,8 +46,8 @@ local function priceOf(id: string, planned: number): number
 end
 
 local function say(text: string, good: boolean)
-	message.Text = text
-	message.TextColor3 = if good then C.Good else C.Muted
+	message.Text = Theme.noEmoji(text)
+	message.TextColor3 = if good then C.GoodText else C.InkMuted
 end
 
 local function isVip(): boolean
@@ -75,13 +75,18 @@ local function notSetUp(id: string)
 	end)
 	busy = false
 	if ok and type(result) == "table" and result.ok then
-		Toasts.push({ emoji = "🛒", title = "STUDIO TEST", text = tostring(result.message), color = C.Good })
+		Toasts.push({
+			badge = "R$",
+			title = "STUDIO TEST",
+			text = Theme.noEmoji(tostring(result.message)),
+			color = C.Good,
+		})
 	end
 end
 
 local function buy(product: Shop.Product)
 	if product.Kind == "goldpass" and hasGold() then
-		say("You have this season's Gold Pass - enjoy the gold rewards!", true)
+		say("You have this season's Gold Pass. Enjoy the gold rewards!", true)
 		return
 	end
 	if product.ProductId <= 0 then
@@ -111,8 +116,8 @@ local function refresh()
 	local gold = Shop.get("goldpass")
 	if gold then
 		if hasGold() then
-			goldButton.Text = "✅ ACTIVE THIS SEASON"
-			Theme.setButtonColor(goldButton, C.PanelLight, C.Good)
+			goldButton.Text = "ACTIVE THIS SEASON"
+			Theme.setButtonColor(goldButton, C.CardLine, C.GoodText)
 		else
 			goldButton.Text = `{ROBUX} {priceOf(gold.Id, gold.Robux)}`
 			Theme.setButtonColor(goldButton, C.Gold)
@@ -120,13 +125,13 @@ local function refresh()
 	end
 	local info = Season.at(PlayerDataClient.today())
 	local days = Season.daysLeft(PlayerDataClient.today())
-	goldSeason.Text = `{info.theme.Emoji} SEASON {info.number}: {string.upper(info.theme.Name)}  ·  {days} DAYS LEFT`
+	goldSeason.Text = `SEASON {info.number}: {string.upper(info.theme.Name)}, {days} DAYS LEFT`
 	if isVip() then
-		vipButton.Text = "✅ YOU'RE VIP"
-		Theme.setButtonColor(vipButton, C.PanelLight, C.Good)
+		vipButton.Text = "YOU'RE VIP"
+		Theme.setButtonColor(vipButton, C.CardLine, C.GoodText)
 	else
 		vipButton.Text = `{ROBUX} {priceOf("vip", Shop.Vip.Robux)}`
-		Theme.setButtonColor(vipButton, rgb(120, 210, 255))
+		Theme.setButtonColor(vipButton, C.Sky)
 	end
 	for id, button in packButtons do
 		local product = Shop.get(id)
@@ -136,30 +141,46 @@ local function refresh()
 	end
 end
 
+-- One line of what you get, with a little square in front.
 local function bullet(parent: Instance, y: number, text: string)
+	local dot = Instance.new("Frame")
+	dot.Name = "Bullet"
+	dot.Size = UDim2.fromOffset(8, 8)
+	dot.Position = UDim2.fromOffset(18, y + 7)
+	dot.Rotation = 45
+	dot.BackgroundColor3 = C.Ink
+	dot.BorderSizePixel = 0
+	dot.Parent = parent
 	Theme.label(parent, {
-		size = UDim2.new(1, -28, 0, 22),
-		position = UDim2.fromOffset(16, y),
+		size = UDim2.new(1, -50, 0, 22),
+		position = UDim2.fromOffset(36, y),
 		text = text,
 		font = Theme.Body,
-		color = C.Text,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 		scaled = false,
-		textSize = 16,
+		textSize = 15,
 	})
 end
 
 local function bigCard(name: string, size: UDim2, position: UDim2, color: Color3): Frame
-	local card = Instance.new("Frame")
-	card.Name = name
-	card.Size = size
-	card.Position = position
-	card.BackgroundColor3 = color:Lerp(C.PanelDark, 0.82)
-	card.Parent = panel
-	Theme.corner(card, 16)
-	Theme.stroke(card, color, 3)
+	local card = Theme.well(panel, name, size, position)
+	card.BackgroundColor3 = color
+	Theme.stroke(card, C.Ink, 3)
 	return card
+end
+
+-- A price button (Roblox draws the Robux icon in Gotham, so price buttons use it).
+local function priceButton(parent: Instance, width: number, height: number, color: Color3): TextButton
+	return Theme.button(parent, {
+		name = "Buy",
+		size = UDim2.fromOffset(width, height),
+		position = UDim2.new(0.5, 0, 1, -14),
+		anchor = Vector2.new(0.5, 1),
+		text = "",
+		color = color,
+		font = Theme.Title,
+		textSize = math.floor(height * 0.44),
+	})
 end
 
 local function build()
@@ -170,67 +191,67 @@ local function build()
 	dim.Text = ""
 	dim.AutoButtonColor = false
 	dim.Size = UDim2.fromScale(1, 1)
-	dim.BackgroundColor3 = rgb(0, 0, 0)
-	dim.BackgroundTransparency = 0.35
+	dim.BackgroundColor3 = rgb(6, 8, 18)
+	dim.BackgroundTransparency = 0.4
 	dim.Parent = gui
 
-	panel = Theme.panel(gui, "Shop", UDim2.fromOffset(1000, 620), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
+	panel = Theme.card(gui, "Shop", UDim2.fromOffset(1000, 624), UDim2.fromScale(0.5, 0.52), Vector2.new(0.5, 0.5))
 	Theme.scaled(panel)
-	Theme.padding(panel, 18)
-	Theme.label(panel, {
+	Theme.padding(panel, 20)
+	Theme.heading(panel, {
 		name = "Title",
-		size = UDim2.fromOffset(400, 46),
-		text = "🛒 SHOP",
-		color = C.Gold,
+		size = UDim2.fromOffset(300, 46),
+		text = "SHOP",
+		textSize = 46,
 		align = Enum.TextXAlignment.Left,
 	})
 	Theme.label(panel, {
 		name = "Subtitle",
-		size = UDim2.fromOffset(640, 20),
-		position = UDim2.fromOffset(2, 48),
+		size = UDim2.fromOffset(700, 18),
+		position = UDim2.fromOffset(2, 50),
 		text = "Everything in Turbo Ball can also be earned by playing. Ask a grown-up before you buy!",
 		font = Theme.Body,
-		color = C.Muted,
+		color = C.InkMuted,
+		textSize = 15,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 	})
 	local close = Theme.button(panel, {
 		name = "Close",
-		size = UDim2.fromOffset(140, 48),
+		size = UDim2.fromOffset(120, 50),
 		position = UDim2.fromScale(1, 0),
 		anchor = Vector2.new(1, 0),
-		text = "◀ BACK",
-		color = C.PanelLight,
-		textColor = C.Text,
+		text = "BACK",
+		color = C.Panel,
+		textSize = 22,
 	})
 	close.Activated:Connect(function()
 		ShopPanel.close()
 	end)
 
 	-- The Gold Season Pass.
-	local gold = bigCard("GoldPass", UDim2.new(0.6, -6, 0, 268), UDim2.fromOffset(0, 82), C.Gold)
-	Theme.label(gold, {
-		size = UDim2.new(1, -24, 0, 34),
-		position = UDim2.fromOffset(14, 10),
-		text = "🏆 GOLD SEASON PASS",
-		color = C.Gold,
+	local gold = bigCard("GoldPass", UDim2.new(0.6, -6, 0, 276), UDim2.fromOffset(0, 84), rgb(255, 232, 160))
+	Theme.heading(gold, {
+		size = UDim2.new(1, -32, 0, 32),
+		position = UDim2.fromOffset(16, 14),
+		text = "GOLD SEASON PASS",
+		textSize = 32,
 		align = Enum.TextXAlignment.Left,
 	})
 	goldSeason = Theme.label(gold, {
-		size = UDim2.new(1, -24, 0, 16),
-		position = UDim2.fromOffset(15, 47),
+		size = UDim2.new(1, -32, 0, 14),
+		position = UDim2.fromOffset(17, 50),
 		text = "",
 		font = Theme.Caps,
-		color = C.Muted,
+		color = C.InkMuted,
+		textSize = 13,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 	})
 	local function itemName(id: string): string
 		local item = Cosmetics.get(id)
-		return if item then `{item.Emoji} {item.Name}` else id
+		return if item then item.Name else id
 	end
-	bullet(gold, 72, "🏆  A gold reward on every tier, on top of the free one")
-	bullet(gold, 98, `🎁  Gold-only: {itemName("airhorn")}, {itemName("goldrush")}, {itemName("trophy")}`)
+	bullet(gold, 74, "A gold reward on every tier, on top of the free one")
+	bullet(gold, 98, `Gold-only: {itemName("airhorn")}, {itemName("goldrush")}, {itemName("trophy")}`)
 	local extraScrap, extraBoosts = 0, 0
 	for _, reward in Season.at(PlayerDataClient.today()).theme.GoldRewards do
 		if reward.Kind == "scrap" then
@@ -239,21 +260,10 @@ local function build()
 			extraBoosts += reward.Amount
 		end
 	end
-	bullet(
-		gold,
-		124,
-		`🔩  {Theme.formatNumber(extraScrap)} extra Scrap and {extraBoosts} Double Scrap matches along the way`
-	)
-	bullet(gold, 150, "⚡  Tiers you've already reached pay their gold rewards right away")
-	bullet(gold, 176, "📅  Lasts this whole season (each season has its own pass)")
-	goldButton = Theme.button(gold, {
-		name = "Buy",
-		size = UDim2.fromOffset(260, 52),
-		position = UDim2.new(0.5, 0, 1, -12),
-		anchor = Vector2.new(0.5, 1),
-		text = "",
-		color = C.Gold,
-	})
+	bullet(gold, 122, `{Theme.formatNumber(extraScrap)} extra Scrap and {extraBoosts} Double Scrap matches`)
+	bullet(gold, 146, "Tiers you've already reached pay their gold rewards right away")
+	bullet(gold, 170, "Lasts this whole season (each season has its own pass)")
+	goldButton = priceButton(gold, 260, 56, C.Gold)
 	goldButton.Activated:Connect(function()
 		local product = Shop.get("goldpass")
 		if product then
@@ -263,42 +273,34 @@ local function build()
 	Theme.sweep(goldButton, 3)
 
 	-- VIP.
-	local vipColor = rgb(120, 210, 255)
-	local vip = bigCard("Vip", UDim2.new(0.4, -6, 0, 268), UDim2.new(0.6, 6, 0, 82), vipColor)
-	Theme.label(vip, {
-		size = UDim2.new(1, -24, 0, 34),
-		position = UDim2.fromOffset(14, 10),
-		text = "💎 VIP",
-		color = vipColor,
+	local vip = bigCard("Vip", UDim2.new(0.4, -6, 0, 276), UDim2.new(0.6, 6, 0, 84), rgb(206, 234, 255))
+	Theme.heading(vip, {
+		size = UDim2.new(1, -32, 0, 32),
+		position = UDim2.fromOffset(16, 14),
+		text = "VIP",
+		textSize = 32,
 		align = Enum.TextXAlignment.Left,
 	})
 	Theme.label(vip, {
-		size = UDim2.new(1, -24, 0, 16),
-		position = UDim2.fromOffset(15, 44),
+		size = UDim2.new(1, -32, 0, 14),
+		position = UDim2.fromOffset(17, 50),
 		text = "YOURS FOREVER",
 		font = Theme.Caps,
-		color = C.Muted,
+		color = C.InkMuted,
+		textSize = 13,
 		align = Enum.TextXAlignment.Left,
-		stroke = false,
 	})
-	bullet(vip, 70, `🔩  +{math.floor(Shop.Vip.ScrapBonus * 100)}% Scrap after every match`)
-	bullet(vip, 96, `{itemName(Shop.Vip.Hat)} hat`)
-	bullet(vip, 122, "💎  The VIP title, and a 💎 by your name")
-	vipButton = Theme.button(vip, {
-		name = "Buy",
-		size = UDim2.fromOffset(220, 52),
-		position = UDim2.new(0.5, 0, 1, -12),
-		anchor = Vector2.new(0.5, 1),
-		text = "",
-		color = vipColor,
-	})
+	bullet(vip, 74, `+{math.floor(Shop.Vip.ScrapBonus * 100)}% Scrap after every match`)
+	bullet(vip, 98, `The {itemName(Shop.Vip.Hat)} hat`)
+	bullet(vip, 122, "The VIP title by your name")
+	vipButton = priceButton(vip, 220, 56, C.Sky)
 	vipButton.Activated:Connect(buyVip)
 
 	-- Scrap packs.
 	local row = Instance.new("Frame")
 	row.Name = "Packs"
-	row.Size = UDim2.new(1, 0, 0, 170)
-	row.Position = UDim2.fromOffset(0, 362)
+	row.Size = UDim2.new(1, 0, 0, 176)
+	row.Position = UDim2.fromOffset(0, 378)
 	row.BackgroundTransparency = 1
 	row.Parent = panel
 	local layout = Instance.new("UIGridLayout")
@@ -310,55 +312,38 @@ local function build()
 		if product.Kind ~= "scrap" then
 			continue
 		end
-		local card = Instance.new("Frame")
-		card.Name = product.Id
+		local card = Theme.well(row, product.Id, UDim2.new(), UDim2.new())
 		card.LayoutOrder = order
-		card.BackgroundColor3 = C.PanelDark
-		card.Parent = row
-		Theme.corner(card, 14)
-		Theme.stroke(card, C.Scrap, 2).Transparency = 0.3
+		Theme.stroke(card, C.Ink, 2)
 		Theme.label(card, {
-			size = UDim2.fromOffset(60, 48),
-			position = UDim2.new(0.5, 0, 0, 10),
+			size = UDim2.fromOffset(60, 44),
+			position = UDim2.new(0.5, 0, 0, 14),
 			anchor = Vector2.new(0.5, 0),
 			text = product.Emoji,
-			stroke = false,
+			textSize = 38,
 		})
+		local amount = Theme.amount(card, 26, UDim2.new(0.5, 0, 0, 62), Vector2.new(0.5, 0))
+		amount.set(product.Amount)
 		Theme.label(card, {
-			size = UDim2.new(1, -16, 0, 26),
-			position = UDim2.fromOffset(8, 60),
-			text = `🔩 {Theme.formatNumber(product.Amount)}`,
-			color = C.Scrap,
-		})
-		Theme.label(card, {
-			size = UDim2.new(1, -16, 0, 16),
-			position = UDim2.fromOffset(8, 88),
+			size = UDim2.new(1, -16, 0, 14),
+			position = UDim2.fromOffset(8, 92),
 			text = product.Name,
 			font = Theme.Body,
-			color = C.Muted,
-			stroke = false,
+			color = C.InkMuted,
+			textSize = 13,
 		})
 		if product.Bonus then
 			local ribbon = Theme.pill(card, {
-				size = UDim2.new(1, -24, 0, 20),
-				position = UDim2.new(0.5, 0, 0, -10),
+				size = UDim2.new(1, -28, 0, 22),
+				position = UDim2.new(0.5, 0, 0, -11),
 				anchor = Vector2.new(0.5, 0),
 				text = product.Bonus,
-				font = Theme.Caps,
-				color = C.Ink,
 				background = C.Good,
-				transparency = 0,
 			})
 			ribbon.ZIndex = 3
 		end
-		local button = Theme.button(card, {
-			name = "Buy",
-			size = UDim2.new(1, -20, 0, 44),
-			position = UDim2.new(0.5, 0, 1, -10),
-			anchor = Vector2.new(0.5, 1),
-			text = "",
-			color = C.Good,
-		})
+		local button = priceButton(card, 160, 48, C.Good)
+		button.Size = UDim2.new(1, -24, 0, 48)
 		button.Activated:Connect(function()
 			buy(product)
 		end)
@@ -367,12 +352,12 @@ local function build()
 
 	message = Theme.label(panel, {
 		name = "Message",
-		size = UDim2.new(1, 0, 0, 22),
-		position = UDim2.new(0, 0, 1, -24),
-		text = "⭐ Roblox Premium members get +10% Scrap after every match.",
+		size = UDim2.new(1, 0, 0, 18),
+		position = UDim2.new(0, 0, 1, -18),
+		text = "",
 		font = Theme.Body,
-		color = C.Muted,
-		stroke = false,
+		color = C.InkMuted,
+		textSize = 15,
 	})
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
 end
@@ -397,7 +382,7 @@ end
 
 function ShopPanel.open()
 	gui.Enabled = true
-	say(`⭐ Roblox Premium members get +{math.floor(Shop.PremiumBonus * 100)}% Scrap after every match.`, false)
+	say(`Roblox Premium members get +{math.floor(Shop.PremiumBonus * 100)}% Scrap after every match.`, false)
 	refresh()
 	loadPrices()
 	panel.Position = UDim2.fromScale(0.5, 0.56)
@@ -433,10 +418,10 @@ function ShopPanel.start()
 	-- A purchase went through: say thanks and what they got.
 	Remotes.Purchased.OnClientEvent:Connect(function(_id: unknown, text: unknown)
 		Toasts.push({
-			emoji = "🎉",
+			badge = "R$",
 			title = "THANK YOU!",
-			text = if type(text) == "string" then text else "Your purchase is ready.",
-			color = C.Gold,
+			text = if type(text) == "string" then Theme.noEmoji(text) else "Your purchase is ready.",
+			color = C.Good,
 		})
 		if gui.Enabled then
 			refresh()

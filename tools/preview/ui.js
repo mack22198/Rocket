@@ -6,18 +6,42 @@ const W = 1280, H = 720, INSET = 58;
 const root = document.getElementById("root");
 if (params.get("bg")) root.style.backgroundImage = `url(${params.get("bg")})`;
 
+// Roblox's fonts, from the open-source copies in fonts/ (see get-fonts.sh; Montserrat stands in for Gotham).
+// Without them, plain fonts are used.
+const FACES = [
+  ["RbxFredoka", "Fredoka[wdth,wght].ttf"],
+  ["RbxLuckiest", "LuckiestGuy-Regular.ttf"],
+  ["RbxBangers", "Bangers-Regular.ttf"],
+  ["RbxGotham", "Montserrat[wght].ttf"],
+  ["RbxOswald", "Oswald[wght].ttf"],
+  ["RbxNunito", "Nunito[wght].ttf"],
+  ["RbxDenk", "DenkOne-Regular.ttf"],
+  ["RbxTitillium", "TitilliumWeb-Bold.ttf"],
+];
+const faceCss = document.createElement("style");
+faceCss.textContent = FACES.map(([name, file]) =>
+  `@font-face{font-family:'${name}';src:url('fonts/${encodeURIComponent(file)}');font-weight:100 900;}`).join("\n");
+document.head.appendChild(faceCss);
 const FONTS = {
-  FredokaOne: "'DejaVu Sans', sans-serif",
-  GothamBlack: "'Liberation Sans', sans-serif",
-  GothamBold: "'Liberation Sans', sans-serif",
-  GothamMedium: "'Liberation Sans', sans-serif",
-  Gotham: "'Liberation Sans', sans-serif",
+  FredokaOne: ["'RbxFredoka', 'DejaVu Sans', sans-serif", 600],
+  LuckiestGuy: ["'RbxLuckiest', 'DejaVu Sans', sans-serif", 400],
+  Bangers: ["'RbxBangers', 'DejaVu Sans', sans-serif", 400],
+  GothamBlack: ["'RbxGotham', 'Liberation Sans', sans-serif", 900],
+  GothamBold: ["'RbxGotham', 'Liberation Sans', sans-serif", 700],
+  GothamMedium: ["'RbxGotham', 'Liberation Sans', sans-serif", 500],
+  Gotham: ["'RbxGotham', 'Liberation Sans', sans-serif", 400],
+  Oswald: ["'RbxOswald', 'Liberation Sans', sans-serif", 400],
+  Nunito: ["'RbxNunito', 'Liberation Sans', sans-serif", 400],
+  DenkOne: ["'RbxDenk', 'Liberation Sans', sans-serif", 400],
+  TitilliumWeb: ["'RbxTitillium', 'Liberation Sans', sans-serif", 700],
 };
-const family = (f) => FONTS[f] || "'Liberation Sans', sans-serif";
+// A CSS font family plus weight, e.g. "900 'RbxGotham', sans-serif" (put the size in between with fontCss).
+const family = (f) => FONTS[f] || ["'Liberation Sans', sans-serif", 700];
+const fontCss = (fam, size) => `${fam[1]} ${size}px ${fam[0]}`;
 const rgba = (c, a = 1) => `rgba(${c.map((v) => Math.round(v * 255)).join(",")},${a})`;
 
 const ctx = document.createElement("canvas").getContext("2d");
-function measure(text, size, fam) { ctx.font = `bold ${size}px ${fam}`; return ctx.measureText(text).width; }
+function measure(text, size, fam) { ctx.font = fontCss(fam, size); return ctx.measureText(text).width; }
 function wrap(text, size, fam, maxW) {
   const lines = [];
   for (const para of String(text).split("\n")) {
@@ -67,6 +91,32 @@ function sizeOf(node, content) {
   let h = node.size[2] * content.h + node.size[3] * content.acc;
   const m = mods(node);
   if (m.aspect) { if (w / h > m.aspect) w = h * m.aspect; else h = w / m.aspect; }
+  // AutomaticSize: grow to fit the text, or the children of a list.
+  if (node.autoSize && node.autoSize !== "None") {
+    const pad = m.padding || [[0, 0], [0, 0], [0, 0], [0, 0]];
+    const padX = pad[2][1] * content.acc + pad[3][1] * content.acc, padY = pad[0][1] * content.acc + pad[1][1] * content.acc;
+    let natW = 0, natH = 0;
+    if (node.text !== undefined && node.text !== "") {
+      const fam = family(node.font);
+      const size = (m.textMax && node.scaled ? m.textMax : node.textSize) * content.acc;
+      const lines = String(node.text).split("\n");
+      natW = Math.max(...lines.map((l) => measure(l, size, fam))) + padX + 2;
+      natH = lines.length * size + padY;
+    } else if (m.list) {
+      const kids = arr(node.children).filter((c) => isGui(c) && c.visible);
+      const sizes = kids.map((k) => sizeOf(k, { ...content, w, h }));
+      const gap = m.list.padding[1] * content.acc;
+      if (m.list.fill === "Horizontal") {
+        natW = sizes.reduce((t, s2) => t + s2.w, 0) + gap * Math.max(0, kids.length - 1) + padX;
+        natH = Math.max(0, ...sizes.map((s2) => s2.h)) + padY;
+      } else {
+        natH = sizes.reduce((t, s2) => t + s2.h, 0) + gap * Math.max(0, kids.length - 1) + padY;
+        natW = Math.max(0, ...sizes.map((s2) => s2.w)) + padX;
+      }
+    }
+    if (node.autoSize.includes("X")) w = Math.max(w, natW);
+    if (node.autoSize.includes("Y")) h = Math.max(h, natH);
+  }
   const s = m.scale ?? 1;
   return { w: w * s, h: h * s };
 }
@@ -169,7 +219,7 @@ function render(node, parentEl, content, forced) {
     const justify = { Left: "flex-start", Center: "center", Right: "flex-end" }[node.xAlign] || "center";
     const alignY = { Top: "flex-start", Center: "center", Bottom: "flex-end" }[node.yAlign] || "center";
     t.style.cssText = `position:absolute;left:${padL}px;top:${padT}px;width:${inner.w}px;height:${inner.h}px;display:flex;` +
-      `justify-content:${justify};align-items:${alignY};text-align:${node.xAlign.toLowerCase()};font:bold ${size}px ${fam};` +
+      `justify-content:${justify};align-items:${alignY};text-align:${node.xAlign.toLowerCase()};font:${fontCss(fam, size)};` +
       `line-height:1;color:${rgba(node.textColor, 1 - node.textT)};white-space:${node.scaled || node.wrapped ? "normal" : "nowrap"};`;
     const strokes = [];
     if (node.strokeT < 1) {
@@ -200,6 +250,8 @@ function topBar() {
   }
 }
 
+await Promise.all(FACES.map(([name]) => document.fonts.load(`400 20px '${name}'`).catch(() => null)));
+await Promise.all(FACES.map(([name]) => document.fonts.load(`900 20px '${name}'`).catch(() => null)));
 const res = await fetch(params.get("ui") || `ui-${scenario}.json`);
 const data = await res.json();
 for (const screen of arr(data.screens)) {

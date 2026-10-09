@@ -2090,7 +2090,7 @@ local function paint(part: BasePart, spec: PartSpec, text: string)
 		label.BackgroundTransparency = 1
 		label.Text = text
 		label.TextScaled = true
-		label.Font = Enum.Font.FredokaOne
+		label.Font = Enum.Font.LuckiestGuy
 		label.TextColor3 = rgb(200, 36, 30)
 		label.Parent = gui
 		gui.Parent = part

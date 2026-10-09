@@ -1,5 +1,13 @@
 --!strict
--- Colours, fonts and small helpers that give every screen the same bright, chunky look.
+-- The look every screen shares: flat, solid colours with a thick dark outline, like stickers and toy parts.
+--
+--   * Menus are cream CARDS with dark text. Things you can press are chunky BUTTONS with a darker lip along the
+--     bottom, so they look like they push in. The in-match HUD uses dark SLABS, so it doesn't fight the pitch.
+--   * One bright colour per job: yellow is the main thing to press (PLAY, COLLECT), green is "done" and buying,
+--     purple is evolving, pink is the shop, and the team colours are only for teams.
+--   * Two typefaces: Luckiest Guy for titles, buttons and big numbers, Gotham for everything else.
+--   * Emoji are only used as big pictures (an item, a car, a hat), never in the middle of text; Scrap has its own
+--     coin (scrapIcon).
 
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,36 +20,79 @@ local rgb = Color3.fromRGB
 
 local Theme = {}
 
-Theme.Title = Enum.Font.FredokaOne
-Theme.Body = Enum.Font.GothamBold
-Theme.Caps = Enum.Font.GothamBlack -- small labels in capitals
+Theme.Display = Enum.Font.LuckiestGuy -- titles, buttons, big numbers
 Theme.Logo = Enum.Font.LuckiestGuy
+Theme.Title = Enum.Font.GothamBlack -- names and headings inside cards
+Theme.Caps = Enum.Font.GothamBlack -- small labels in capitals
+Theme.Body = Enum.Font.GothamBold
 
 Theme.Colors = {
-	Panel = rgb(22, 26, 48),
-	PanelLight = rgb(40, 48, 84),
-	PanelDark = rgb(12, 14, 28),
-	Text = rgb(255, 255, 255),
-	Muted = rgb(170, 182, 214),
-	Gold = rgb(255, 204, 51),
-	Scrap = rgb(255, 176, 64),
-	Good = rgb(88, 222, 118),
-	Bad = rgb(255, 92, 92),
+	-- Surfaces
+	Ink = rgb(16, 18, 34), -- outlines, shadows and text on light colours
+	Card = rgb(255, 248, 234), -- menu cards
+	CardShade = rgb(242, 231, 209), -- rows and wells inside cards
+	CardLine = rgb(220, 205, 178), -- dividers and empty tracks on cards
+	Panel = rgb(30, 33, 58), -- HUD slabs
+	PanelLight = rgb(52, 57, 92),
+	PanelDark = rgb(20, 22, 40),
+	-- Text
+	Text = rgb(255, 251, 242), -- on dark surfaces and over the 3D world
+	Muted = rgb(160, 168, 204), -- secondary text on dark surfaces
+	InkMuted = rgb(122, 112, 98), -- secondary text on cards
+	-- Jobs
+	Gold = rgb(255, 202, 40), -- the main button, highlights
+	Scrap = rgb(255, 186, 52),
+	Good = rgb(52, 200, 100),
+	GoodText = rgb(28, 150, 68), -- green that reads well as text on cards
+	Bad = rgb(238, 70, 70),
+	Evolve = rgb(150, 98, 255), -- car XP and evolving
+	Shop = rgb(255, 86, 164),
+	Sky = rgb(86, 180, 255),
 	Blue = GameConfig.Teams.Blue.Color,
 	Orange = GameConfig.Teams.Orange.Color,
-	Mega = rgb(255, 120, 40),
-	Boost = rgb(255, 200, 50),
-	Evolve = rgb(186, 120, 255), -- car XP and evolving
-	Ink = rgb(10, 12, 24), -- outlines and text on bright buttons
+	Mega = rgb(255, 108, 40),
+	Boost = rgb(255, 202, 40),
 }
+
+local C = Theme.Colors
+
+-- How much darker the lip along the bottom of buttons and cards is.
+local LIP_SHADE = rgb(158, 158, 158)
+local BUTTON_LIP = 6 -- pixels
+local CARD_LIP = 6
 
 function Theme.teamColor(team: string?): Color3
 	if team == "Blue" then
-		return Theme.Colors.Blue
+		return C.Blue
 	elseif team == "Orange" then
-		return Theme.Colors.Orange
+		return C.Orange
 	end
-	return Theme.Colors.Muted
+	return C.Muted
+end
+
+-- Is this a light colour (so text on it should be dark)?
+function Theme.isLight(color: Color3): boolean
+	return color.R * 0.3 + color.G * 0.59 + color.B * 0.11 > 0.62
+end
+
+-- Removes emoji from text (server messages and names from the configs carry some).
+function Theme.noEmoji(text: string): string
+	local out = {}
+	for _, code in utf8.codes(text) do
+		local emoji = (code >= 0x2190 and code <= 0x2BFF)
+			or (code >= 0x1F000 and code <= 0x1FAFF)
+			or code == 0xFE0F
+			or code == 0x200D
+			or code == 0x20E3
+		if not emoji then
+			table.insert(out, utf8.char(code))
+		end
+	end
+	local cleaned = table.concat(out)
+	cleaned = string.gsub(cleaned, "%s%s+", " ")
+	cleaned = string.gsub(cleaned, "^%s+", "")
+	cleaned = string.gsub(cleaned, "%s+$", "")
+	return cleaned
 end
 
 function Theme.corner(parent: GuiObject, radius: number?): UICorner
@@ -53,10 +104,23 @@ end
 
 function Theme.stroke(parent: GuiObject, color: Color3?, thickness: number?): UIStroke
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = color or rgb(0, 0, 0)
+	stroke.Color = color or C.Ink
 	stroke.Thickness = thickness or 2
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.LineJoinMode = Enum.LineJoinMode.Round
 	stroke.Parent = parent
+	return stroke
+end
+
+-- A thick dark outline around text (for text over the 3D world or on bright buttons).
+function Theme.outline(label: TextLabel | TextButton, thickness: number?): UIStroke
+	local stroke = Instance.new("UIStroke")
+	stroke.Name = "Outline"
+	stroke.Color = C.Ink
+	stroke.Thickness = thickness or 2
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	stroke.LineJoinMode = Enum.LineJoinMode.Round
+	stroke.Parent = label
 	return stroke
 end
 
@@ -76,22 +140,88 @@ function Theme.gradient(parent: GuiObject, top: Color3, bottom: Color3)
 	gradient.Parent = parent
 end
 
-function Theme.panel(parent: Instance, name: string, size: UDim2, position: UDim2, anchor: Vector2?): Frame
+-- The darker band along the bottom of buttons and cards that makes them look solid. `fraction` is how much of
+-- the height it takes.
+local function lipSequence(fraction: number): ColorSequence
+	local f = math.clamp(fraction, 0.03, 0.4)
+	return ColorSequence.new({
+		ColorSequenceKeypoint.new(0, rgb(255, 255, 255)),
+		ColorSequenceKeypoint.new(1 - f - 0.002, rgb(255, 255, 255)),
+		ColorSequenceKeypoint.new(1 - f, LIP_SHADE),
+		ColorSequenceKeypoint.new(1, LIP_SHADE),
+	})
+end
+
+-- Adds a lip `pixels` tall to an object, keeping it that tall as the object changes size.
+local function addLip(object: GuiObject, pixels: number): UIGradient
+	local lip = Instance.new("UIGradient")
+	lip.Name = "Lip"
+	lip.Rotation = 90
+	lip.Parent = object
+	local function refresh()
+		local height = object.Size.Y.Offset
+		if object.Size.Y.Scale ~= 0 or height <= 0 then
+			local absolute = object.AbsoluteSize.Y
+			height = if absolute > 0 then absolute / math.max(Theme.getScale(), 0.01) else 60
+		end
+		lip.Color = lipSequence(pixels / math.max(height, 1))
+	end
+	refresh()
+	object:GetPropertyChangedSignal("AbsoluteSize"):Connect(refresh)
+	return lip
+end
+Theme.lip = addLip
+
+local function surface(
+	parent: Instance,
+	name: string,
+	size: UDim2,
+	position: UDim2,
+	anchor: Vector2?,
+	color: Color3,
+	radius: number,
+	lip: number
+): Frame
 	local frame = Instance.new("Frame")
 	frame.Name = name
 	frame.Size = size
 	frame.Position = position
 	frame.AnchorPoint = anchor or Vector2.zero
-	frame.BackgroundColor3 = Theme.Colors.Panel
-	frame.BackgroundTransparency = 0.04
+	frame.BackgroundColor3 = color
 	frame.BorderSizePixel = 0
 	frame.Parent = parent
-	Theme.corner(frame, 16)
-	Theme.stroke(frame, rgb(255, 255, 255), 2).Transparency = 0.82
-	local shade = Instance.new("UIGradient")
-	shade.Color = ColorSequence.new(rgb(255, 255, 255), rgb(170, 175, 195))
-	shade.Rotation = 90
-	shade.Parent = frame
+	Theme.corner(frame, radius)
+	Theme.stroke(frame, C.Ink, 3)
+	if lip > 0 then
+		addLip(frame, lip)
+	end
+	return frame
+end
+
+-- A cream menu card with a dark outline.
+function Theme.card(parent: Instance, name: string, size: UDim2, position: UDim2, anchor: Vector2?): Frame
+	return surface(parent, name, size, position, anchor, C.Card, 18, CARD_LIP)
+end
+
+-- A dark slab, for the in-match HUD.
+function Theme.slab(parent: Instance, name: string, size: UDim2, position: UDim2, anchor: Vector2?): Frame
+	return surface(parent, name, size, position, anchor, C.Panel, 14, 5)
+end
+
+-- Menu screens are cards.
+Theme.panel = Theme.card
+
+-- A flat inset area inside a card (a row, a list, a box of stats).
+function Theme.well(parent: Instance, name: string, size: UDim2, position: UDim2, anchor: Vector2?): Frame
+	local frame = Instance.new("Frame")
+	frame.Name = name
+	frame.Size = size
+	frame.Position = position
+	frame.AnchorPoint = anchor or Vector2.zero
+	frame.BackgroundColor3 = C.CardShade
+	frame.BorderSizePixel = 0
+	frame.Parent = parent
+	Theme.corner(frame, 12)
 	return frame
 end
 
@@ -104,12 +234,13 @@ export type LabelOptions = {
 	font: Enum.Font?,
 	color: Color3?,
 	scaled: boolean?,
-	textSize: number?,
+	textSize: number?, -- the size when not scaled, and the biggest it gets when scaled
 	align: Enum.TextXAlignment?,
-	stroke: boolean?,
+	stroke: boolean?, -- a dark outline (for text over the 3D world or a bright colour)
 	zIndex: number?,
 }
 
+-- Text. By default it's dark (for cards) and fills its box, up to `textSize` if that's given.
 function Theme.label(parent: Instance, options: LabelOptions): TextLabel
 	local label = Instance.new("TextLabel")
 	label.Name = options.name or "Label"
@@ -119,18 +250,29 @@ function Theme.label(parent: Instance, options: LabelOptions): TextLabel
 	label.BackgroundTransparency = 1
 	label.Text = options.text
 	label.Font = options.font or Theme.Title
-	label.TextColor3 = options.color or Theme.Colors.Text
+	label.TextColor3 = options.color or C.Ink
 	label.TextScaled = if options.scaled == nil then true else options.scaled
 	label.TextSize = options.textSize or 24
 	label.TextXAlignment = options.align or Enum.TextXAlignment.Center
 	label.TextWrapped = true
 	label.ZIndex = options.zIndex or 1
-	if options.stroke ~= false then
-		label.TextStrokeTransparency = 0.4
-		label.TextStrokeColor3 = rgb(0, 0, 0)
+	if label.TextScaled and options.textSize then
+		local limit = Instance.new("UITextSizeConstraint")
+		limit.MaxTextSize = options.textSize
+		limit.Parent = label
+	end
+	if options.stroke then
+		Theme.outline(label, if (options.textSize or 24) >= 40 then 3 else 2)
 	end
 	label.Parent = parent
 	return label
+end
+
+-- A big Luckiest Guy heading.
+function Theme.heading(parent: Instance, options: LabelOptions): TextLabel
+	local copy = table.clone(options)
+	copy.font = copy.font or Theme.Display
+	return Theme.label(parent, copy)
 end
 
 export type ButtonOptions = {
@@ -141,24 +283,17 @@ export type ButtonOptions = {
 	text: string,
 	color: Color3?,
 	textColor: Color3?,
+	font: Enum.Font?,
+	textSize: number?, -- the biggest the text gets (it shrinks to fit)
 }
 
--- A chunky, glossy button: bright on top, a darker "lip" along the bottom so it looks like you can press it
--- in, and it grows a little under the mouse and squashes when pressed.
-local LIP = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, rgb(255, 255, 255)),
-	ColorSequenceKeypoint.new(0.45, rgb(236, 236, 236)),
-	ColorSequenceKeypoint.new(0.83, rgb(214, 214, 214)),
-	ColorSequenceKeypoint.new(0.84, rgb(150, 150, 150)),
-	ColorSequenceKeypoint.new(1, rgb(135, 135, 135)),
-})
-
+-- Buttons grow a little under the mouse (or the gamepad's selection) and squash when pressed.
 local function pop(button: GuiButton): UIScale
 	local scale = Instance.new("UIScale")
 	scale.Name = "Pop"
 	scale.Parent = button
-	local function to(size: number)
-		TweenService:Create(scale, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+	local function to(size: number, seconds: number?)
+		TweenService:Create(scale, TweenInfo.new(seconds or 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			Scale = size,
 		}):Play()
 	end
@@ -169,7 +304,7 @@ local function pop(button: GuiButton): UIScale
 		to(1)
 	end)
 	button.MouseButton1Down:Connect(function()
-		to(0.95)
+		to(0.94, 0.06)
 	end)
 	button.MouseButton1Up:Connect(function()
 		to(1.04)
@@ -184,8 +319,23 @@ local function pop(button: GuiButton): UIScale
 end
 Theme.pop = pop
 
+-- Text colour and outline for a button of `color`: dark text on light colours, white outlined text on the rest.
+local function styleButtonText(button: TextButton, color: Color3, textColor: Color3?)
+	local wanted = textColor or (if Theme.isLight(color) then C.Ink else C.Text)
+	button.TextColor3 = wanted
+	local outline = button:FindFirstChild("Outline")
+	if Theme.isLight(wanted) then
+		if not outline then
+			Theme.outline(button, 2)
+		end
+	elseif outline then
+		outline:Destroy()
+	end
+end
+
+-- A chunky button: a flat colour, a dark outline and a darker lip along the bottom.
 function Theme.button(parent: Instance, options: ButtonOptions): TextButton
-	local color = options.color or Theme.Colors.Gold
+	local color = options.color or C.Gold
 	local button = Instance.new("TextButton")
 	button.Name = options.name or "Button"
 	button.Size = options.size
@@ -195,20 +345,22 @@ function Theme.button(parent: Instance, options: ButtonOptions): TextButton
 	button.BorderSizePixel = 0
 	button.AutoButtonColor = true
 	button.Text = options.text
-	button.Font = Theme.Title
+	button.Font = options.font or Theme.Display
 	button.TextScaled = true
-	button.TextColor3 = options.textColor or Theme.Colors.Ink
+	button.TextWrapped = true
 	button.Parent = parent
+	styleButtonText(button, color, options.textColor)
 	Theme.corner(button, 14)
-	Theme.stroke(button, color:Lerp(rgb(0, 0, 0), 0.55), 2.5)
-	local shine = Instance.new("UIGradient")
-	shine.Name = "Gloss"
-	shine.Color = LIP
-	shine.Rotation = 90
-	shine.Parent = button
+	Theme.stroke(button, C.Ink, 3)
+	addLip(button, BUTTON_LIP)
+	-- The text sits on the face (above the lip), as big as the button allows.
+	local height = if options.size.Y.Scale == 0 then options.size.Y.Offset else 56
+	local limit = Instance.new("UITextSizeConstraint")
+	limit.MaxTextSize = options.textSize or math.clamp(math.floor(height * 0.46), 14, 44)
+	limit.Parent = button
 	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0.16, 0)
-	padding.PaddingBottom = UDim.new(0.27, 0)
+	padding.PaddingTop = UDim.new(0, 4)
+	padding.PaddingBottom = UDim.new(0, BUTTON_LIP + 3)
 	padding.PaddingLeft = UDim.new(0, 12)
 	padding.PaddingRight = UDim.new(0, 12)
 	padding.Parent = button
@@ -231,9 +383,9 @@ function Theme.sweep(button: GuiObject, every: number)
 	gradient.Rotation = 25
 	gradient.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.42, 1),
-		NumberSequenceKeypoint.new(0.5, 0.55),
-		NumberSequenceKeypoint.new(0.58, 1),
+		NumberSequenceKeypoint.new(0.44, 1),
+		NumberSequenceKeypoint.new(0.5, 0.6),
+		NumberSequenceKeypoint.new(0.56, 1),
 		NumberSequenceKeypoint.new(1, 1),
 	})
 	gradient.Offset = Vector2.new(-1, 0)
@@ -249,14 +401,10 @@ function Theme.sweep(button: GuiObject, every: number)
 	end)
 end
 
--- Sets a Theme.button's colour (keeping its rim in step).
+-- Changes a Theme.button's colour (and its text to suit).
 function Theme.setButtonColor(button: TextButton, color: Color3, textColor: Color3?)
 	button.BackgroundColor3 = color
-	button.TextColor3 = textColor or Theme.Colors.Ink
-	local stroke = button:FindFirstChildOfClass("UIStroke")
-	if stroke then
-		stroke.Color = color:Lerp(rgb(0, 0, 0), 0.55)
-	end
+	styleButtonText(button, color, textColor)
 end
 
 -- Puts the gamepad's selection on a button (when a gamepad is being used), so menus work from the sofa.
@@ -268,13 +416,13 @@ function Theme.focus(button: GuiObject?)
 	end
 end
 
--- A full-screen shade that fades from dark on one side to clear, so text stays readable over the 3D scene.
+-- A full-screen shade that fades from dark on one side to clear, so things stay readable over the 3D scene.
 function Theme.shade(parent: Instance, name: string, fromLeft: boolean, width: number, darkness: number): Frame
 	local frame = Instance.new("Frame")
 	frame.Name = name
 	frame.Size = UDim2.fromScale(width, 1)
 	frame.Position = if fromLeft then UDim2.new() else UDim2.fromScale(1 - width, 0)
-	frame.BackgroundColor3 = rgb(4, 6, 14)
+	frame.BackgroundColor3 = rgb(6, 8, 18)
 	frame.BackgroundTransparency = 0
 	frame.BorderSizePixel = 0
 	frame.Parent = parent
@@ -286,6 +434,18 @@ function Theme.shade(parent: Instance, name: string, fromLeft: boolean, width: n
 		NumberSequenceKeypoint.new(1, 1),
 	})
 	gradient.Parent = frame
+	return frame
+end
+
+-- Darkens everything behind a pop-up.
+function Theme.scrim(parent: Instance, darkness: number?): Frame
+	local frame = Instance.new("Frame")
+	frame.Name = "Scrim"
+	frame.Size = UDim2.fromScale(1, 1)
+	frame.BackgroundColor3 = rgb(6, 8, 18)
+	frame.BackgroundTransparency = 1 - (darkness or 0.55)
+	frame.BorderSizePixel = 0
+	frame.Parent = parent
 	return frame
 end
 
@@ -301,49 +461,55 @@ export type PillOptions = {
 	font: Enum.Font?,
 }
 
--- A rounded label with its own background, for short bits of status.
+-- A small rounded tag with its own background, for short bits of status ("NEW", "3 DAYS LEFT").
 function Theme.pill(parent: Instance, options: PillOptions): TextLabel
+	local background = options.background or C.Ink
 	local label = Instance.new("TextLabel")
 	label.Name = options.name or "Pill"
 	label.Size = options.size
 	label.Position = options.position or UDim2.new()
 	label.AnchorPoint = options.anchor or Vector2.zero
-	label.BackgroundColor3 = options.background or Theme.Colors.Panel
-	label.BackgroundTransparency = options.transparency or 0.1
+	label.BackgroundColor3 = background
+	label.BackgroundTransparency = options.transparency or 0
 	label.BorderSizePixel = 0
 	label.Text = options.text
-	label.Font = options.font or Theme.Title
+	label.Font = options.font or Theme.Caps
 	label.TextScaled = true
-	label.TextColor3 = options.color or Theme.Colors.Text
+	label.TextColor3 = options.color or (if Theme.isLight(background) then C.Ink else C.Text)
 	label.Parent = parent
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0.5, 0)
 	corner.Parent = label
-	Theme.stroke(label, rgb(255, 255, 255), 2).Transparency = 0.8
+	Theme.stroke(label, C.Ink, 2)
+	local height = if options.size.Y.Scale == 0 then options.size.Y.Offset else 30
+	local limit = Instance.new("UITextSizeConstraint")
+	limit.MaxTextSize = math.clamp(math.floor(height * 0.5), 10, 26)
+	limit.Parent = label
 	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0.2, 0)
-	padding.PaddingBottom = UDim.new(0.2, 0)
-	padding.PaddingLeft = UDim.new(0, 14)
-	padding.PaddingRight = UDim.new(0, 14)
+	padding.PaddingTop = UDim.new(0.18, 0)
+	padding.PaddingBottom = UDim.new(0.18, 0)
+	padding.PaddingLeft = UDim.new(0, 12)
+	padding.PaddingRight = UDim.new(0, 12)
 	padding.Parent = label
 	return label
 end
 
 export type Bar = { frame: Frame, fill: Frame, set: (fraction: number) -> () }
 
--- A rounded progress bar. Call bar.set(0..1) to fill it.
-function Theme.bar(parent: Instance, size: UDim2, position: UDim2, color: Color3): Bar
+-- A rounded progress bar. Call bar.set(0..1) to fill it. `track` is the empty part's colour (dark by default;
+-- use Theme.Colors.CardLine on cards).
+function Theme.bar(parent: Instance, size: UDim2, position: UDim2, color: Color3, track: Color3?): Bar
 	local frame = Instance.new("Frame")
 	frame.Name = "Bar"
 	frame.Size = size
 	frame.Position = position
-	frame.BackgroundColor3 = Theme.Colors.PanelDark
+	frame.BackgroundColor3 = track or C.PanelDark
 	frame.BorderSizePixel = 0
 	frame.Parent = parent
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0.5, 0)
 	corner.Parent = frame
-	Theme.stroke(frame, rgb(255, 255, 255), 1.5).Transparency = 0.85
+	Theme.stroke(frame, C.Ink, 2)
 	local fill = Instance.new("Frame")
 	fill.Name = "Fill"
 	fill.Size = UDim2.fromScale(0, 1)
@@ -353,16 +519,93 @@ function Theme.bar(parent: Instance, size: UDim2, position: UDim2, color: Color3
 	local fillCorner = Instance.new("UICorner")
 	fillCorner.CornerRadius = UDim.new(0.5, 0)
 	fillCorner.Parent = fill
-	local shine = Instance.new("UIGradient")
-	shine.Color = ColorSequence.new(rgb(255, 255, 255), rgb(200, 200, 200))
-	shine.Rotation = 90
-	shine.Parent = fill
 	return {
 		frame = frame,
 		fill = fill,
 		set = function(fraction: number)
 			fill.Size = UDim2.fromScale(math.clamp(fraction, 0, 1), 1)
 			fill.Visible = fraction > 0.005
+		end,
+	}
+end
+
+-- Scrap's coin: a gold washer with a dark outline. `size` is its width in pixels.
+function Theme.scrapIcon(parent: Instance, size: number, position: UDim2?, anchor: Vector2?): Frame
+	local coin = Instance.new("Frame")
+	coin.Name = "ScrapIcon"
+	coin.Size = UDim2.fromOffset(size, size)
+	coin.Position = position or UDim2.new()
+	coin.AnchorPoint = anchor or Vector2.zero
+	coin.BackgroundColor3 = C.Scrap
+	coin.BorderSizePixel = 0
+	coin.Parent = parent
+	local round = Instance.new("UICorner")
+	round.CornerRadius = UDim.new(0.5, 0)
+	round.Parent = coin
+	Theme.stroke(coin, C.Ink, math.max(1.5, size / 12))
+	local rim = Instance.new("Frame")
+	rim.Name = "Rim"
+	rim.Size = UDim2.fromScale(0.64, 0.64)
+	rim.Position = UDim2.fromScale(0.5, 0.5)
+	rim.AnchorPoint = Vector2.new(0.5, 0.5)
+	rim.BackgroundColor3 = rgb(222, 140, 24)
+	rim.BorderSizePixel = 0
+	rim.Parent = coin
+	local rimRound = Instance.new("UICorner")
+	rimRound.CornerRadius = UDim.new(0.5, 0)
+	rimRound.Parent = rim
+	local hole = Instance.new("Frame")
+	hole.Name = "Hole"
+	hole.Size = UDim2.fromScale(0.5, 0.5)
+	hole.Position = UDim2.fromScale(0.5, 0.5)
+	hole.AnchorPoint = Vector2.new(0.5, 0.5)
+	hole.BackgroundColor3 = C.Ink
+	hole.BorderSizePixel = 0
+	hole.Parent = rim
+	local holeRound = Instance.new("UICorner")
+	holeRound.CornerRadius = UDim.new(0.5, 0)
+	holeRound.Parent = hole
+	return coin
+end
+
+export type Amount = { frame: Frame, label: TextLabel, set: (value: number, prefix: string?) -> () }
+
+-- A Scrap amount: the coin and a number, left to right, `height` pixels tall.
+function Theme.amount(parent: Instance, height: number, position: UDim2, anchor: Vector2?, color: Color3?): Amount
+	local frame = Instance.new("Frame")
+	frame.Name = "Amount"
+	frame.Size = UDim2.fromOffset(0, height) -- as wide as the coin and the number
+	frame.Position = position
+	frame.AnchorPoint = anchor or Vector2.zero
+	frame.BackgroundTransparency = 1
+	frame.AutomaticSize = Enum.AutomaticSize.X
+	frame.Parent = parent
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.Padding = UDim.new(0, math.max(4, height * 0.25))
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = frame
+	local coin = Theme.scrapIcon(frame, math.floor(height * 0.86))
+	coin.LayoutOrder = 1
+	local label = Theme.label(frame, {
+		name = "Value",
+		size = UDim2.fromOffset(0, height),
+		text = "0",
+		font = Theme.Display,
+		color = color or C.Ink,
+		scaled = false,
+		textSize = math.floor(height * 0.92),
+		align = Enum.TextXAlignment.Left,
+	})
+	label.AutomaticSize = Enum.AutomaticSize.X
+	label.TextWrapped = false
+	label.LayoutOrder = 2
+	return {
+		frame = frame,
+		label = label,
+		set = function(value: number, prefix: string?)
+			label.Text = (prefix or "") .. Theme.formatNumber(value)
 		end,
 	}
 end
