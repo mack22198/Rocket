@@ -36,7 +36,7 @@ Powers.CarPowers = {
 		Emoji = "🧀",
 		Color = rgb(255, 204, 64),
 		Description = "Floods the pitch all around you with gooey cheese. Cars on the other team get stuck in it!",
-		Duration = 8,
+		Duration = 12,
 	},
 	banana = {
 		Id = "peel",
@@ -44,7 +44,7 @@ Powers.CarPowers = {
 		Emoji = "🍌",
 		Color = rgb(255, 226, 70),
 		Description = "Throws five banana peels out in front of you. Anyone who drives over one spins out!",
-		Duration = 15,
+		Duration = 20,
 		ChargeRate = 1.1,
 	},
 	kart = {
@@ -97,7 +97,7 @@ Powers.CarPowers = {
 		Emoji = "🌭",
 		Color = rgb(235, 44, 40),
 		Description = "Squirts a long ketchup slick out in front of you. Cars on the other team that cross it spin out!",
-		Duration = 9,
+		Duration = 12,
 		ChargeRate = 1.1,
 	},
 	ufo = {
@@ -150,7 +150,7 @@ end
 Powers.Tuning = {
 	CheeseRadius = 18, -- the cheese floods out this far all around the car
 	CheeseSlowTime = 0.5,
-	PeelRadius = 5,
+	PeelRadius = 6,
 	PeelFlight = 0.5, -- seconds a thrown peel is in the air
 	SpinTime = 1.2,
 	NitroBurst = 75,
@@ -179,11 +179,11 @@ Powers.Tuning = {
 
 -- Where a Banana Storm's peels land, from the car: (studs to the right, studs ahead). A fan out in front.
 Powers.PeelSpots = {
-	Vector2.new(-16, 18),
-	Vector2.new(-8, 27),
-	Vector2.new(0, 34),
-	Vector2.new(8, 27),
-	Vector2.new(16, 18),
+	Vector2.new(-20, 18),
+	Vector2.new(-10, 28),
+	Vector2.new(0, 36),
+	Vector2.new(10, 28),
+	Vector2.new(20, 18),
 }
 
 -- The power that comes with a car (every car has one).

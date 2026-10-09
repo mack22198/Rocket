@@ -4,7 +4,8 @@
 --
 -- Controls:  throttle (-1..1)  steer (-1..1)  pitch (-1..1, air only; defaults to throttle)  roll (-1..1)
 --            boost  jump
--- On the ground: drive, steer, jump (pushes off whatever surface you're on, even walls).
+-- On the ground: drive, steer, jump (pushes off whatever surface you're on, even walls). Hold a hard turn at speed
+--                 and the car drifts: the back steps out and it swings round much tighter (no button needed).
 -- In the air:    pitch tips the nose, steer = yaw, roll = barrel roll. Jump again within 1.5s to double jump,
 --                or jump while holding a direction to dodge/flip into the ball.
 
@@ -29,6 +30,11 @@ export type Config = {
 	TurnSpeedRamp: number,
 	HighSpeedTurnFactor: number,
 	SteerResponse: number,
+	DriftDelay: number,
+	DriftMinSpeed: number,
+	DriftTurn: number,
+	DriftGrip: number,
+	DriftScrub: number,
 	BoostAcceleration: number,
 	MaxBoostedSpeed: number,
 	OverSpeedDecay: number,
@@ -85,6 +91,8 @@ export type State = {
 	dodgeTimer: number,
 	suspensionPause: number,
 	stuckTimer: number,
+	steerHold: number, -- how long a hard turn has been held (it turns into a drift)
+	drifting: boolean,
 	-- Item and power effects (seconds left): spun out on a banana, stuck in cheese, frozen solid.
 	spinTimer: number,
 	spinDirection: number,
@@ -96,6 +104,7 @@ export type State = {
 export type Assist = {
 	ball: Vector3?, -- where the ball is: jumps lean toward it and the second jump flips into it
 	level: boolean, -- in the air, holding the throttle doesn't tip the nose (the car stays level)
+	drift: boolean?, -- steering for a ball that's inside the turning circle: drift straight away to make it
 }
 
 export type StepParams = {
@@ -167,6 +176,8 @@ function CarPhysics.newState(): State
 		dodgeTimer = 0,
 		suspensionPause = 0,
 		stuckTimer = 0,
+		steerHold = 0,
+		drifting = false,
 		spinTimer = 0,
 		spinDirection = 1,
 		slowTimer = 0,
@@ -210,6 +221,21 @@ end
 
 local function hasAirInput(input: Input, pitch: number): boolean
 	return math.abs(pitch) > 0.05 or math.abs(input.steer) > 0.05 or math.abs(input.roll) > 0.05
+end
+
+-- How fast the car turns at full lock (radians a second) at `speed`: it needs a little speed to turn at all, and
+-- turns a bit less sharply the faster it goes.
+local function turnRate(config: Config, stats: Stats, speed: number): number
+	return config.TurnRate
+		* stats.Handling
+		* math.clamp(speed / config.TurnSpeedRamp, 0, 1)
+		* (1 - config.HighSpeedTurnFactor * math.clamp(speed / config.MaxBoostedSpeed, 0, 1))
+end
+
+-- The radius of the car's turning circle at full lock at `speed` (without drifting), in studs.
+function CarPhysics.turnRadius(config: Config, stats: Stats, speed: number): number
+	local rate = turnRate(config, stats, speed)
+	return if rate > 1e-3 then speed / rate else math.huge
 end
 
 function CarPhysics.step(p: StepParams): StepResult
@@ -308,17 +334,31 @@ function CarPhysics.step(p: StepParams): StepResult
 			velocity -= forward * (math.sign(forwardSpeed) * math.min(excess, fade * dt))
 		end
 
-		-- Tyre grip: bleed off sideways sliding (hardly any while spinning out).
-		local grip = config.Grip * (if spinning then config.SpinGrip else 1)
+		-- Drifting: holding a hard turn at speed for a moment (or, with driving help, steering for a ball that's
+		-- inside the turning circle) lets the back step out, so the car swings round much tighter and scrubs off a
+		-- little speed. Easing off the turn ends it.
+		local absSpeed = math.abs(forwardSpeed)
+		local planarSpeed = (velocity - normal * velocity:Dot(normal)).Magnitude -- (sliding sideways counts too)
+		local moving = forwardSpeed > 0 and planarSpeed > config.DriftMinSpeed and not spinning
+		if math.abs(input.steer) > 0.85 and moving then
+			state.steerHold += dt
+		else
+			state.steerHold = 0
+		end
+		local tight = p.assist ~= nil and p.assist.drift == true and math.abs(input.steer) > 0.5
+		local drifting = moving and (state.steerHold >= config.DriftDelay or tight)
+		state.drifting = drifting
+		if drifting then
+			velocity -= forward * (forwardSpeed * math.min(1, config.DriftScrub * dt))
+		end
+
+		-- Tyre grip: bleed off sideways sliding (hardly any while spinning out, less while drifting).
+		local grip = config.Grip * (if spinning then config.SpinGrip elseif drifting then config.DriftGrip else 1)
 		local sideSpeed = velocity:Dot(side)
 		velocity -= side * (sideSpeed * MathUtil.expDecay(grip, dt))
 
 		-- Steering: turn rate grows with speed, then softens at very high speed. Reversing flips it like a real car.
-		local absSpeed = math.abs(forwardSpeed)
-		local turn = config.TurnRate
-			* stats.Handling
-			* math.clamp(absSpeed / config.TurnSpeedRamp, 0, 1)
-			* (1 - config.HighSpeedTurnFactor * math.clamp(absSpeed / config.MaxBoostedSpeed, 0, 1))
+		local turn = turnRate(config, stats, absSpeed) * (if drifting then config.DriftTurn else 1)
 		local direction = if forwardSpeed >= 0 then 1 else -1
 		local targetYaw = if spinning then config.SpinRate * state.spinDirection else -input.steer * turn * direction
 		local currentYaw = angular:Dot(normal)

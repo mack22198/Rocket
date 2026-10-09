@@ -159,6 +159,9 @@ function BotBrain.adaptiveSkill(base: number, playersLead: number, rookie: boole
 	return math.clamp(skill, tuning.MinSkill, tuning.MaxSkill)
 end
 
+-- The most a bot steers (see the end of BotBrain.decide).
+local BOT_LOCK = 0.84
+
 -- Bots that aren't chasing the ball go for the charge orb when it's at most this far away.
 local ORB_RANGE = 130
 
@@ -268,7 +271,8 @@ function BotBrain.decide(ctx: Context, memory: Memory, dt: number): CarPhysics.I
 
 	return {
 		throttle = math.clamp(throttle, -1, 1),
-		steer = math.clamp(steer, -1, 1),
+		-- (Just short of full lock, so bots don't slide into drifts and scrub off the speed they hit the ball with.)
+		steer = math.clamp(steer, -BOT_LOCK, BOT_LOCK),
 		roll = roll,
 		boost = false,
 		jump = jump,

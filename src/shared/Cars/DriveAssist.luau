@@ -1,6 +1,9 @@
 --!strict
 -- Driving help, for players new to car soccer (on by default; it can be switched off in the match menu):
---   * Keyboard steering eases in instead of snapping to full lock, so a tap of A or D is a small nudge.
+--   * Keyboard steering eases in very quickly instead of snapping to full lock, so a tap of A or D is a nudge
+--     and holding it turns straight away.
+--   * Tight turns: steering for a ball that's too close to reach at this speed (inside the car's turning circle)
+--     makes the car drift round to it at once (see CarPhysics).
 --   * Aim assist: while you hold the throttle and the ball is roughly ahead, the car steers itself toward the spot
 --     that knocks the ball at the other team's goal. Your own steering always wins.
 --   * Shot assist (see HitModel): your hits bend partly toward the other team's goal.
@@ -13,8 +16,12 @@ local MathUtil = require(script.Parent.Parent.Util.MathUtil)
 local DriveAssist = {}
 
 -- Keyboard steering: how fast it builds up to full lock, and how fast it lets go.
-DriveAssist.KeyRise = 4.5 -- full lock after about a fifth of a second
-DriveAssist.KeyFall = 11
+DriveAssist.KeyRise = 9 -- full lock after about a tenth of a second
+DriveAssist.KeyFall = 14
+
+-- Tight turns.
+DriveAssist.TightRange = 50 -- only for a ball this close
+DriveAssist.TightAngle = math.rad(20) -- that's at least this far off to the side
 
 -- Aim assist.
 DriveAssist.Range = 110 -- the ball must be this close (studs, along the ground)...
@@ -97,6 +104,29 @@ function DriveAssist.steer(p: SteerParams): number
 		return p.steer -- steering hard the other way: you're in charge
 	end
 	return math.clamp(p.steer + assist * (1 - math.abs(p.steer)), -1, 1)
+end
+
+-- Is the player steering for a ball they can't reach at this speed: close, off to the side they're turning to,
+-- and inside the circle the car turns in (`turnRadius`, see CarPhysics.turnRadius)? Then the car should drift.
+function DriveAssist.needsTightTurn(p: SteerParams, turnRadius: number): boolean
+	if not p.grounded or p.throttle < DriveAssist.MinThrottle or math.abs(p.steer) < 0.5 then
+		return false
+	end
+	local carPos = p.carCFrame.Position
+	local toBall = MathUtil.flat(p.ballPosition - carPos)
+	local distance = toBall.Magnitude
+	if distance > DriveAssist.TightRange or distance < 1e-3 then
+		return false
+	end
+	local look = MathUtil.safeUnit(MathUtil.flat(p.carCFrame.LookVector), Vector3.new(0, 0, -1))
+	local direction = toBall / distance
+	local angle = math.atan2(look:Cross(direction).Y, look:Dot(direction)) -- positive = to the left
+	if math.abs(angle) < DriveAssist.TightAngle or math.sign(-p.steer) ~= math.sign(angle) then
+		return false -- (straight ahead already, or steering the other way)
+	end
+	-- The circle that leaves along the car's heading and passes through the ball has this radius.
+	local needed = distance / (2 * math.sin(math.min(math.abs(angle), math.pi / 2)))
+	return needed < turnRadius
 end
 
 -- The sideways push a jump gets toward a ball in the air (zero if there's no ball to jump at).

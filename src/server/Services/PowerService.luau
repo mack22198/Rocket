@@ -36,6 +36,7 @@ type Hazard = {
 	expiresAt: number,
 	model: Model,
 	hit: { [string]: number }, -- participant key -> when this hazard last got them
+	fading: boolean,
 }
 
 local PowerService = {}
@@ -53,6 +54,7 @@ local rayParams = RaycastParams.new()
 local hazards: { Hazard } = {}
 local slowedAt: { [Participant]: number } = {}
 local KETCHUP_REHIT = 1.4 -- a car stays in a ketchup slick a while; it spins again only after this long
+local FADE = 0.8 -- a trap starts fading away on every screen this long before it goes
 -- Goes up whenever the pitch is swept (a kickoff, the end of the match), so something still on its way - a peel
 -- in the air, a Ground Pound about to land - knows it's been called off.
 local generation = 0
@@ -181,6 +183,7 @@ local function placeHazard(
 		expiresAt = now + duration,
 		model = model,
 		hit = {},
+		fading = false,
 	})
 end
 
@@ -380,6 +383,9 @@ function PowerService.update()
 		if now >= hazard.expiresAt then
 			removeHazard(i)
 			continue
+		elseif not hazard.fading and now >= hazard.expiresAt - FADE then
+			hazard.fading = true
+			hazard.model:SetAttribute("Fading", true) -- (every screen fades it away)
 		end
 		for _, p in Roster.all() do
 			local chassis = p.chassis

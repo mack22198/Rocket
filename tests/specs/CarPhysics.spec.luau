@@ -151,10 +151,45 @@ return function(t)
 	t.test("steering right turns the car to the right", function()
 		local sim = newSim()
 		sim.run(0.5)
-		sim.run(1, function()
+		sim.run(0.5, function()
 			return input({ throttle = 1, steer = 1 })
 		end)
 		expect.atLeast(sim.cframe.LookVector.X, 0.3)
+	end)
+
+	t.test("the turning circle is tight enough to get round to the ball", function()
+		local top = cfg.MaxSpeed * def.Stats.Speed
+		expect.atMost(CarPhysics.turnRadius(cfg, def.Stats, top), 35, "at top speed")
+		expect.atMost(CarPhysics.turnRadius(cfg, def.Stats, 50), 16, "at half speed")
+		expect.truthy(
+			CarPhysics.turnRadius(cfg, def.Stats, 30) < CarPhysics.turnRadius(cfg, def.Stats, top),
+			"tighter when slower"
+		)
+	end)
+
+	-- Drives at `speed` for a moment, then turns with `steer` for `seconds` (on full throttle, or `throttle`): how
+	-- far round it got (radians) and whether it ended up drifting.
+	local function turnFrom(speed: number, steer: number, seconds: number, throttle: number?): (number, boolean)
+		local sim = newSim(nil, Vector3.new(0, 0, -speed))
+		sim.run(0.3, function()
+			return input({ throttle = throttle or 1 })
+		end)
+		local before = sim.cframe.LookVector
+		sim.run(seconds, function()
+			return input({ throttle = throttle or 1, steer = steer })
+		end)
+		local after = sim.cframe.LookVector
+		return math.acos(math.clamp(before:Dot(after), -1, 1)), sim.state.drifting
+	end
+
+	t.test("holding a hard turn at speed drifts round tighter", function()
+		local plain, plainDrift = turnFrom(90, 0.8, 0.6)
+		local hard, hardDrift = turnFrom(90, 1, 0.6)
+		expect.falsy(plainDrift, "a gentler turn stays on its wheels")
+		expect.truthy(hardDrift, "a hard turn drifts")
+		expect.truthy(hard > plain * 1.35, "and gets round much further")
+		local _, slowDrift = turnFrom(20, 1, 0.6, 0.2)
+		expect.falsy(slowDrift, "no drifting at a crawl")
 	end)
 
 	t.test("a car can't spin in place without moving", function()

@@ -36,6 +36,17 @@ type CarLook = {
 	goo: ParticleEmitter, -- cheese dripping off a car stuck in a Cheese Flood
 	ghostParts: { BasePart },
 	ghosted: boolean?, -- nil = needs setting again (after the car was hidden for a replay)
+	trailAt: number, -- when it last left a mark on the ground while dashing
+}
+
+-- A trap lying on the pitch (cheese, a banana peel, a ketchup slick), kept lively while it lasts.
+type Trap = {
+	model: Model,
+	kind: string,
+	base: CFrame, -- where it lies (a peel bobs and turns around this)
+	glows: { BasePart }, -- its team-coloured edge, which pulses
+	phase: number,
+	ready: boolean, -- it has finished spreading out
 }
 
 -- The charge orb, as this screen animates it.
@@ -48,11 +59,53 @@ local ORB_COLOR = rgb(80, 220, 255)
 local ORB_CORE_SIZE = 4.6 -- (as PropBuilder.chargeOrb builds it)
 local SPREAD_SPEED = 80 -- studs a second a new trap spreads out from where it came from
 local CHEESE = rgb(255, 204, 64)
+local FADE = 0.8 -- seconds a trap takes to fade away (the server says when; see PowerService)
+local TRAIL_EVERY = 0.05 -- seconds between the marks a dashing car leaves on the ground
 
 local folder: Folder
 local cars: { [Model]: CarLook } = {}
 local orbs: { [Model]: Orb } = {}
+local traps: { [Model]: Trap } = {}
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Include
 local ballAttachment: Attachment? = nil
+
+-- A mark on the ground that fades away over `life` seconds: scorch marks behind a Nitro Rocket, the splash of a
+-- Shark Dive, the crater a Ground Pound leaves. `surface` is a CFrame on the ground whose UpVector points out.
+local function mark(surface: CFrame, radius: number, color: Color3, material: Enum.Material, life: number)
+	local disc = Instance.new("Part")
+	disc.Name = "Mark"
+	disc.Shape = Enum.PartType.Cylinder
+	disc.Size = Vector3.new(0.12, radius * 2, radius * 2)
+	disc.CFrame = surface * CFrame.new(0, 0.08, 0) * CFrame.Angles(0, 0, math.rad(90))
+	disc.Color = color
+	disc.Material = material
+	disc.Transparency = if material == Enum.Material.Neon then 0.2 else 0.15
+	disc.Anchored = true
+	disc.CanCollide = false
+	disc.CanQuery = false
+	disc.CanTouch = false
+	disc.CastShadow = false
+	disc.Parent = folder
+	TweenService:Create(disc, TweenInfo.new(life, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		Transparency = 1,
+	}):Play()
+	task.delay(life + 0.1, function()
+		disc:Destroy()
+	end)
+	return disc
+end
+
+-- The ground under a point (a CFrame lying on it), if there's any close below.
+local function groundUnder(position: Vector3, down: Vector3): CFrame?
+	local hit = workspace:Raycast(position, down * 8, groundParams)
+	if not hit then
+		return nil
+	end
+	local normal = hit.Normal
+	local across = normal:Cross(if math.abs(normal.Y) < 0.9 then Vector3.yAxis else Vector3.xAxis)
+	return CFrame.fromMatrix(hit.Position, across.Unit, normal)
+end
 
 ---------------------------------------------------------------------------------------------------------------
 -- Cars
@@ -144,6 +197,7 @@ local function track(model: Instance)
 		goo = goo,
 		ghostParts = ghostParts,
 		ghosted = false,
+		trailAt = 0,
 	}
 
 	-- A demolished car is gone from every screen until it's back.
@@ -175,6 +229,23 @@ local function updateCar(look: CarLook, ballPosition: Vector3, ballShown: boolea
 	look.aura.Enabled = glowing
 	look.auraLight.Enabled = glowing
 	look.goo.Enabled = model:GetAttribute(A.Goo) == true
+
+	-- Dashing leaves a trail on the ground that fades away: scorch marks behind a Nitro Rocket, a wake of water
+	-- behind a diving shark.
+	local now = os.clock()
+	if model:GetAttribute(A.Dashing) == true and now - look.trailAt >= TRAIL_EVERY then
+		look.trailAt = now
+		local chassis = look.chassis
+		local surface = groundUnder(chassis.Position, -chassis.CFrame.UpVector)
+		if surface then
+			if model:GetAttribute(A.Ghost) == true then
+				mark(surface, 3.2, rgb(120, 210, 255), Enum.Material.Neon, 1.6)
+			else
+				mark(surface, 2.6, rgb(36, 28, 24), Enum.Material.Slate, 3)
+				mark(surface * CFrame.new(0, 0.02, 0), 1.4, rgb(255, 140, 40), Enum.Material.Neon, 1.2)
+			end
+		end
+	end
 
 	-- Shark Dive: the car goes see-through.
 	local ghost = model:GetAttribute(A.Ghost) == true
@@ -299,21 +370,51 @@ end
 -- Cheese, banana peels and ketchup
 ---------------------------------------------------------------------------------------------------------------
 
+-- Something sparkly coming off `part` (bubbles in the cheese, glints on the ketchup, a shine on a peel).
+local function sparkle(part: BasePart, color: Color3, size: number, rate: number, rise: number)
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "Sparkle"
+	emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	emitter.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
+	emitter.LightEmission = 0.6
+	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, size), NumberSequenceKeypoint.new(1, 0) })
+	emitter.Transparency = NumberSequence.new(0.1, 1)
+	emitter.Lifetime = NumberRange.new(0.6, 1.1)
+	emitter.Speed = NumberRange.new(0.5, 1.5)
+	emitter.SpreadAngle = Vector2.new(30, 30)
+	emitter.Acceleration = Vector3.new(0, rise, 0)
+	emitter.Rate = rate
+	emitter.Parent = part
+end
+
 -- A new trap appears the way it was made: it spreads out from where it came from (the car), so a Cheese Flood
--- floods outwards and a Ketchup Slick squirts forwards. (A thrown peel just lands.)
-local function spreadOut(model: Instance)
+-- floods outwards and a Ketchup Slick squirts forwards (a thrown peel just lands). Then it stays lively until it
+-- goes: cheese bubbles, ketchup glistens, a peel bobs and turns, and its team-coloured edge pulses.
+local function trapAdded(model: Instance)
 	if not model:IsA("Model") then
 		return
 	end
 	task.wait() -- (its parts can arrive a moment after the model)
 	local from = model:GetAttribute("From")
 	local origin = if typeof(from) == "Vector3" then from else model:GetPivot().Position
+	local kind = model:GetAttribute("Kind")
+	local trap: Trap = {
+		model = model,
+		kind = if type(kind) == "string" then kind else "",
+		base = model:GetPivot(),
+		glows = {},
+		phase = math.random() * 10,
+		ready = false,
+	}
+	local longest = 0
 	for _, part in model:GetDescendants() do
 		if part:IsA("BasePart") then
 			local size = part.Size
+			local delay = (part.Position - origin).Magnitude / SPREAD_SPEED
+			longest = math.max(longest, delay)
 			part.LocalTransparencyModifier = 1
 			part.Size = size * 0.15
-			task.delay((part.Position - origin).Magnitude / SPREAD_SPEED, function()
+			task.delay(delay, function()
 				if part.Parent then
 					part.LocalTransparencyModifier = 0
 					TweenService:Create(part, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
@@ -321,6 +422,67 @@ local function spreadOut(model: Instance)
 					}):Play()
 				end
 			end)
+			if part.Name == "TeamRing" or part.Name == "TeamEdge" then
+				table.insert(trap.glows, part)
+			elseif part.Name == "Cheese" then
+				sparkle(part, CHEESE, 1.3, 22, 7)
+				local glow = Instance.new("PointLight")
+				glow.Color = rgb(255, 200, 90)
+				glow.Range = 22
+				glow.Brightness = 0.9
+				glow.Shadows = false
+				glow.Parent = part
+			elseif part.Name == "Ketchup" then
+				sparkle(part, rgb(255, 120, 110), 0.7, 3, 2)
+			elseif part.Name == "Peel" then
+				sparkle(part, rgb(255, 236, 120), 0.9, 8, 3)
+			end
+		end
+	end
+	traps[model] = trap
+	task.delay(longest + 0.35, function()
+		trap.ready = true
+	end)
+	-- Fading away at the end (the server says when, a moment before it goes).
+	local function fade()
+		if model:GetAttribute("Fading") ~= true then
+			return
+		end
+		traps[model] = nil
+		for _, part in model:GetDescendants() do
+			if part:IsA("BasePart") then
+				TweenService:Create(part, TweenInfo.new(FADE, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+					LocalTransparencyModifier = 1,
+					Size = part.Size * 0.6,
+				}):Play()
+			elseif part:IsA("ParticleEmitter") then
+				part.Enabled = false
+			end
+		end
+	end
+	model:GetAttributeChangedSignal("Fading"):Connect(fade)
+	fade()
+end
+
+-- Every frame: peels bob and turn, and every trap's team-coloured edge pulses.
+local function updateTraps()
+	local t = os.clock()
+	for model, trap in traps do
+		if not model.Parent then
+			traps[model] = nil
+			continue
+		end
+		if not trap.ready then
+			continue
+		end
+		local pulse = 0.25 + 0.25 * math.sin(t * 4 + trap.phase)
+		for _, part in trap.glows do
+			part.LocalTransparencyModifier = pulse
+		end
+		if trap.kind == "peel" then
+			local base = trap.base
+			local bob = 0.35 + math.sin(t * 3 + trap.phase) * 0.35
+			model:PivotTo(base * CFrame.new(0, bob, 0) * CFrame.Angles(0, t * 0.9 + trap.phase, 0))
 		end
 	end
 end
@@ -364,6 +526,72 @@ end
 ---------------------------------------------------------------------------------------------------------------
 -- One-off effects
 ---------------------------------------------------------------------------------------------------------------
+
+-- A Ground Pound's crater: a dark scorched ring with cracks running out of it, slowly fading.
+local function crater(position: Vector3, color: Color3)
+	local surface = groundUnder(position + Vector3.new(0, 4, 0), -Vector3.yAxis)
+	if not surface then
+		return
+	end
+	local surfaceFrame: CFrame = surface
+	mark(surfaceFrame, T.PoundRadius * 0.42, rgb(70, 52, 40), Enum.Material.Slate, 5)
+	mark(surfaceFrame * CFrame.new(0, 0.02, 0), T.PoundRadius * 0.2, color, Enum.Material.Neon, 2.5)
+	for i = 1, 7 do
+		local angle = i / 7 * math.pi * 2 + math.random() * 0.4
+		local length = T.PoundRadius * (0.45 + math.random() * 0.25)
+		local crack = Instance.new("Part")
+		crack.Name = "Crack"
+		crack.Size = Vector3.new(0.7, 0.14, length)
+		crack.CFrame = surfaceFrame * CFrame.Angles(0, angle, 0) * CFrame.new(0, 0.1, -length / 2)
+		crack.Color = rgb(44, 32, 26)
+		crack.Material = Enum.Material.Slate
+		crack.Anchored = true
+		crack.CanCollide = false
+		crack.CanQuery = false
+		crack.CanTouch = false
+		crack.CastShadow = false
+		crack.Parent = folder
+		TweenService:Create(crack, TweenInfo.new(5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+			Transparency = 1,
+		}):Play()
+		task.delay(5.1, function()
+			crack:Destroy()
+		end)
+	end
+end
+
+-- Something drifting in the air for a while: feathers after a QUACK, dust after a Ground Pound.
+local function drift(position: Vector3, color: Color3, size: number, count: number, life: number, fall: number)
+	local holder = Instance.new("Part")
+	holder.Name = "Drift"
+	holder.Size = Vector3.new(16, 6, 16)
+	holder.CFrame = CFrame.new(position + Vector3.new(0, 4, 0))
+	holder.Transparency = 1
+	holder.Anchored = true
+	holder.CanCollide = false
+	holder.CanQuery = false
+	holder.CanTouch = false
+	holder.Parent = folder
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	emitter.Color = ColorSequence.new(color)
+	emitter.LightEmission = 0.3
+	emitter.Size =
+		NumberSequence.new({ NumberSequenceKeypoint.new(0, size), NumberSequenceKeypoint.new(1, size * 0.4) })
+	emitter.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+	emitter.Lifetime = NumberRange.new(life * 0.6, life)
+	emitter.Speed = NumberRange.new(2, 6)
+	emitter.SpreadAngle = Vector2.new(180, 180)
+	emitter.Acceleration = Vector3.new(0, -fall, 0)
+	emitter.Drag = 1.5
+	emitter.RotSpeed = NumberRange.new(-90, 90)
+	emitter.Rate = 0
+	emitter.Parent = holder
+	emitter:Emit(count)
+	task.delay(life + 0.5, function()
+		holder:Destroy()
+	end)
+end
 
 -- The ultimate a car has (from its Power attribute).
 local function powerOf(car: unknown): Powers.PowerDef?
@@ -448,8 +676,8 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 		local glow = if power then power.Color else color
 		E.flash(at, glow, 60, 8, 0.6)
 		E.shockwave(at, glow, 16, 0.45)
-		E.ring(ground, glow, 30, 0.7)
-		E.burst(at, glow, 70, 40, 2, 0.7)
+		E.ring(ground, glow, 30, 1)
+		E.burst(at, glow, 70, 40, 2, 1)
 		E.play("Ultimate", 1, 1)
 		if mine then
 			CameraController.punch(14, 0.8)
@@ -478,6 +706,7 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 	elseif kind == "nitro" then
 		E.burst(at, rgb(255, 170, 60), 36, 36, 1.8, 0.6)
 		E.flash(at, rgb(255, 160, 60), 30, 4, 0.4)
+		E.ring(ground, rgb(255, 150, 50), 12, 0.6)
 		E.play("Whoosh", 0.8, 1)
 	elseif kind == "cheese" then
 		-- A wave of cheese: goo splashes up everywhere as the puddle floods out.
@@ -499,8 +728,14 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 		shout(extra, "HOT!", rgb(255, 110, 40))
 		E.play("Whoosh", 0.9, 0.8)
 	elseif kind == "quack" then
+		-- Rings of sound rolling out, one after another, and feathers drifting down.
 		E.shockwave(at, rgb(255, 224, 80), T.QuackRadius, 0.5)
-		E.ring(ground, rgb(255, 224, 80), T.QuackRadius, 0.5)
+		for i = 0, 2 do
+			task.delay(i * 0.18, function()
+				E.ring(ground, rgb(255, 224, 80), T.QuackRadius * (1 - i * 0.2), 0.9)
+			end)
+		end
+		drift(at, rgb(255, 250, 235), 0.9, 30, 3, 3)
 		shout(extra, "QUACK!", rgb(255, 220, 60))
 		E.play("Click", 1, 0.45)
 		if nearMe(at, T.QuackRadius * 1.5) then
@@ -509,6 +744,7 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 	elseif kind == "dive" then
 		E.burst(at, rgb(90, 210, 255), 50, 34, 1.6, 0.7, 40)
 		E.shockwave(at, rgb(120, 220, 255), 9, 0.35)
+		E.ring(ground, rgb(120, 220, 255), 14, 0.9)
 		E.play("Whoosh", 0.8, 1.2)
 	elseif kind == "pound" then
 		-- The slam: a shockwave, a ring of dust racing out and the ground shaking.
@@ -517,6 +753,8 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 		E.ring(position - Vector3.new(0, 2, 0), slam, T.PoundRadius, 0.5)
 		E.burst(position, rgb(170, 140, 110), 90, 50, 2.6, 1, 30)
 		E.flash(position, rgb(255, 120, 80), 50, 7, 0.4)
+		crater(position, slam)
+		drift(position, rgb(190, 160, 120), 2.4, 40, 3.5, 1)
 		E.play("Hit", 1, 0.45)
 		E.play("Poof", 0.8, 0.8)
 		if nearMe(position, T.PoundRadius * 1.6) then
@@ -578,7 +816,7 @@ function PowerVisuals.start()
 	task.spawn(function()
 		local hazardFolder = matchFolder:WaitForChild(MatchState.Folders.Hazards)
 		hazardFolder.ChildAdded:Connect(function(child)
-			task.spawn(spreadOut, child)
+			task.spawn(trapAdded, child)
 		end)
 	end)
 
@@ -597,9 +835,14 @@ function PowerVisuals.start()
 		end
 	end)
 
+	task.spawn(function()
+		groundParams.FilterDescendantsInstances = { workspace:WaitForChild(MatchState.Folders.Arena) }
+	end)
+
 	RunService.RenderStepped:Connect(function()
 		ensureBallAttachment()
 		updateOrbs()
+		updateTraps()
 		local ballPosition = BallView.getPosition()
 		local ballShown = BallView.isVisible()
 		for model, look in cars do

@@ -19,7 +19,8 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   the ball to you and pass it up to you - and the bots you play against ease off while you're behind (and for
   your first few matches) and push harder while you're ahead, so matches stay close. Bots play under made-up
   usernames (a different set every match, from [`BotNames.luau`](src/shared/Config/BotNames.luau)) with levels
-  and titles, so a match with bots in it feels like a match with other kids.
+  and titles, so a match with bots in it feels like a match with other kids. Name tags over cars are small,
+  shrink with distance and hide behind the ball, so they never cover the play (titles show on cars close by).
 - **Simple to play:** there are only three things to do - drive, jump and set off your **ultimate** - so the
   only buttons are JUMP and ULT (E on a keyboard). No boost to manage, nothing to pick up and juggle.
 - **Car soccer:** a roomy curved-wall arena with glowing goals and nets, kickoff countdowns, a scoreboard and clock, a
@@ -33,11 +34,13 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   trails and the camera widens as you go faster.
 - **The winners' podium:** at the final whistle the top three cars appear on a podium in the middle of the
   pitch - the MVP on the top step - with confetti and fireworks, before the results screen.
-- **Arcade driving:** quick cars, jump, double jump, flips (dodges), air control, driving up the curved walls, and
-  bumping other cars. The ball is big (about as wide as a car is long) and the goals are wide, so
+- **Arcade driving:** quick cars with a tight turning circle, jump, double jump, flips (dodges), air control,
+  driving up the curved walls, and bumping other cars. Hold a hard turn at speed and the car **drifts**: the back
+  steps out and it swings round tight, like Rocket League's powerslide but with no button. The ball is big (about as wide as a car is long) and the goals are wide, so
   it's easy to hit and easy to score.
-- **Driving help (on by default),** so a keyboard is all you need: steering keys ease in, so a tap of A or D is
-  a nudge, not a swerve; while you hold W with the ball ahead, the car steers itself toward the spot that knocks
+- **Driving help (on by default),** so a keyboard is all you need: steering keys answer straight away but a tap
+  of A or D is a nudge, not a swerve; steering for a ball that's too close to reach at your speed drifts you
+  round to it; while you hold W with the ball ahead, the car steers itself toward the spot that knocks
   the ball at the other team's goal (your own steering always wins); your hits bend part of the way toward the
   goal; jumping near a ball in the air leans the jump toward it and the second jump flips into it; and holding
   W in the air keeps the car level instead of tipping it over. Players who want full control switch it off in
@@ -56,8 +59,11 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
 - **Ultimates are made to be seen:** when you set yours off, the screen flashes its colour, its name bursts
   onto the screen and the camera kicks; your car glows while it lasts, and everything it does happens where
   your camera is looking - the cheese floods out from under you, the peels fly through the air and land ahead
-  of you, the ketchup squirts forward. Everyone else gets a popup ("TurboTaco9: CHEESE FLOOD!") so they see it
-  coming, and cars stuck in the cheese drip with it.
+  of you, the ketchup squirts forward. What's left on the pitch stays lively while it lasts (the cheese bubbles,
+  the ketchup glistens, peels bob and turn, their team-coloured edges pulse) and fades away when it goes; the
+  instant ones leave marks that fade over a few seconds (a Nitro Rocket's scorch trail, a diving shark's wake, a
+  Ground Pound's cracked crater, drifting feathers after a QUACK). Everyone else gets a popup ("TurboTaco9:
+  CHEESE FLOOD!") so they see it coming, and cars stuck in the cheese drip with it.
 - **The ultimate meter fills mostly from playing:** every touch of the ball (once a second at most), air and wall
   hits, shots, saves, goals, assists, big bumps and the charge orb. It only creeps up by itself (faster for a
   team that's behind), so everyone's is ready at a different moment - and each car's fills at its own pace.
@@ -174,7 +180,7 @@ ever remade (see [tools/meshes](tools/meshes)), delete the old `TurboBallCars` a
 | Action | Keyboard / mouse | Gamepad | Touch |
 | --- | --- | --- | --- |
 | Drive / brake / reverse | W / S (or arrows) | RT / LT (or left stick) | Drag toward where you want to go |
-| Steer | A / D | Left stick | (the same drag) |
+| Steer (hold a hard turn to drift) | A / D | Left stick | (the same drag) |
 | Jump (twice to double jump, jump + direction to flip) | Space or right mouse | A | JUMP |
 | Ultimate (when the meter is full) | E (Q, F, R and G work too) | X (B, RB and LB work too) | ULT |
 | Horn | H | D-pad up | HORN |
@@ -183,7 +189,9 @@ ever remade (see [tools/meshes](tools/meshes)), delete the old `TurboBallCars` a
 | In the air: tip the nose | W / S | Left stick | Stick |
 | Match menu (leave the match, driving help) | M | View / Back | ☰ MENU |
 
-Driving help (see above) is on for every new player; ☰ MENU → DRIVING HELP switches it off and on.
+Driving help (see above) is on for every new player; ☰ MENU → DRIVING HELP switches it off and on. A controller
+is the smoothest way to play (like Rocket League, the game is at its best with analog sticks and triggers), but
+everything is tuned so a keyboard or a phone works well too.
 
 ## Publishing to Roblox
 

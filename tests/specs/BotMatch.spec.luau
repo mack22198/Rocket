@@ -19,7 +19,7 @@ return function(t)
 		local ballCfg = GameConfig.Ball
 		local dt = ballCfg.FixedStep
 		local THINK = 1 / 8
-		local SECONDS = 75
+		local SECONDS = 120
 		local KICKOFF = { Vector2.new(-56, 88), Vector2.new(0, 156) } -- (as MatchService places them)
 
 		local ball = BallSim.newState(Vector3.new(0, ballCfg.Radius, 0))

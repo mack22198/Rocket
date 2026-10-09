@@ -28,6 +28,8 @@ local A = MatchState.CarAttr
 local rgb = Color3.fromRGB
 local effectsFolder: Folder
 local rng = Random.new()
+local titles: { [TextLabel]: BasePart } = {} -- the titles under name tags, shown only for cars close by
+local TITLE_DISTANCE = 45
 
 local SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
 local CONFETTI_COLORS = {
@@ -353,26 +355,27 @@ local function decorateCar(model: Instance)
 	end
 	local isMine = model:GetAttribute(A.OwnerUserId) == localPlayer.UserId
 
-	-- Everyone else's name over their car: their level, their name and (smaller) their title.
+	-- Everyone else's name over their car: their level and name, small, shrinking with distance and hidden behind
+	-- the ball and other cars, so it never covers the play. Their title shows underneath only when they're close.
 	if not isMine then
 		local tag = Instance.new("BillboardGui")
 		tag.Name = "NameTag"
-		tag.Size = UDim2.fromOffset(190, 48)
-		tag.StudsOffset = Vector3.new(0, 5.8, 0)
-		tag.AlwaysOnTop = true
-		tag.MaxDistance = 260
+		tag.Size = UDim2.new(4.5, 56, 0.7, 12) -- (studs plus pixels: smaller far away, but still readable)
+		tag.StudsOffset = Vector3.new(0, 5.4, 0)
+		tag.AlwaysOnTop = false
+		tag.MaxDistance = 220
 		tag.LightInfluence = 0
 		tag.Adornee = chassis
 		local label = Instance.new("TextLabel")
 		label.Name = "Name"
-		label.Size = UDim2.fromScale(1, 0.64)
+		label.Size = UDim2.fromScale(1, 1)
 		label.BackgroundTransparency = 1
 		label.Font = Enum.Font.GothamBlack
 		label.TextScaled = true
 		label.RichText = true
 		local outline = Instance.new("UIStroke")
 		outline.Color = Color3.fromRGB(16, 18, 34)
-		outline.Thickness = 2
+		outline.Thickness = 1.5
 		outline.Parent = label
 		local name = model:GetAttribute(A.DriverName)
 		local level = model:GetAttribute(A.Level)
@@ -388,18 +391,20 @@ local function decorateCar(model: Instance)
 		if type(title) == "string" and title ~= "" then
 			local titleLabel = Instance.new("TextLabel")
 			titleLabel.Name = "Title"
-			titleLabel.Size = UDim2.fromScale(1, 0.36)
-			titleLabel.Position = UDim2.fromScale(0, 0.64)
+			titleLabel.Size = UDim2.fromScale(1, 0.7)
+			titleLabel.Position = UDim2.fromScale(0, 1)
 			titleLabel.BackgroundTransparency = 1
 			titleLabel.Font = Enum.Font.GothamBold
 			titleLabel.TextScaled = true
+			titleLabel.Visible = false
 			local titleOutline = Instance.new("UIStroke")
 			titleOutline.Color = Color3.fromRGB(16, 18, 34)
-			titleOutline.Thickness = 1.5
+			titleOutline.Thickness = 1.2
 			titleOutline.Parent = titleLabel
 			titleLabel.TextColor3 = Color3.fromRGB(255, 226, 150)
 			titleLabel.Text = title
 			titleLabel.Parent = tag
+			titles[titleLabel] = chassis
 		end
 		tag.Parent = chassis
 	end
@@ -706,6 +711,20 @@ function EffectsController.start()
 	for _, child in cars:GetChildren() do
 		task.defer(decorateCar, child)
 	end
+	-- Titles under name tags show only for cars close by (a few times a second is plenty).
+	task.spawn(function()
+		while true do
+			task.wait(0.2)
+			local camera = workspace.CurrentCamera
+			for label, chassis in titles do
+				if not label.Parent or not chassis.Parent then
+					titles[label] = nil
+				elseif camera then
+					label.Visible = (camera.CFrame.Position - chassis.Position).Magnitude < TITLE_DISTANCE
+				end
+			end
+		end
+	end)
 
 	BallView.Hit:Connect(function(position: Vector3, strength: number, mine: boolean)
 		burst(position, Color3.fromRGB(255, 255, 255), math.floor(6 + strength * 18), 25 + strength * 40, 1.2, 0.5)

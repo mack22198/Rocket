@@ -92,14 +92,9 @@ local function step(dt: number)
 	if canDrive and info and InputController.assist() then
 		local ballPosition, ballVelocity, radius, visible = info()
 		local team = car:GetAttribute(A.Team)
-		assist = { ball = if visible then ballPosition else nil, level = true }
+		local help: CarPhysics.Assist = { ball = if visible then ballPosition else nil, level = true }
 		if visible and (team == "Blue" or team == "Orange") then
-			local goal = DriveAssist.enemyGoal(
-				GameConfig.Teams[team :: string].DefendsSide,
-				GameConfig.Arena.Length,
-				GameConfig.Arena.GoalHeight
-			)
-			local steer = DriveAssist.steer({
+			local params: DriveAssist.SteerParams = {
 				carCFrame = d.chassis.CFrame,
 				carVelocity = d.chassis.AssemblyLinearVelocity,
 				grounded = d:isGrounded(),
@@ -108,14 +103,25 @@ local function step(dt: number)
 				ballPosition = ballPosition,
 				ballVelocity = ballVelocity,
 				ballRadius = radius,
-				enemyGoal = goal,
-			})
+				enemyGoal = DriveAssist.enemyGoal(
+					GameConfig.Teams[team :: string].DefendsSide,
+					GameConfig.Arena.Length,
+					GameConfig.Arena.GoalHeight
+				),
+			}
+			local steer = DriveAssist.steer(params)
 			if steer ~= input.steer then
 				local steered = table.clone(input)
 				steered.steer = steer
 				input = steered
 			end
+			-- The ball is too close to reach at this speed: drift round to it.
+			params.steer = input.steer
+			local speed = d.chassis.AssemblyLinearVelocity.Magnitude
+			help.drift =
+				DriveAssist.needsTightTurn(params, CarPhysics.turnRadius(CarDriver.config(), d.def.Stats, speed))
 		end
+		assist = help
 	end
 	local result = d:step(dt, input, false, assist)
 	if result and (result.jumped or result.dodged) then

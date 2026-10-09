@@ -37,6 +37,32 @@ return function(t)
 		expect.truthy(steer < 0 and steer > -0.2, "the other way too")
 	end)
 
+	t.test("steering for a ball that's too close to reach makes the car drift round to it", function()
+		local close = Vector3.new(-20, r, -15) -- just ahead, off to the left
+		local radius = 27 -- the car's turning circle at this speed
+		expect.truthy(DriveAssist.needsTightTurn(params({ ballPosition = close, steer = -1 }), radius))
+		expect.falsy(
+			DriveAssist.needsTightTurn(params({ ballPosition = close, steer = 1 }), radius),
+			"steering away from it"
+		)
+		expect.falsy(
+			DriveAssist.needsTightTurn(params({ ballPosition = close, steer = -1 }), 10),
+			"a car that can already turn that tight"
+		)
+		expect.falsy(
+			DriveAssist.needsTightTurn(params({ ballPosition = Vector3.new(0, r, -30), steer = -1 }), radius),
+			"straight ahead"
+		)
+		expect.falsy(
+			DriveAssist.needsTightTurn(params({ ballPosition = Vector3.new(-20, r, -80), steer = -1 }), radius),
+			"far away: plenty of room"
+		)
+		expect.falsy(
+			DriveAssist.needsTightTurn(params({ ballPosition = close, steer = -1, throttle = 0 }), radius),
+			"only while driving"
+		)
+	end)
+
 	t.test("letting go of a steering key straightens up quickly", function()
 		local steer = 1
 		for _ = 1, 6 do

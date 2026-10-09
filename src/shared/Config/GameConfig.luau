@@ -91,10 +91,16 @@ GameConfig.Car = {
 	BrakeDeceleration = 150,
 	CoastDeceleration = 18,
 	Grip = 10, -- how quickly sideways sliding is cancelled
-	TurnRate = 3.0, -- radians per second
+	TurnRate = 4.0, -- radians per second (a tight turning circle, so you can get round to the ball)
 	TurnSpeedRamp = 12, -- the car needs this much speed before it turns at full rate
-	HighSpeedTurnFactor = 0.45, -- turning is this much weaker at top speed
-	SteerResponse = 15,
+	HighSpeedTurnFactor = 0.3, -- turning is this much weaker at the fastest a car can go
+	SteerResponse = 24, -- how quickly the car answers the steering
+	-- Drifting (no button: hold a hard turn at speed, see CarPhysics).
+	DriftDelay = 0.3, -- seconds of hard turning before the back steps out
+	DriftMinSpeed = 35,
+	DriftTurn = 1.3, -- turns this much faster while drifting...
+	DriftGrip = 0.55, -- ...with this much of the usual grip...
+	DriftScrub = 0.2, -- ...losing this share of its speed each second
 	-- (The car physics can still boost, but nothing in the game uses it any more.)
 	BoostAcceleration = 85,
 	MaxBoostedSpeed = 150, -- the fastest any car can go (a Nitro Rocket gets close)

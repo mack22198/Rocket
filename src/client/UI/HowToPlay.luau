@@ -36,8 +36,8 @@ local CARDS = {
 }
 
 local CONTROLS = {
-	{ "KEYBOARD", "W S drive, A D steer, SPACE jump, E ultimate, C ball cam, T chat, M menu" },
-	{ "GAMEPAD", "RT LT drive, left stick steer, A jump, X ultimate, Y ball cam, D-pad chat, VIEW menu" },
+	{ "KEYBOARD", "W S drive, A D steer (hold it to drift round), SPACE jump, E ultimate, C ball cam, M menu" },
+	{ "GAMEPAD", "The smoothest way to play! RT LT drive, stick steer, A jump, X ultimate, Y ball cam" },
 	{ "TOUCH", "Drag toward where you want to go, then tap JUMP, and ULT when it glows." },
 }
 
