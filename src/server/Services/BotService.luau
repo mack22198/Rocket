@@ -1,7 +1,7 @@
 --!strict
 -- Drives the bot cars on the server. Bots "think" a dozen times a second (BotBrain) and drive every frame.
--- They use their items and car powers too (PowerService.botThink). Bots on a player's team play for them, and
--- bots against players adapt to the score (see BotBrain).
+-- They set off their ultimates too (PowerService.botThink) and go for the charge orb when they're free. Bots on
+-- a player's team play for them, and bots against players adapt to the score (see BotBrain).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -16,7 +16,7 @@ local Powers = require(Shared.Config.Powers)
 
 local Roster = require(script.Parent.Parent.Match.Roster)
 local BallService = require(script.Parent.BallService)
-local CarService = require(script.Parent.CarService)
+local OrbService = require(script.Parent.OrbService)
 local PowerService = require(script.Parent.PowerService)
 
 type Participant = Roster.Participant
@@ -85,7 +85,7 @@ local function forecast(): (number) -> Vector3
 	end
 end
 
--- What a bot can see when deciding on its item and power.
+-- What a bot can see when deciding whether to set off its ultimate.
 local function botView(
 	p: Participant,
 	chassis: BasePart,
@@ -120,7 +120,7 @@ local function botView(
 		shotLinedUp = ballDirection:Dot(goalDirection) > 0.6,
 		nearestEnemy = nearest,
 		enemyBehind = behind,
-		heldFor = if p.item then workspace:GetServerTimeNow() - p.itemReadyAt else 0,
+		readyFor = math.max(0, workspace:GetServerTimeNow() - p.ultReadyAt),
 	}
 end
 
@@ -180,12 +180,10 @@ local function think()
 				local wobble = (1 - skill) * 10
 				mind.aimOffset = Vector3.new(rng:NextNumber(-wobble, wobble), 0, rng:NextNumber(-wobble, wobble))
 			end
-			local input, wantsMega = BotBrain.decide({
+			mind.input = BotBrain.decide({
 				carCFrame = chassis.CFrame,
 				carVelocity = chassis.AssemblyLinearVelocity,
 				grounded = p.driver:isGrounded(),
-				boost = p.boost,
-				megaReady = p.mega >= GameConfig.Mega.Max and not p.megaArmed,
 				ballPosition = ball.position,
 				ballVelocity = ball.velocity,
 				ballRadius = BallService.config().Radius,
@@ -196,11 +194,8 @@ local function think()
 				arena = arena,
 				aimOffset = mind.aimOffset,
 				feed = feed,
+				orb = OrbService.position(),
 			}, mind.memory, THINK_INTERVAL)
-			mind.input = input
-			if wantsMega then
-				CarService.activateMega(p)
-			end
 			local enemyGoal = Vector3.new(0, 0, -defendsSide * arena.halfLength)
 			PowerService.botThink(p, botView(p, chassis, mind.role, ball.position, enemyGoal))
 		end
@@ -220,9 +215,7 @@ function BotService.update(dt: number, active: boolean)
 		local driver = p.driver
 		if p.isBot and driver then
 			local mind = mindOf(p)
-			local input = if active then mind.input else CarPhysics.NoInput
-			local result = driver:step(dt, input, p.boost > 0)
-			p.boosting = result ~= nil and result.boosting
+			driver:step(dt, if active then mind.input else CarPhysics.NoInput, false)
 		end
 	end
 end

@@ -1,7 +1,7 @@
 --!strict
 -- The one place that moves the camera. While driving it's a chase camera: ball cam (on by default) keeps the
--- ball in view; press C / Y for a plain behind-the-car view. It leans back and widens as you boost, for a
--- feeling of speed. In the menus the showroom provides the shots (see setProvider), and if there's nothing to
+-- ball in view; press C / Y for a plain behind-the-car view. It leans back and widens at top speed and when you
+-- dash, for a feeling of speed. In the menus the showroom provides the shots (see setProvider), and if there's nothing to
 -- follow at all it slowly circles the stadium.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,7 +10,6 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ArenaShape = require(Shared.Arena.ArenaShape)
 local GameConfig = require(Shared.Config.GameConfig)
-local MatchState = require(Shared.Match.MatchState)
 local MathUtil = require(Shared.Util.MathUtil)
 local Signal = require(Shared.Util.Signal)
 
@@ -34,8 +33,8 @@ local shakeStrength = 0
 local DISTANCE = 18.5
 local HEIGHT = 7.2
 local FOV = 78
-local BOOST_FOV = 8 -- extra field of view at full boost speed
-local BOOST_PULL = 2.5 -- extra distance at full boost speed
+local DASH_FOV = 8 -- extra field of view at full dash speed
+local DASH_PULL = 2.5 -- extra distance at full dash speed
 
 -- Something else that wants to place the camera (the menu showroom). Returns nil when it has nothing to show.
 type Provider = (dt: number) -> (CFrame?, number)
@@ -86,16 +85,14 @@ local function update(dt: number)
 	end
 	heading = MathUtil.safeUnit(heading:Lerp(wanted, MathUtil.expDecay(8, dt)), wanted)
 
-	-- The faster you go (boosting especially), the further back the camera sits and the wider it sees.
-	local car = CarController.getCar()
-	local boosting = car ~= nil and car:GetAttribute(MatchState.CarAttr.Boosting) == true
+	-- The faster you go (dashing especially), the further back the camera sits and the wider it sees.
 	local wantedFeel = math.clamp((flatVelocity.Magnitude - GameConfig.Car.MaxSpeed * 0.8) / 60, 0, 1)
-	if boosting then
+	if CarController.isDashing() then
 		wantedFeel = math.max(wantedFeel, 0.6)
 	end
 	speedFeel = MathUtil.lerp(speedFeel, wantedFeel, MathUtil.expDecay(if wantedFeel > speedFeel then 4 else 2, dt))
 
-	local desiredPosition = carPos - heading * (DISTANCE + BOOST_PULL * speedFeel) + Vector3.new(0, HEIGHT, 0)
+	local desiredPosition = carPos - heading * (DISTANCE + DASH_PULL * speedFeel) + Vector3.new(0, HEIGHT, 0)
 	desiredPosition = arena:clampInside(desiredPosition, 2.5)
 	local focus: Vector3
 	if ballCam and BallView.isVisible() then
@@ -121,7 +118,7 @@ local function update(dt: number)
 		shake = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * s
 	end
 	camera.CameraType = Enum.CameraType.Scriptable
-	camera.FieldOfView = FOV + BOOST_FOV * speedFeel
+	camera.FieldOfView = FOV + DASH_FOV * speedFeel
 	camera.CFrame = MathUtil.lookAlong(position + shake, smoothFocus - position, Vector3.yAxis)
 end
 

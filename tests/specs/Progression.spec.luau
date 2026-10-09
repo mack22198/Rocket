@@ -52,7 +52,7 @@ return function(t)
 		local stats = { "matches", "wins", "goals", "assists", "saves", "shots", "megaShots", "demos", "mvps" }
 		local known: { [string]: boolean } = {
 			styleTouches = true,
-			items = true,
+			orbs = true,
 			powers = true,
 			bestStreak = true,
 			friendMatches = true,

@@ -324,7 +324,7 @@ function LobbyBuilder.build(): Folder
 	PartKit.label(
 		screen,
 		"Tagline",
-		"3v3 CAR SOCCER",
+		"2v2 CAR SOCCER",
 		Color3.new(1, 1, 1),
 		Vector2.new(0.5, 0.84),
 		Vector2.new(0.6, 0.18),
@@ -350,9 +350,9 @@ function LobbyBuilder.build(): Folder
 		"HOW TO PLAY",
 		"W / S  drive     A / D  steer",
 		"SPACE  jump (twice to flip)",
-		"SHIFT or CLICK  boost",
-		"F  Mega Shot when your meter is full",
-		"C  ball cam     Q / E  air roll",
+		"E  ultimate when your meter is full",
+		"Grab the glowing orb to charge it!",
+		"C  ball cam",
 	}, { color = Color3.new(1, 1, 1), background = Palette.Board })
 	-- ...and the garage hint at the other end.
 	local garage = PartKit.box(

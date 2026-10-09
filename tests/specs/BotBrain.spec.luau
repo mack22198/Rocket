@@ -11,8 +11,6 @@ return function(t)
 			carCFrame = CFrame.new(0, 2, 60), -- facing -Z
 			carVelocity = Vector3.zero,
 			grounded = true,
-			boost = 50,
-			megaReady = false,
 			ballPosition = Vector3.new(0, 6, 0),
 			ballVelocity = Vector3.zero,
 			ballRadius = 6,
@@ -110,6 +108,21 @@ return function(t)
 		local input = BotBrain.decide(context({ grounded = false, carCFrame = tilted }), BotBrain.newMemory(), 1 / 12)
 		expect.equal(input.throttle, 1) -- pitch nose down
 		expect.falsy(input.boost)
+	end)
+
+	t.test("a defender with nothing to do grabs the charge orb", function()
+		local away = Vector3.new(0, 6, -120) -- the ball is down the other end
+		local ctx = context({ role = "defend", ballPosition = away, carCFrame = CFrame.new(0, 2, 60) })
+		ctx.orb = Vector3.new(60, 4.5, 0) -- ahead and to the right
+		local input = BotBrain.decide(ctx, BotBrain.newMemory(), 1 / 12)
+		expect.atLeast(input.throttle, 0.5)
+		expect.truthy(input.steer > 0.3, "turns toward the orb")
+	end)
+
+	t.test("an attacker keeps chasing the ball instead of the orb", function()
+		local input = BotBrain.decide(context({ orb = Vector3.new(60, 4.5, 30) }), BotBrain.newMemory(), 1 / 12)
+		expect.atLeast(input.throttle, 0.8)
+		expect.atMost(math.abs(input.steer), 0.2)
 	end)
 
 	t.test("bots leave the ball to a player on their team who's nearly as close", function()

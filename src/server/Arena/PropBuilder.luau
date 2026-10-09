@@ -1,6 +1,7 @@
 --!strict
--- The things items and powers put on the pitch: the spinning "?" item boxes, gooey cheese puddles and banana
--- peels. Just the looks; ItemService and PowerService decide where they go and what they do.
+-- The things on the pitch besides the ball and the cars: the charge orb, and what ultimates leave lying around
+-- (gooey cheese, banana peels, ketchup). Just the looks; OrbService and PowerService decide where they go and
+-- what they do.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -29,68 +30,47 @@ local function part(parent: Instance, name: string, size: Vector3, cframe: CFram
 	return p
 end
 
--- A glassy rainbow cube with a glowing "?" on every side.
-function PropBuilder.itemBox(folder: Instance, position: Vector3, index: number): Model
+-- The charge orb: a bright glowing ball inside a glassy shell, with a ring on the ground below it and a tall beam
+-- of light over it so you can see where it is from anywhere on the pitch. `position` is the middle of the orb.
+function PropBuilder.chargeOrb(folder: Instance, position: Vector3): Model
 	local model = Instance.new("Model")
-	model.Name = `ItemBox{index}`
-	local centre = CFrame.new(position + Vector3.new(0, T.BoxHeight, 0))
-	local shell = part(model, "Box", Vector3.one * 4.2, centre, rgb(80, 180, 255))
+	model.Name = "ChargeOrb"
+	local centre = CFrame.new(position)
+	local shell = part(model, "Shell", Vector3.one * 7.4, centre, rgb(150, 236, 255))
+	shell.Shape = Enum.PartType.Ball
 	shell.Material = Enum.Material.Glass
-	shell.Transparency = 0.2
+	shell.Transparency = 0.45
 	shell.Reflectance = 0.2
-	-- Bright edges, so the box stands out from across the pitch.
-	local edges = Instance.new("SelectionBox")
-	edges.Name = "Edges"
-	edges.Adornee = shell
-	edges.Color3 = rgb(255, 255, 255)
-	edges.LineThickness = 0.08
-	edges.SurfaceColor3 = rgb(140, 210, 255)
-	edges.SurfaceTransparency = 0.8
-	edges.Parent = shell
-	local core = part(model, "Core", Vector3.one * 2.6, centre * CFrame.Angles(0, math.rad(45), 0), rgb(255, 214, 90))
+	local core = part(model, "Core", Vector3.one * 4.6, centre, rgb(80, 220, 255))
+	core.Shape = Enum.PartType.Ball
 	core.Material = Enum.Material.Neon
-	core.Transparency = 0.1
-	for _, face in Enum.NormalId:GetEnumItems() do
-		if face == Enum.NormalId.Bottom then
-			continue
-		end
-		local gui = Instance.new("SurfaceGui")
-		gui.Name = `Mark{face.Name}`
-		gui.Face = face
-		gui.CanvasSize = Vector2.new(100, 100)
-		gui.LightInfluence = 0
-		gui.Brightness = 2
-		gui.Parent = shell
-		local mark = Instance.new("TextLabel")
-		mark.Size = UDim2.fromScale(1, 1)
-		mark.BackgroundTransparency = 1
-		mark.Text = "?"
-		mark.Font = Enum.Font.LuckiestGuy
-		mark.TextScaled = true
-		mark.TextColor3 = rgb(255, 255, 255)
-		mark.TextStrokeTransparency = 0
-		mark.TextStrokeColor3 = rgb(40, 60, 140)
-		mark.Parent = gui
-	end
 	local light = Instance.new("PointLight")
-	light.Color = rgb(255, 220, 140)
-	light.Range = 12
-	light.Brightness = 1.5
+	light.Color = rgb(120, 230, 255)
+	light.Range = 22
+	light.Brightness = 2.5
 	light.Parent = core
-	-- A glowing ring on the floor marks the spot while the box is growing back.
 	local ring = part(
 		model,
 		"Spot",
-		Vector3.new(0.12, 7, 7),
-		CFrame.new(position + Vector3.new(0, 0.07, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-		rgb(150, 210, 255)
+		Vector3.new(0.12, 11, 11),
+		CFrame.new(position.X, 0.07, position.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		rgb(80, 220, 255)
 	)
 	ring.Shape = Enum.PartType.Cylinder
 	ring.Material = Enum.Material.Neon
-	ring.Transparency = 0.55
-	model.PrimaryPart = shell
-	model:SetAttribute("Home", position + Vector3.new(0, T.BoxHeight, 0))
-	model:SetAttribute("Active", true)
+	ring.Transparency = 0.4
+	local beacon = part(
+		model,
+		"Beacon",
+		Vector3.new(70, 2.4, 2.4),
+		CFrame.new(position.X, position.Y + 35, position.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		rgb(80, 220, 255)
+	)
+	beacon.Shape = Enum.PartType.Cylinder
+	beacon.Material = Enum.Material.Neon
+	beacon.Transparency = 0.7
+	model.PrimaryPart = core
+	model:SetAttribute("Home", position)
 	model.Parent = folder
 	return model
 end

@@ -8,7 +8,7 @@
 --     server what it saw, and the server checks the story (HitValidation) before rewinding the ball to that
 --     moment, applying the hit and fast-forwarding back to now.
 --
--- Magnets and Tractor Beams tug the ball toward the car using them (Powers.applyPull), here and in every
+-- Tractor Beams tug the ball toward the car using them (Powers.applyPull), here and in every
 -- client's prediction, and a Ground Pound can shove it (nudge), which counts as a touch.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -137,9 +137,8 @@ local function applyHit(
 	if not contact then
 		return nil
 	end
-	-- Hot Sauce (the Taco Truck's power) makes this hit a Mega Shot too.
-	local hotSauce = Roster.hasEffect(p, "hotsauce", serverNow())
-	local mega = p.megaArmed or hotSauce
+	-- Hot Sauce (the Taco Truck's ultimate) makes this hit a Mega Shot.
+	local mega = Roster.hasEffect(p, "hotsauce", serverNow())
 	-- Players with driving help on get the same shot assist their own screen gave the hit.
 	local player = p.player
 	local aim = if player and player:GetAttribute(MatchState.PlayerAttr.Assist) ~= false
@@ -171,9 +170,7 @@ local function applyHit(
 
 	p.lastHitAt = atTime
 	lastTouchTeam = if p.team == "Blue" then 1 else 2
-	if p.megaArmed then
-		CarService.consumeMega(p)
-	elseif hotSauce then
+	if mega then
 		p.effects.hotsauce = 0 -- used up
 		CarService.sync(p)
 	end
@@ -216,7 +213,7 @@ local function escaped(position: Vector3): boolean
 		or position.Y > arena.height + 10
 end
 
--- Magnets and Tractor Beams pull the ball toward whoever is using them.
+-- Tractor Beams pull the ball toward whoever is using them.
 local function applyPulls()
 	local now = serverNow()
 	for _, p in Roster.all() do
@@ -224,13 +221,9 @@ local function applyPulls()
 		if not chassis then
 			continue
 		end
-		local kind = if Roster.hasEffect(p, "beam", now)
-			then "beam"
-			elseif Roster.hasEffect(p, "magnet", now) then "magnet"
-			else nil
-		if kind then
-			local target = Powers.pullTarget(kind, chassis.CFrame)
-			state.velocity = Powers.applyPull(kind, state.position, state.velocity, target, cfg.Gravity, STEP)
+		if Roster.hasEffect(p, "beam", now) then
+			local target = Powers.pullTarget(chassis.CFrame)
+			state.velocity = Powers.applyPull(state.position, state.velocity, target, cfg.Gravity, STEP)
 		end
 	end
 end

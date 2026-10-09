@@ -13,8 +13,8 @@ export type MatchStats = {
 	styleTouches: number,
 	megaShots: number,
 	points: number,
-	items: number, -- item boxes used
-	powers: number, -- car powers used
+	orbs: number, -- charge orbs grabbed
+	powers: number, -- ultimates used
 	demos: number, -- cars demolished
 }
 
@@ -67,7 +67,7 @@ function Rewards.emptyStats(): MatchStats
 		styleTouches = 0,
 		megaShots = 0,
 		points = 0,
-		items = 0,
+		orbs = 0,
 		powers = 0,
 		demos = 0,
 	}

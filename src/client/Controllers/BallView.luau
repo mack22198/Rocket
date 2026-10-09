@@ -2,8 +2,8 @@
 -- The ball you see. The server sends the real ball ~30 times a second; in between, this runs the same
 -- BallSim so the ball moves smoothly, and small corrections are blended in instead of snapping.
 -- When YOUR car touches the ball, the hit is applied here immediately (so it feels instant) and sent to the
--- server to be confirmed. Magnets and Tractor Beams (a car's Pull attribute) tug the ball here too, just like
--- on the server.
+-- server to be confirmed. A UFO's Tractor Beam (a car's Pull attribute) tugs the ball here too, just like on
+-- the server.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -236,19 +236,18 @@ local function tryLocalHit()
 	end
 end
 
--- The cars pulling the ball right now: (kind, chassis) pairs.
-local function activePulls(): { { kind: string, chassis: BasePart } }
+-- The cars holding the ball in a Tractor Beam right now.
+local function activePulls(): { BasePart }
 	local list = {}
 	local folder = carsFolder
 	if not folder then
 		return list
 	end
 	for _, car in folder:GetChildren() do
-		local kind = car:GetAttribute(A.Pull)
-		if kind == "magnet" or kind == "beam" then
+		if car:GetAttribute(A.Pull) == "beam" then
 			local chassis = car:FindFirstChild("Chassis")
 			if chassis and chassis:IsA("BasePart") then
-				table.insert(list, { kind = kind :: string, chassis = chassis })
+				table.insert(list, chassis)
 			end
 		end
 	end
@@ -261,9 +260,9 @@ local function update(dt: number)
 		local steps = 0
 		local pulls = activePulls()
 		while simTime + STEP <= now and steps < 12 do
-			for _, pull in pulls do
-				local target = Powers.pullTarget(pull.kind, pull.chassis.CFrame)
-				sim.velocity = Powers.applyPull(pull.kind, sim.position, sim.velocity, target, cfg.Gravity, STEP)
+			for _, chassis in pulls do
+				local target = Powers.pullTarget(chassis.CFrame)
+				sim.velocity = Powers.applyPull(sim.position, sim.velocity, target, cfg.Gravity, STEP)
 			end
 			BallSim.step(arena, cfg, sim, STEP)
 			simTime += STEP

@@ -33,8 +33,8 @@ export type LifetimeStats = {
 	demos: number,
 	mvps: number,
 	styleTouches: number,
-	items: number,
-	powers: number,
+	orbs: number, -- charge orbs grabbed
+	powers: number, -- ultimates used
 	bestStreak: number, -- most wins in a row
 	friendMatches: number, -- matches played with a Roblox friend
 }
@@ -117,7 +117,7 @@ local function defaultData(): SavedData
 			demos = 0,
 			mvps = 0,
 			styleTouches = 0,
-			items = 0,
+			orbs = 0,
 			powers = 0,
 			bestStreak = 0,
 			friendMatches = 0,

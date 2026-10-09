@@ -1,7 +1,8 @@
 --!strict
 -- Decision making for bot drivers. Pure logic (no Roblox objects), so it's easy to test and tweak.
 -- Bots share three roles per team: one ATTACKS the ball, one DEFENDS near its own goal, the rest SUPPORT.
--- Skill (0..1) controls aim wobble, boost use and flip attempts. Default bots are meant to be beatable.
+-- Skill (0..1) controls aim wobble, how quick off the mark they are and flip attempts. Default bots are meant to be
+-- beatable. A bot that isn't chasing the ball goes for the charge orb when it's close.
 --
 -- Bots on a player's team are team-mates, not ball hogs: they leave the ball to the player when the player is
 -- nearly as close, and pass it up to them when they're further upfield. Bots playing against players get a
@@ -18,8 +19,6 @@ export type Context = {
 	carCFrame: CFrame,
 	carVelocity: Vector3,
 	grounded: boolean,
-	boost: number,
-	megaReady: boolean,
 	ballPosition: Vector3,
 	ballVelocity: Vector3,
 	ballRadius: number,
@@ -30,6 +29,7 @@ export type Context = {
 	arena: ArenaShape.Arena,
 	aimOffset: Vector3, -- per-bot wobble so bots aren't perfect
 	feed: Vector3?, -- a player on our team to pass to (where their car is)
+	orb: Vector3?, -- the charge orb, if there's one on the pitch
 }
 
 export type Memory = {
@@ -159,8 +159,11 @@ function BotBrain.adaptiveSkill(base: number, playersLead: number, rookie: boole
 	return math.clamp(skill, tuning.MinSkill, tuning.MaxSkill)
 end
 
--- Decides this frame's controls. Returns the input and whether the bot wants to fire its Mega Shot.
-function BotBrain.decide(ctx: Context, memory: Memory, dt: number): (CarPhysics.Input, boolean)
+-- Bots that aren't chasing the ball go for the charge orb when it's at most this far away.
+local ORB_RANGE = 110
+
+-- Decides this frame's controls.
+function BotBrain.decide(ctx: Context, memory: Memory, dt: number): CarPhysics.Input
 	local carPos = ctx.carCFrame.Position
 	local speed = ctx.carVelocity.Magnitude
 	local halfLength = ctx.arena.halfLength
@@ -170,15 +173,19 @@ function BotBrain.decide(ctx: Context, memory: Memory, dt: number): (CarPhysics.
 	local ballNearOurGoal = MathUtil.flat(ctx.ballPosition - ownGoal).Magnitude < 75
 
 	local target: Vector3
-	local alignment = 0
 	local urgent = false
+	local orb = ctx.orb
 	if ctx.role == "attack" then
-		target, alignment = chaseTarget(ctx, BotBrain.aimPoint(ctx, enemyGoal))
+		target = chaseTarget(ctx, BotBrain.aimPoint(ctx, enemyGoal))
 		urgent = true
 	elseif ctx.role == "defend" and ballNearOurGoal then
 		-- Clear it: hit the ball away from our goal.
 		local away = ctx.ballPosition + (ctx.ballPosition - ownGoal)
-		target, alignment = chaseTarget(ctx, Vector3.new(away.X, 0, away.Z))
+		target = chaseTarget(ctx, Vector3.new(away.X, 0, away.Z))
+		urgent = true
+	elseif orb and MathUtil.flat(orb - carPos).Magnitude < ORB_RANGE then
+		-- Nothing to do just now: grab the charge orb.
+		target = Vector3.new(orb.X, 0, orb.Z)
 		urgent = true
 	elseif ctx.role == "defend" then
 		local shadow = ownGoal + MathUtil.flat(ctx.ballPosition - ownGoal) * 0.3
@@ -219,14 +226,6 @@ function BotBrain.decide(ctx: Context, memory: Memory, dt: number): (CarPhysics.
 		memory.stuckTimer = 0
 	end
 
-	local boost = urgent
-		and ctx.boost > 5
-		and ctx.grounded
-		and math.abs(angle) < 0.3
-		and distance > 30
-		and speed < 140
-		and ctx.skill > 0.4
-
 	-- Jumps and flips.
 	local jump = false
 	if memory.jumpMode == 0 and ctx.grounded and urgent and math.abs(angle) < 0.5 then
@@ -265,19 +264,15 @@ function BotBrain.decide(ctx: Context, memory: Memory, dt: number): (CarPhysics.
 		throttle = if look.Y > 0.15 then 1 elseif look.Y < -0.15 then -1 else 0
 		roll = if right.Y > 0.15 then 1 elseif right.Y < -0.15 then -1 else 0
 		steer = 0
-		boost = false
 	end
-
-	local wantsMega = ctx.megaReady and ctx.role == "attack" and ballFlatDistance < 45 and alignment > 0.5
 
 	return {
 		throttle = math.clamp(throttle, -1, 1),
 		steer = math.clamp(steer, -1, 1),
 		roll = roll,
-		boost = boost,
+		boost = false,
 		jump = jump,
-	},
-		wantsMega
+	}
 end
 
 return BotBrain

@@ -1,5 +1,5 @@
 --!strict
--- "How to play": six numbered cards that explain the whole game in a few words, plus the controls for
+-- "How to play": four numbered cards that explain the whole game in a few words, plus the controls for
 -- keyboard, gamepad and touch. Opened from the main menu and the in-match menu.
 
 local Players = game:GetService("Players")
@@ -15,40 +15,30 @@ local rgb = Color3.fromRGB
 local CARDS = {
 	{
 		title = "SCORE GOALS",
-		text = "Hold W and your car helps you hit the ball at the other team's goal. Most goals at 0:00 wins!",
+		text = "Hold W and your car helps you hit the ball at the other team's goal. Most goals when the clock hits 0:00 wins!",
 		color = C.Good,
 	},
 	{
-		title = "BOOST AND JUMP",
-		text = "Boost to go super fast. Ball in the air? Jump at it, then jump again to flip into it. Smash cars at full boost - POOF!",
-		color = C.Gold,
-	},
-	{
-		title = "ITEM BOXES",
-		text = "Drive through a ? box to grab an item, like a Magnet or Freeze Ray. Losing? You get better ones!",
+		title = "JUMP AND FLIP",
+		text = "Ball in the air? Jump at it, then jump again to flip into it and send it flying!",
 		color = C.Sky,
 	},
 	{
-		title = "CAR POWERS",
-		text = "Every car has its own power, like Cheese Trap or Ground Pound. It charges back up after each use!",
-		color = C.Shop,
+		title = "YOUR ULTIMATE",
+		text = "Every car has its own big move, like Cheese Flood or Quack Attack. It charges up as you play, faster when you hit the ball. Full? Press E or ULT!",
+		color = C.Gold,
 	},
 	{
-		title = "MEGA SHOT",
-		text = "Touching the ball fills your Mega meter. When it's full, press Mega and your next hit blasts the ball!",
-		color = C.Mega,
-	},
-	{
-		title = "UNLOCK AND EVOLVE",
-		text = "Matches earn Scrap for new cars and season rewards (more with friends!). Drive a car to make it evolve!",
+		title = "THE CHARGE ORB",
+		text = "Now and then a glowing orb pops up on the halfway line. Drive through it first for a big boost to your ultimate!",
 		color = C.Evolve,
 	},
 }
 
 local CONTROLS = {
-	{ "KEYBOARD", "W S drive, A D steer, SPACE jump, SHIFT boost, R item, G power, F mega, T chat, M menu" },
-	{ "GAMEPAD", "RT LT drive, A jump, B boost, RB item, LB power, X mega, D-pad chat, Y cam, VIEW menu" },
-	{ "TOUCH", "Drag toward where you want to go, then JUMP, BOOST, ITEM and POWER. Mega Shot arms itself!" },
+	{ "KEYBOARD", "W S drive, A D steer, SPACE jump, E ultimate, C ball cam, T chat, M menu" },
+	{ "GAMEPAD", "RT LT drive, left stick steer, A jump, X ultimate, Y ball cam, D-pad chat, VIEW menu" },
+	{ "TOUCH", "Drag toward where you want to go, then tap JUMP, and ULT when it glows." },
 }
 
 local gui: ScreenGui
@@ -81,7 +71,7 @@ local function card(parent: Instance, info: typeof(CARDS[1]), order: number)
 	})
 	local body = Theme.label(frame, {
 		name = "Text",
-		size = UDim2.new(1, -86, 0, 74),
+		size = UDim2.new(1, -86, 0, 70),
 		position = UDim2.fromOffset(72, 40),
 		text = info.text,
 		font = Theme.Body,
@@ -120,7 +110,7 @@ local function build()
 		name = "Subheading",
 		size = UDim2.new(1, 0, 0, 18),
 		position = UDim2.fromOffset(2, 48),
-		text = "Three against three. Your team is blue or orange.",
+		text = "Two against two. Matches earn Scrap for new cars, and the car you drive evolves!",
 		font = Theme.Body,
 		color = C.InkMuted,
 		textSize = 16,
@@ -129,12 +119,12 @@ local function build()
 
 	local grid = Instance.new("Frame")
 	grid.Name = "Cards"
-	grid.Size = UDim2.new(1, 0, 0, 268)
+	grid.Size = UDim2.new(1, 0, 0, 252)
 	grid.Position = UDim2.fromOffset(0, 84)
 	grid.BackgroundTransparency = 1
 	grid.Parent = panel
 	local layout = Instance.new("UIGridLayout")
-	layout.CellSize = UDim2.fromOffset(289, 126)
+	layout.CellSize = UDim2.fromOffset(440, 120)
 	layout.CellPadding = UDim2.fromOffset(12, 12)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -146,7 +136,7 @@ local function build()
 	local controls = Instance.new("Frame")
 	controls.Name = "Controls"
 	controls.Size = UDim2.new(1, -200, 0, 96)
-	controls.Position = UDim2.fromOffset(0, 372)
+	controls.Position = UDim2.fromOffset(0, 360)
 	controls.BackgroundTransparency = 1
 	controls.Parent = panel
 	for i, row in CONTROLS do

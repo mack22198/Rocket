@@ -1,7 +1,7 @@
 --!strict
 -- Reasons to come back every day, without any gambling:
 --   * a login streak: Scrap for every day in a row you play (it grows up to day 7)
---   * three daily quests ("Score 2 goals", "Use 5 items"...), each worth Scrap
+--   * three daily quests ("Score 2 goals", "Grab 2 charge orbs"...), each worth Scrap
 --   * a daily chest once all three are done: you see all three prizes and pick the one you want
 -- Everything is worked out from the player's id and the day, so the server (and the tests) always agree on
 -- what today's quests and prizes are.
@@ -42,13 +42,13 @@ Daily.Quests = {
 		Emoji = "👟",
 		Easy = true,
 	},
-	{ Id = "items", Stat = "items", Target = 5, Reward = 50, Text = "Use %d items", Emoji = "🎁", Easy = true },
+	{ Id = "orbs", Stat = "orbs", Target = 2, Reward = 50, Text = "Grab %d charge orbs", Emoji = "🔮", Easy = true },
 	{
 		Id = "powers",
 		Stat = "powers",
-		Target = 6,
+		Target = 3,
 		Reward = 50,
-		Text = "Use your car power %d times",
+		Text = "Use your ultimate %d times",
 		Emoji = "⚡",
 		Easy = true,
 	},
@@ -57,8 +57,6 @@ Daily.Quests = {
 	{ Id = "shots", Stat = "shots", Target = 5, Reward = 60, Text = "Take %d shots at goal", Emoji = "🎯" },
 	{ Id = "assists", Stat = "assists", Target = 2, Reward = 70, Text = "Get %d assists", Emoji = "🤝" },
 	{ Id = "style", Stat = "styleTouches", Target = 3, Reward = 70, Text = "Do %d air or wall hits", Emoji = "✨" },
-	{ Id = "mega", Stat = "megaShots", Target = 1, Reward = 60, Text = "Hit a Mega Shot", Emoji = "💥" },
-	{ Id = "demos", Stat = "demos", Target = 2, Reward = 70, Text = "Demolish %d cars", Emoji = "💨" },
 	{ Id = "wins", Stat = "wins", Target = 1, Reward = 80, Text = "Win a match", Emoji = "🏆" },
 } :: { QuestDef }
 
@@ -230,7 +228,33 @@ function Daily.rollover(state: State, userId: number, today: number): boolean
 		state.lastLoginDay = today
 		changed = true
 	end
+	-- A quest that's been retired (in an update) is swapped for one that's still around.
+	for i, quest in state.quests do
+		if not Daily.quest(quest.id) then
+			for _, def in Daily.Quests do
+				local taken = false
+				for _, other in state.quests do
+					taken = taken or other.id == def.Id
+				end
+				if not taken then
+					state.quests[i] = { id = def.Id, progress = 0, claimed = false }
+					changed = true
+					break
+				end
+			end
+		end
+	end
 	return changed
+end
+
+-- Does today's list still have a quest that's been retired (see rollover)?
+function Daily.hasRetired(state: State): boolean
+	for _, quest in state.quests do
+		if not Daily.quest(quest.id) then
+			return true
+		end
+	end
+	return false
 end
 
 function Daily.isDone(quest: QuestState): boolean

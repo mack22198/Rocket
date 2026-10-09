@@ -31,7 +31,7 @@ function DailyService.refresh(player: Player)
 		return
 	end
 	local day = today()
-	if data.daily.day ~= day or data.daily.lastLoginDay ~= day then
+	if data.daily.day ~= day or data.daily.lastLoginDay ~= day or Daily.hasRetired(data.daily) then
 		DataService.update(player, function(d)
 			Daily.rollover(d.daily, player.UserId, day)
 		end)

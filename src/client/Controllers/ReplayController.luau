@@ -19,7 +19,6 @@ local Signal = require(Shared.Util.Signal)
 
 local BallView = require(script.Parent.BallView)
 local CameraController = require(script.Parent.CameraController)
-local CarController = require(script.Parent.CarController)
 local LocalHide = require(script.Parent.LocalHide)
 
 local ReplayController = {}
@@ -60,19 +59,16 @@ local function recordFrame()
 		return
 	end
 	local cars: { [any]: CFrame } = {}
-	local boosting: { [any]: boolean } = {}
-	local mine = CarController.getCar()
+	local dashing: { [any]: boolean } = {}
 	for _, model in folder:GetChildren() do
 		local chassis = model:FindFirstChild("Chassis")
 		-- (A demolished car is left out until it's back.)
 		if model:IsA("Model") and chassis and chassis:IsA("BasePart") and model:GetAttribute(A.Demolished) ~= true then
 			cars[model] = chassis.CFrame
-			boosting[model] = if model == mine
-				then CarController.isBoosting()
-				else model:GetAttribute(A.Boosting) == true
+			dashing[model] = model:GetAttribute(A.Dashing) == true
 		end
 	end
-	table.insert(frames, { t = now, ball = BallView.getPosition(), cars = cars, boosting = boosting })
+	table.insert(frames, { t = now, ball = BallView.getPosition(), cars = cars, dashing = dashing })
 	while #frames > 2 and now - frames[1].t > Replay.ClipLength + 0.5 do
 		table.remove(frames, 1)
 	end
@@ -104,10 +100,10 @@ local function standIn(model: Model, parent: Instance): Model?
 	return copy
 end
 
--- The copy's boost trails and flames, on or off.
-local function setBoosting(copy: Model, on: boolean)
+-- The copy's dash trails and flames, on or off.
+local function setDashing(copy: Model, on: boolean)
 	for _, d in copy:GetDescendants() do
-		if (d:IsA("Trail") and d.Name == "BoostTrail") or (d:IsA("ParticleEmitter") and d.Name == "BoostFlames") then
+		if (d:IsA("Trail") and d.Name == "DashTrail") or (d:IsA("ParticleEmitter") and d.Name == "DashFlames") then
 			(d :: any).Enabled = on
 		end
 	end
@@ -270,10 +266,10 @@ local function play(clip: { Frame }, scorer: string, team: string, combo: string
 			local cframe = if from and to then from:Lerp(to, alpha) else from or to
 			if cframe then
 				copy:PivotTo(cframe)
-				local boosting = a.boosting[model] == true
-				if shown[model] ~= boosting then
-					shown[model] = boosting
-					setBoosting(copy, boosting)
+				local dashing = a.dashing[model] == true
+				if shown[model] ~= dashing then
+					shown[model] = dashing
+					setDashing(copy, dashing)
 				end
 			else
 				copy:PivotTo(OUT_OF_SIGHT) -- demolished at this point in the clip

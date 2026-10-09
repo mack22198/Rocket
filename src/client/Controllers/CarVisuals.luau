@@ -1,8 +1,8 @@
 --!strict
 -- Makes the cars look alive on your screen: wheels roll as fast as the car moves and the front ones steer,
--- a team-coloured light trail streams from the back of any car that's boosting, wind streaks rush past your
--- own car when it boosts, tyres smoke when a car slides sideways, and dust puffs up when a car lands from a
--- big jump. None of this touches the physics - it's all just for looks.
+-- a team-coloured light trail streams from the back of any car that's dashing (a Nitro Rocket or Shark Dive),
+-- wind streaks rush past your own car when it dashes, tyres smoke when a car slides sideways, and dust puffs up
+-- when a car lands from a big jump. None of this touches the physics - it's all just for looks.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -86,7 +86,7 @@ local function makeTrails(chassis: BasePart, color: Color3): { Trail }
 		local x = side * size.X * 0.36
 		local z = size.Z / 2 + 0.2
 		local trail = Instance.new("Trail")
-		trail.Name = "BoostTrail"
+		trail.Name = "DashTrail"
 		trail.Attachment0 = attachment(chassis, "TrailTop", Vector3.new(x, 0.25, z))
 		trail.Attachment1 = attachment(chassis, "TrailBottom", Vector3.new(x, -0.45, z))
 		trail.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
@@ -105,7 +105,7 @@ local function makeTrails(chassis: BasePart, color: Color3): { Trail }
 	return trails
 end
 
--- Streaks of wind rushing past the sides of your car while you boost.
+-- Streaks of wind rushing past the sides of your car while you dash.
 local function makeStreaks(chassis: BasePart): { ParticleEmitter }
 	local size = chassis.Size
 	local list = {}
@@ -230,12 +230,8 @@ local function track(model: Instance)
 	}
 end
 
-local function isBoosting(car: Car): boolean
-	if not car.mine then
-		return car.model:GetAttribute(A.Boosting) == true
-	end
-	-- Your own car reacts to your key presses at once instead of waiting for the server.
-	return CarController.isBoosting()
+local function isDashing(car: Car): boolean
+	return car.model:GetAttribute(A.Dashing) == true
 end
 
 local function step(dt: number)
@@ -267,12 +263,12 @@ local function step(dt: number)
 			wheel.motor.Transform = turn * CFrame.Angles(wheel.spin, 0, 0)
 		end
 
-		local boosting = isBoosting(car) and not LocalHide.isHidden(model)
+		local dashing = isDashing(car) and not LocalHide.isHidden(model)
 		for _, trail in car.trails do
-			trail.Enabled = boosting
+			trail.Enabled = dashing
 		end
 		for _, streak in car.streaks do
-			streak.Enabled = boosting and forward > 40
+			streak.Enabled = dashing and forward > 40
 		end
 
 		-- Landing from a big jump kicks up dust; sliding sideways makes the tyres smoke.

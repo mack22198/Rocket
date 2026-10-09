@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.Config.CarCatalog)
 local CarDriver = require(Shared.Cars.CarDriver)
+local GameConfig = require(Shared.Config.GameConfig)
 local Rewards = require(Shared.Config.Rewards)
 
 export type Team = "Blue" | "Orange"
@@ -24,22 +25,16 @@ export type Participant = {
 	driver: CarDriver.CarDriver?, -- server-side driver (bots only)
 	brain: { [string]: any }?, -- bot memory
 	stats: Rewards.MatchStats,
-	boost: number,
-	boosting: boolean,
-	mega: number,
-	megaArmed: boolean,
-	megaArmedUntil: number,
+	ult: number, -- how full the ultimate meter is (see GameConfig.Ultimate)
+	ultReadyAt: number, -- server time the meter filled up (bots use this to decide when to go)
 	lastHitAt: number, -- server time of the last accepted ball touch
-	item: string?, -- the item from an item box they're holding (see Powers)
-	itemReadyAt: number, -- server time the item stops spinning and can be used
-	powerReadyAt: number, -- server time the car's power has recharged
-	effects: { [string]: number }, -- effect name -> server time it wears off ("shield", "ghost", "rocket", ...)
+	effects: { [string]: number }, -- effect name -> server time it wears off ("ghost", "dash", "hotsauce", ...)
 	topper: string?, -- the hat on the car (see Cosmetics)
 	horn: string,
 	celebration: string, -- what goes off when they score
 	experience: number, -- matches a player had finished before this one (bots: 0)
 	level: number, -- player level (bots get a made-up one)
-	title: string, -- the title shown under their name, e.g. "🧤 Brick Wall"
+	title: string, -- the title shown under their name, e.g. "Brick Wall"
 }
 
 local Roster = {}
@@ -131,15 +126,9 @@ function Roster.newParticipant(fields: {
 		driver = nil,
 		brain = nil,
 		stats = Rewards.emptyStats(),
-		boost = 0,
-		boosting = false,
-		mega = 0,
-		megaArmed = false,
-		megaArmedUntil = 0,
+		ult = GameConfig.Ultimate.Start,
+		ultReadyAt = math.huge,
 		lastHitAt = -math.huge,
-		item = nil,
-		itemReadyAt = 0,
-		powerReadyAt = 0,
 		effects = {},
 		topper = nil,
 		horn = "beep",

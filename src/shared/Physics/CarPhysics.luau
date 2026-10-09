@@ -31,6 +31,7 @@ export type Config = {
 	SteerResponse: number,
 	BoostAcceleration: number,
 	MaxBoostedSpeed: number,
+	OverSpeedDecay: number,
 	JumpSpeed: number,
 	JumpSuspensionPause: number,
 	DoubleJumpSpeed: number,
@@ -300,10 +301,11 @@ function CarPhysics.step(p: StepParams): StepResult
 			accel = -forwardSpeed / dt -- stop exactly instead of rolling backwards
 		end
 		velocity += forward * (accel * dt)
-		if slowed and math.abs(forwardSpeed) > maxSpeed then
-			-- Stuck in the goo: drag the car down to the slow speed.
+		if math.abs(forwardSpeed) > maxSpeed and (slowed or not (input.boost and p.hasBoost)) then
+			-- Faster than the car can drive (a dash, a big bump, or stuck in the goo): ease back down to top speed.
 			local excess = math.abs(forwardSpeed) - maxSpeed
-			velocity -= forward * (math.sign(forwardSpeed) * math.min(excess, config.BrakeDeceleration * dt))
+			local fade = if slowed then config.BrakeDeceleration else config.OverSpeedDecay
+			velocity -= forward * (math.sign(forwardSpeed) * math.min(excess, fade * dt))
 		end
 
 		-- Tyre grip: bleed off sideways sliding (hardly any while spinning out).

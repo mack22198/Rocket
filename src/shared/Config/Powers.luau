@@ -1,10 +1,10 @@
 --!strict
--- Item boxes and car powers: what each one is called, what it does and how often it turns up.
+-- Ultimates: every car has its own big move (the Pizza Car floods the pitch with cheese, the Rubber Duck QUACKs
+-- everyone into a spin...). The ultimate meter fills up by itself, faster when you play the ball, and with the
+-- charge orb (see GameConfig.Ultimate); when it's full, one button sets it off (E / X / ULT). A fused car (see
+-- CarCatalog) gets a combo: both its parents' ultimates at once, but its meter fills a little slower.
 --
--- Items come out of the spinning "?" boxes on the pitch. You hold one at a time and use it whenever you like
--- (R / RB / ITEM). A team that's behind gets the better items more often, so matches stay close.
--- Powers belong to cars: every car has its own (G / LB / POWER), which recharges after each use. A fused car
--- (see CarCatalog) gets a combo: both its parents' powers at once, with a longer recharge.
+-- (In the code an ultimate is a "power", the name it had before it charged up like this.)
 --
 -- This is plain data plus a few pure helpers, so the server, the clients and the tests all agree.
 
@@ -12,116 +12,41 @@ local Powers = {}
 
 local rgb = Color3.fromRGB
 
-export type ItemDef = {
-	Id: string,
-	Name: string,
-	Emoji: string,
-	Color: Color3,
-	Description: string,
-	Duration: number, -- seconds the effect lasts (0 = instant)
-}
-
 export type PowerDef = {
 	Id: string,
 	Name: string,
 	Emoji: string,
 	Color: Color3,
 	Description: string,
-	Cooldown: number,
-	Duration: number,
-	Combo: { string }?, -- a fused car's power: the ids of the two powers it does at once
+	Duration: number, -- seconds the effect lasts (0 = instant)
+	ChargeRate: number?, -- how fast its meter fills compared with the others (1 when not given)
+	Combo: { string }?, -- a fused car's ultimate: the ids of the two it does at once
 }
-
-export type Standing = "ahead" | "level" | "behind"
-
-Powers.Items = {
-	magnet = {
-		Id = "magnet",
-		Name = "Magnet",
-		Emoji = "🧲",
-		Color = rgb(255, 80, 90),
-		Description = "Pulls the ball to the front of your car for a few seconds.",
-		Duration = 4,
-	},
-	freeze = {
-		Id = "freeze",
-		Name = "Freeze Ray",
-		Emoji = "❄️",
-		Color = rgb(120, 220, 255),
-		Description = "Freezes the closest car on the other team.",
-		Duration = 2.5,
-	},
-	spring = {
-		Id = "spring",
-		Name = "Super Spring",
-		Emoji = "🦘",
-		Color = rgb(120, 230, 110),
-		Description = "Bounces you way up into the air.",
-		Duration = 0,
-	},
-	rocket = {
-		Id = "rocket",
-		Name = "Rocket Fuel",
-		Emoji = "🚀",
-		Color = rgb(255, 170, 40),
-		Description = "A full tank of boost that doesn't run out for a few seconds.",
-		Duration = 5,
-	},
-	shield = {
-		Id = "shield",
-		Name = "Bubble Shield",
-		Emoji = "🛡️",
-		Color = rgb(110, 170, 255),
-		Description = "Nothing can bump, freeze or trip you up.",
-		Duration = 6,
-	},
-	mega = {
-		Id = "mega",
-		Name = "Mega Charge",
-		Emoji = "💥",
-		Color = rgb(255, 120, 40),
-		Description = "Your next hit is a Mega Shot!",
-		Duration = 0,
-	},
-} :: { [string]: ItemDef }
-
--- Every item, in a fixed order (for picking and for showing them).
-Powers.ItemOrder = { "magnet", "freeze", "spring", "rocket", "shield", "mega" }
-
--- How likely each item is, depending on how your team is doing.
-Powers.ItemWeights = {
-	ahead = { magnet = 2, freeze = 1, spring = 4, rocket = 4, shield = 3, mega = 1 },
-	level = { magnet = 3, freeze = 2, spring = 3, rocket = 3, shield = 2, mega = 2 },
-	behind = { magnet = 4, freeze = 4, spring = 1, rocket = 2, shield = 1, mega = 4 },
-} :: { [string]: { [string]: number } }
 
 Powers.CarPowers = {
 	pizza = {
 		Id = "cheese",
-		Name = "Cheese Trap",
+		Name = "Cheese Flood",
 		Emoji = "🧀",
 		Color = rgb(255, 204, 64),
-		Description = "Drops a gooey cheese puddle behind you. Cars in it slow right down.",
-		Cooldown = 14,
-		Duration = 8,
+		Description = "Floods the pitch behind you with gooey cheese. Cars in it slow right down.",
+		Duration = 10,
 	},
 	banana = {
 		Id = "peel",
-		Name = "Banana Peel",
+		Name = "Banana Storm",
 		Emoji = "🍌",
 		Color = rgb(255, 226, 70),
-		Description = "Drops a banana peel. Anyone who drives over it spins out!",
-		Cooldown = 11,
+		Description = "Drops three banana peels behind you. Anyone who drives over one spins out!",
 		Duration = 15,
 	},
 	kart = {
 		Id = "nitro",
-		Name = "Nitro Dash",
+		Name = "Nitro Rocket",
 		Emoji = "🔥",
 		Color = rgb(255, 110, 40),
-		Description = "A huge burst of speed, right now.",
-		Cooldown = 8,
-		Duration = 0.6,
+		Description = "A rocket-powered dash. Smash into a car on the other team and it goes POOF!",
+		Duration = 1.2,
 	},
 	shark = {
 		Id = "dive",
@@ -129,16 +54,14 @@ Powers.CarPowers = {
 		Emoji = "🌊",
 		Color = rgb(60, 200, 255),
 		Description = "Dive like a ghost: a burst of speed, and nothing can touch you.",
-		Cooldown = 13,
-		Duration = 1.6,
+		Duration = 2.4,
 	},
 	monster = {
 		Id = "pound",
 		Name = "Ground Pound",
 		Emoji = "💢",
 		Color = rgb(255, 80, 60),
-		Description = "A shockwave that knocks nearby cars flying and blasts the ball away.",
-		Cooldown = 12,
+		Description = "A huge shockwave that knocks nearby cars flying and blasts the ball away.",
 		Duration = 0,
 	},
 	taco = {
@@ -146,17 +69,15 @@ Powers.CarPowers = {
 		Name = "Hot Sauce",
 		Emoji = "🌶️",
 		Color = rgb(255, 70, 40),
-		Description = "Hit the ball in the next few seconds and it's a Mega Shot!",
-		Cooldown = 16,
-		Duration = 4,
+		Description = "Hit the ball in the next 6 seconds and it's a flaming Mega Shot!",
+		Duration = 6,
 	},
 	duck = {
 		Id = "quack",
 		Name = "Quack Attack",
 		Emoji = "🦆",
 		Color = rgb(255, 214, 46),
-		Description = "A mighty QUACK that spins out nearby cars on the other team.",
-		Cooldown = 13,
+		Description = "A mighty QUACK that spins out every car on the other team nearby.",
 		Duration = 0,
 	},
 	hotdog = {
@@ -165,8 +86,7 @@ Powers.CarPowers = {
 		Emoji = "🌭",
 		Color = rgb(235, 44, 40),
 		Description = "Squirts a long ketchup trail behind you. Other cars that drive through it spin out!",
-		Cooldown = 14,
-		Duration = 7,
+		Duration = 9,
 	},
 	ufo = {
 		Id = "beam",
@@ -174,8 +94,7 @@ Powers.CarPowers = {
 		Emoji = "🛸",
 		Color = rgb(130, 255, 110),
 		Description = "Lifts the ball up in front of you. Line up the perfect shot!",
-		Cooldown = 14,
-		Duration = 2.5,
+		Duration = 3.5,
 	},
 	-- Fused cars
 	pizzashark = {
@@ -183,9 +102,9 @@ Powers.CarPowers = {
 		Name = "Cheesy Dive",
 		Emoji = "🧀",
 		Color = rgb(255, 170, 60),
-		Description = "A Shark Dive that leaves a Cheese Trap behind you!",
-		Cooldown = 17,
-		Duration = 1.6,
+		Description = "A Shark Dive that floods the pitch with cheese behind you!",
+		Duration = 2.4,
+		ChargeRate = 0.8,
 		Combo = { "dive", "cheese" },
 	},
 	ducksaucer = {
@@ -194,8 +113,8 @@ Powers.CarPowers = {
 		Emoji = "🛸",
 		Color = rgb(200, 240, 80),
 		Description = "A Tractor Beam with a mighty QUACK that spins out cars nearby.",
-		Cooldown = 17,
-		Duration = 2.5,
+		Duration = 3.5,
+		ChargeRate = 0.8,
 		Combo = { "beam", "quack" },
 	},
 	monstertaco = {
@@ -204,8 +123,8 @@ Powers.CarPowers = {
 		Emoji = "🌶️",
 		Color = rgb(255, 96, 50),
 		Description = "A Ground Pound, then Hot Sauce: hit the ball straight after and it's a Mega Shot!",
-		Cooldown = 18,
-		Duration = 4,
+		Duration = 6,
+		ChargeRate = 0.8,
 		Combo = { "pound", "hotsauce" },
 	},
 } :: { [string]: PowerDef }
@@ -216,59 +135,31 @@ for _, def in Powers.CarPowers do
 end
 
 Powers.Tuning = {
-	-- Item boxes
-	BoxRespawn = 10,
-	BoxPickupRadius = 7.5,
-	BoxHeight = 4,
-	Roulette = 1.2, -- the item spins in your slot this long before you can use it
-	-- Eight boxes, mirrored across the pitch (clear of the boost pads).
-	BoxPositions = {
-		Vector3.new(45, 0, 0),
-		Vector3.new(-45, 0, 0),
-		Vector3.new(70, 0, 55),
-		Vector3.new(-70, 0, 55),
-		Vector3.new(70, 0, -55),
-		Vector3.new(-70, 0, -55),
-		Vector3.new(0, 0, 100),
-		Vector3.new(0, 0, -100),
-	},
-	-- Items
-	MagnetRange = 75,
-	MagnetPull = 70,
-	MagnetDamping = 1.6,
-	MagnetReach = 13, -- the ball is held this far in front of the car...
-	MagnetLift = 4, -- ...and this high
-	FreezeRange = 120,
-	SpringLaunch = 72,
-	SpringForward = 16,
-	-- Powers
-	CheeseRadius = 11,
+	CheeseRadius = 15,
 	CheeseSlowTime = 0.5,
 	HazardDrop = 7, -- cheese and peels land this far behind the car
 	PeelRadius = 5,
+	PeelCount = 3, -- a Banana Storm drops this many peels...
+	PeelSpread = 10, -- ...this far apart, side to side
 	SpinTime = 1.2,
-	NitroBurst = 60,
-	DiveBurst = 45,
-	PoundRadius = 30,
-	PoundKnockback = 70,
-	PoundPop = 30,
-	PoundBallRadius = 28,
-	PoundBallSpeed = 90,
+	NitroBurst = 75,
+	DiveBurst = 55,
+	PoundRadius = 38,
+	PoundKnockback = 75,
+	PoundPop = 32,
+	PoundBallRadius = 34,
+	PoundBallSpeed = 95,
 	BeamRange = 60,
 	BeamPull = 95,
 	BeamDamping = 2.4,
 	BeamLift = 13,
 	BeamReach = 11,
-	QuackRadius = 26,
-	QuackSpin = 1.1,
-	KetchupLength = 18,
+	QuackRadius = 34,
+	QuackSpin = 1.4,
+	KetchupLength = 26,
 	KetchupWidth = 4.6,
 	KetchupSpin = 0.8,
 }
-
-function Powers.item(id: string): ItemDef?
-	return Powers.Items[id]
-end
 
 -- The power that comes with a car (every car has one).
 function Powers.forCar(carId: string): PowerDef
@@ -296,61 +187,41 @@ function Powers.components(power: PowerDef): { PowerDef }
 	return parts
 end
 
--- Is your team ahead, level or behind?
-function Powers.standing(ourScore: number, theirScore: number): Standing
-	if ourScore > theirScore then
-		return "ahead"
-	elseif ourScore < theirScore then
-		return "behind"
-	end
-	return "level"
-end
-
--- Picks an item for a team's standing from a random number between 0 and 1.
-function Powers.pickItem(standing: Standing, roll: number): string
-	local weights = Powers.ItemWeights[standing] or Powers.ItemWeights.level
-	local total = 0
-	for _, id in Powers.ItemOrder do
-		total += weights[id] or 0
-	end
-	local target = math.clamp(roll, 0, 0.999999) * total
-	for _, id in Powers.ItemOrder do
-		target -= weights[id] or 0
-		if target < 0 then
-			return id
-		end
-	end
-	return Powers.ItemOrder[#Powers.ItemOrder]
-end
-
 local function flatForward(carCFrame: CFrame): Vector3
 	local forward = Vector3.new(carCFrame.LookVector.X, 0, carCFrame.LookVector.Z)
 	return if forward.Magnitude > 1e-3 then forward.Unit else Vector3.new(0, 0, -1)
 end
 
--- Where a pull (a Magnet or a Tractor Beam) drags the ball to, for a car at `carCFrame`.
-function Powers.pullTarget(kind: string, carCFrame: CFrame): Vector3
-	local t = Powers.Tuning
-	local forward = flatForward(carCFrame)
-	if kind == "beam" then
-		return carCFrame.Position + forward * t.BeamReach + Vector3.new(0, t.BeamLift, 0)
-	end
-	return carCFrame.Position + forward * t.MagnetReach + Vector3.new(0, t.MagnetLift, 0)
+-- How fast an ultimate's meter fills, compared with the others (a fused car's combo is slower).
+function Powers.chargeRate(power: PowerDef): number
+	return power.ChargeRate or 1
 end
 
--- The push a car gives itself with a Super Spring, Nitro Dash or Shark Dive (nil for anything else).
--- The spring always sends you up at the same speed, even if you were falling.
-function Powers.launch(kind: string, carCFrame: CFrame, velocity: Vector3): Vector3?
+-- Where a Tractor Beam holds the ball, for a car at `carCFrame`.
+function Powers.pullTarget(carCFrame: CFrame): Vector3
 	local t = Powers.Tuning
-	if kind == "spring" then
-		local up = math.max(0, t.SpringLaunch - velocity.Y)
-		return Vector3.new(0, up, 0) + flatForward(carCFrame) * t.SpringForward
-	elseif kind == "nitro" then
+	return carCFrame.Position + flatForward(carCFrame) * t.BeamReach + Vector3.new(0, t.BeamLift, 0)
+end
+
+-- The push a car gives itself with a Nitro Rocket or Shark Dive (nil for anything else).
+function Powers.launch(kind: string, carCFrame: CFrame): Vector3?
+	local t = Powers.Tuning
+	if kind == "nitro" then
 		return carCFrame.LookVector * t.NitroBurst
 	elseif kind == "dive" then
 		return carCFrame.LookVector * t.DiveBurst
 	end
 	return nil
+end
+
+-- Where each banana peel of a Banana Storm lands, side to side (studs to the right of the car).
+function Powers.peelOffsets(): { number }
+	local t = Powers.Tuning
+	local offsets = {}
+	for i = 1, t.PeelCount do
+		table.insert(offsets, (i - (t.PeelCount + 1) / 2) * t.PeelSpread)
+	end
+	return offsets
 end
 
 -- The shove a Ground Pound at `centre` gives something at `position` (a car or the ball): strongest close
@@ -393,10 +264,9 @@ function Powers.inHazard(
 	return across <= radius
 end
 
--- Nudges a ball's velocity toward a pull's target for one step of `dt` seconds. Used by the server's ball and
--- by every client's prediction of it, so they stay in step. Returns the new velocity.
+-- Nudges a ball's velocity toward a Tractor Beam's target for one step of `dt` seconds. Used by the server's
+-- ball and by every client's prediction of it, so they stay in step. Returns the new velocity.
 function Powers.applyPull(
-	kind: string,
 	ballPosition: Vector3,
 	ballVelocity: Vector3,
 	target: Vector3,
@@ -404,28 +274,21 @@ function Powers.applyPull(
 	dt: number
 ): Vector3
 	local t = Powers.Tuning
-	local beam = kind == "beam"
-	local range = if beam then t.BeamRange else t.MagnetRange
 	local offset = target - ballPosition
 	local distance = offset.Magnitude
-	if distance > range then
+	if distance > t.BeamRange then
 		return ballVelocity
 	end
-	local strength = if beam then t.BeamPull else t.MagnetPull
-	local damping = if beam then t.BeamDamping else t.MagnetDamping
 	local velocity = ballVelocity
 	if distance > 1e-3 then
 		-- Pull harder when far away, gently when close, and bleed off speed so the ball settles.
-		velocity += offset / distance * (strength * math.clamp(distance / 10, 0.25, 1) * dt)
+		velocity += offset / distance * (t.BeamPull * math.clamp(distance / 10, 0.25, 1) * dt)
 	end
-	velocity *= math.max(0, 1 - damping * dt)
-	if beam then
-		velocity += Vector3.new(0, gravity * dt, 0) -- the beam holds the ball up
-	end
-	return velocity
+	velocity *= math.max(0, 1 - t.BeamDamping * dt)
+	return velocity + Vector3.new(0, gravity * dt, 0) -- the beam holds the ball up
 end
 
--- What a bot knows when deciding whether to use its item or power.
+-- What a bot knows when deciding whether to set off its ultimate.
 export type BotView = {
 	role: string, -- "attack", "support" or "defend"
 	ballDistance: number, -- flat distance to the ball
@@ -434,29 +297,15 @@ export type BotView = {
 	shotLinedUp: boolean, -- the ball is between the bot and the other team's goal
 	nearestEnemy: number, -- distance to the closest car on the other team
 	enemyBehind: boolean, -- a car on the other team is right behind
-	heldFor: number, -- seconds the bot has been holding its item
+	readyFor: number, -- seconds the bot's ultimate has been ready
 }
 
-function Powers.botWantsItem(item: string, v: BotView): boolean
-	if v.heldFor > 8 then
-		return true -- don't sit on it all match
-	elseif item == "magnet" then
-		return v.role == "attack" and v.ballDistance < 45
-	elseif item == "freeze" then
-		return v.nearestEnemy < 70
-	elseif item == "spring" then
-		return v.ballInFront and v.ballHeight > 14 and v.ballDistance < 24
-	elseif item == "rocket" then
-		return v.role == "attack" and v.ballDistance > 50
-	elseif item == "shield" then
-		return v.nearestEnemy < 25
-	end
-	return v.heldFor > 1.5 -- Mega Charge (and anything new): just use it
-end
-
+-- Would a bot set off this ultimate now? (After holding it a while it just goes for it.)
 function Powers.botWantsPower(power: string, v: BotView): boolean
 	local t = Powers.Tuning
-	if power == "cheese" or power == "peel" or power == "ketchup" then
+	if v.readyFor > 12 then
+		return true
+	elseif power == "cheese" or power == "peel" or power == "ketchup" then
 		return v.enemyBehind
 	elseif power == "hotsauce" then
 		return v.role == "attack" and v.ballInFront and v.ballDistance < 35

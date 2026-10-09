@@ -1,12 +1,12 @@
 --!strict
--- Reads keyboard, gamepad and touch controls and turns them into car input.
+-- Reads keyboard, gamepad and touch controls and turns them into car input. There are only three things to do
+-- in a match: drive, jump and set off your car's ultimate.
 --
--- Keyboard: W/S or arrows = drive (and pitch in the air), A/D = steer, Space / right mouse = jump,
---           Shift / left mouse = boost, F = Mega Shot, R = use item, G = car power, H = horn,
---           C = ball cam, Q/E = air roll, M = menu, T = quick chat list, 1-8 = say a quick chat phrase
--- Gamepad:  RT/LT = drive/brake, left stick = steer + pitch, A = jump, B = boost, X = Mega Shot,
---           RB = use item, LB = car power, D-pad up = horn, D-pad left/right/down = quick chat,
---           Y = ball cam, View/Back = menu
+-- Keyboard: W/S or arrows = drive (and tip the car in the air), A/D = steer, Space / right mouse = jump,
+--           E = ultimate (Q, F, R and G work too), H = horn, C = ball cam, M = menu, T = quick chat list,
+--           1-8 = say a quick chat phrase
+-- Gamepad:  RT/LT = drive/brake, left stick = steer + tip, A = jump, X = ultimate (B, RB and LB work too),
+--           D-pad up = horn, D-pad left/right/down = quick chat, Y = ball cam, View/Back = menu
 -- Touch:    on-screen stick and buttons (see TouchControls). With easy steering (on by default) you push the
 --           stick toward where you want to go on the screen (see EasySteer); in the air it tips the car.
 
@@ -25,9 +25,7 @@ local Signal = require(Shared.Util.Signal)
 
 local InputController = {}
 
-InputController.MegaPressed = Signal.new() :: Signal.Signal<>
-InputController.ItemPressed = Signal.new() :: Signal.Signal<>
-InputController.PowerPressed = Signal.new() :: Signal.Signal<>
+InputController.UltimatePressed = Signal.new() :: Signal.Signal<>
 InputController.HornPressed = Signal.new() :: Signal.Signal<>
 InputController.BallCamToggled = Signal.new() :: Signal.Signal<>
 InputController.MenuPressed = Signal.new() :: Signal.Signal<>
@@ -116,9 +114,9 @@ function InputController.read(context: Context?): CarPhysics.Input
 		return last
 	end
 
-	local throttle, steer, roll = 0, 0, 0
+	local throttle, steer = 0, 0
 	local pitch: number? = nil
-	local boost, jump = false, false
+	local jump = false
 
 	-- Keyboard and mouse.
 	if keyDown(Enum.KeyCode.W, Enum.KeyCode.Up) then
@@ -137,14 +135,6 @@ function InputController.read(context: Context?): CarPhysics.Input
 	-- With driving help, a tap is a gentle nudge and holding the key builds up to a full turn.
 	keySteer = if InputController.assist() then DriveAssist.smoothKey(keySteer, keys, dt) else keys
 	steer += keySteer
-	if keyDown(Enum.KeyCode.E) then
-		roll += 1
-	end
-	if keyDown(Enum.KeyCode.Q) then
-		roll -= 1
-	end
-	boost = keyDown(Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift)
-		or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
 	jump = keyDown(Enum.KeyCode.Space) or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
 
 	-- Gamepad.
@@ -171,9 +161,6 @@ function InputController.read(context: Context?): CarPhysics.Input
 		if UserInputService:IsGamepadButtonDown(pad, Enum.KeyCode.ButtonA) then
 			jump = true
 		end
-		if UserInputService:IsGamepadButtonDown(pad, Enum.KeyCode.ButtonB) then
-			boost = true
-		end
 	end
 
 	-- Touch.
@@ -188,15 +175,14 @@ function InputController.read(context: Context?): CarPhysics.Input
 			throttle += touchStick.Y
 		end
 	end
-	boost = boost or touchHeld.boost == true
 	jump = jump or touchHeld.jump == true
 
 	last = {
 		throttle = math.clamp(throttle, -1, 1),
 		steer = math.clamp(steer, -1, 1),
 		pitch = if pitch then math.clamp(pitch, -1, 1) else nil,
-		roll = math.clamp(roll, -1, 1),
-		boost = boost,
+		roll = 0,
+		boost = false,
 		jump = jump,
 	}
 	return last
@@ -204,9 +190,22 @@ end
 
 -- One-press actions: (action name, signal, keys).
 local PRESS_ACTIONS: { { name: string, signal: Signal.Signal<>, keys: { Enum.KeyCode } } } = {
-	{ name = "TurboMega", signal = InputController.MegaPressed, keys = { Enum.KeyCode.F, Enum.KeyCode.ButtonX } },
-	{ name = "TurboItem", signal = InputController.ItemPressed, keys = { Enum.KeyCode.R, Enum.KeyCode.ButtonR1 } },
-	{ name = "TurboPower", signal = InputController.PowerPressed, keys = { Enum.KeyCode.G, Enum.KeyCode.ButtonL1 } },
+	{
+		name = "TurboUltimate",
+		signal = InputController.UltimatePressed,
+		-- Any of the spare keys sets it off, so nobody presses a "wrong" one.
+		keys = {
+			Enum.KeyCode.E,
+			Enum.KeyCode.Q,
+			Enum.KeyCode.F,
+			Enum.KeyCode.R,
+			Enum.KeyCode.G,
+			Enum.KeyCode.ButtonX,
+			Enum.KeyCode.ButtonB,
+			Enum.KeyCode.ButtonR1,
+			Enum.KeyCode.ButtonL1,
+		},
+	},
 	{ name = "TurboHorn", signal = InputController.HornPressed, keys = { Enum.KeyCode.H, Enum.KeyCode.DPadUp } },
 	{
 		name = "TurboBallCam",
@@ -236,8 +235,8 @@ for index = 1, math.min(#NUMBER_KEYS, #QuickChat.Phrases) do
 	CHAT_KEYS[NUMBER_KEYS[index]] = index
 end
 
--- One-press actions (Mega Shot, items, powers, ball cam, quick chat) are bound only while driving, so they don't
--- clash with anything else.
+-- One-press actions (ultimate, horn, ball cam, quick chat) are bound only while driving, so they don't clash with
+-- anything else.
 function InputController.setDriving(driving: boolean)
 	if driving == actionsBound then
 		return

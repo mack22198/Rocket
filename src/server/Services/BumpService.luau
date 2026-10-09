@@ -1,6 +1,6 @@
 --!strict
 -- Cars already collide physically; this adds a knock-back that depends on each car's Weight and BumpPower,
--- so the Monster Truck really does bully the Tiny Kart. Smash into the other team at full boost and it's a
+-- so the Monster Truck really does bully the Tiny Kart. Smash into the other team on a Nitro Rocket and it's a
 -- demolition instead (see DemolitionService).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,13 +26,13 @@ local function push(p: Participant, change: Vector3)
 	CarService.push(p, change)
 end
 
--- Bubble Shields can't be bumped, and diving sharks pass straight through everyone.
+-- Diving sharks pass straight through everyone.
 local function untouchable(p: Participant, now: number): boolean
-	return Roster.hasEffect(p, "shield", now) or Roster.hasEffect(p, "ghost", now)
+	return Roster.hasEffect(p, "ghost", now)
 end
 
-local function side(p: Participant): Demolition.Side
-	return { team = p.team, bot = p.isBot, matches = p.experience }
+local function side(p: Participant, now: number): Demolition.Side
+	return { team = p.team, bot = p.isBot, matches = p.experience, dashing = Roster.hasEffect(p, "dash", now) }
 end
 
 local function contactDistance(a: Participant, b: Participant): number
@@ -81,7 +81,7 @@ function BumpService.update()
 			if untouchable(victim, now) then
 				continue -- bounced off the bubble
 			end
-			if Demolition.check(side(attacker), side(victim), speed) then
+			if Demolition.check(side(attacker, now), side(victim, now), speed) then
 				DemolitionService.demolish(attacker, victim)
 				continue
 			end

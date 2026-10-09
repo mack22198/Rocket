@@ -37,7 +37,7 @@ Sounds.List = {
 		Id = 0,
 		BuiltIn = "rbxasset://sounds/swoosh.wav",
 		Volume = 1,
-		Note = "a fast whoosh (boosting, items and powers)",
+		Note = "a fast whoosh (dashes and ultimates)",
 	},
 	Goal = {
 		Id = 0,
@@ -61,7 +61,19 @@ Sounds.List = {
 		Id = 0,
 		BuiltIn = "rbxasset://sounds/button.wav",
 		Volume = 1,
-		Note = "a sparkly pickup chime (grabbing an item box)",
+		Note = "a sparkly pickup chime (grabbing the charge orb)",
+	},
+	Ultimate = {
+		Id = 0,
+		BuiltIn = "rbxasset://sounds/electronicpingshort.wav",
+		Volume = 1,
+		Note = "a big power-up blast (whenever someone sets off their ultimate)",
+	},
+	Orb = {
+		Id = 0,
+		BuiltIn = "rbxasset://sounds/button.wav",
+		Volume = 0.8,
+		Note = "a magical twinkle (when the charge orb appears)",
 	},
 	Engine = {
 		Id = 0,
@@ -69,7 +81,7 @@ Sounds.List = {
 		Looped = true,
 		Note = "a car engine hum (loops on your car and gets higher the faster you go)",
 	},
-	BoostLoop = { Id = 0, Volume = 0.5, Looped = true, Note = "a rocket or jet roar (loops while you boost)" },
+	DashLoop = { Id = 0, Volume = 0.5, Looped = true, Note = "a rocket or jet roar (loops while your car dashes)" },
 	Cheer = { Id = 0, Volume = 0.8, Note = "a stadium crowd cheering (after goals)" },
 	Whistle = { Id = 0, Volume = 0.7, Note = "a referee's whistle (kickoffs and full time)" },
 	Crowd = { Id = 0, Volume = 0.25, Looped = true, Note = "stadium crowd chatter (loops during matches)" },

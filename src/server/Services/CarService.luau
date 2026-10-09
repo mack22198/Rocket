@@ -1,8 +1,8 @@
 --!strict
--- Spawns and removes cars, hands players physics ownership of their own car, and runs the server side of
--- boost and Mega Shot (the server decides how much boost you have; your client just asks to use it).
--- It also keeps each car's attributes in step with the match (boost, Mega, item, power, active effects), which
--- is how every client knows what to draw.
+-- Spawns and removes cars, hands players physics ownership of their own car, and fills each car's ultimate
+-- meter (see GameConfig.Ultimate): by itself as the match goes on, and when StatsService and OrbService say so.
+-- It also keeps each car's attributes in step with the match (the meter, active effects), which is how every
+-- client knows what to draw.
 
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
@@ -24,8 +24,10 @@ local CarService = {}
 
 local carsFolder: Folder
 local arenaFolder: Instance
-local unlimitedBoost = false -- the Turbo Mode twist
+local ultMultiplier = 1 -- the Ultimate Rush twist fills meters faster
 local lastHonk: { [string]: number } = {}
+local stateObject = MatchState.getObject()
+local U = GameConfig.Ultimate
 local HONK_GAP = 1.2 -- seconds between honks
 
 local A = MatchState.CarAttr
@@ -49,38 +51,14 @@ local function syncAttributes(p: Participant)
 	if not car then
 		return
 	end
-	local boost = math.floor(p.boost + 0.5)
-	if car:GetAttribute(A.Boost) ~= boost then
-		car:SetAttribute(A.Boost, boost)
-	end
-	local mega = math.floor(p.mega + 0.5)
-	if car:GetAttribute(A.Mega) ~= mega then
-		car:SetAttribute(A.Mega, mega)
-	end
-	-- Hot Sauce (the Taco Truck's power) arms a Mega Shot for a few seconds too.
-	local armed = p.megaArmed or Roster.hasEffect(p, "hotsauce", workspace:GetServerTimeNow())
-	if car:GetAttribute(A.MegaArmed) ~= armed then
-		car:SetAttribute(A.MegaArmed, armed)
-	end
-	local boosting = p.boosting and p.boost > 0
-	if car:GetAttribute(A.Boosting) ~= boosting then
-		car:SetAttribute(A.Boosting, boosting)
-	end
-
 	local now = workspace:GetServerTimeNow()
-	setIfChanged(car, A.Item, p.item or "")
-	setIfChanged(car, A.ItemReadyAt, p.itemReadyAt)
-	setIfChanged(car, A.PowerReadyAt, p.powerReadyAt)
-	setIfChanged(car, A.Shield, Roster.hasEffect(p, "shield", now))
-	setIfChanged(car, A.Frozen, Roster.hasEffect(p, "frozen", now))
-	setIfChanged(car, A.Rocket, Roster.hasEffect(p, "rocket", now))
+	setIfChanged(car, A.Ult, math.floor(p.ult))
+	setIfChanged(car, A.Dashing, Roster.hasEffect(p, "dash", now))
+	-- Hot Sauce (the Taco Truck's ultimate) makes the next hit a Mega Shot.
+	setIfChanged(car, A.MegaArmed, Roster.hasEffect(p, "hotsauce", now))
 	local ghost = Roster.hasEffect(p, "ghost", now)
 	setIfChanged(car, A.Ghost, ghost)
-	local pull = if Roster.hasEffect(p, "beam", now)
-		then "beam"
-		elseif Roster.hasEffect(p, "magnet", now) then "magnet"
-		else ""
-	setIfChanged(car, A.Pull, pull)
+	setIfChanged(car, A.Pull, if Roster.hasEffect(p, "beam", now) then "beam" else "")
 	local chassis = p.chassis
 	local group = if ghost then GHOST_GROUP else CAR_GROUP
 	if chassis and chassis.CollisionGroup ~= group then
@@ -117,21 +95,6 @@ function CarService.init(arena: Instance)
 	cars.Name = MatchState.Folders.Cars
 	cars.Parent = matchFolder
 	carsFolder = cars
-
-	Remotes.SetBoosting.OnServerEvent:Connect(function(player: Player, boosting: unknown)
-		local p = Roster.byPlayer(player)
-		if p and type(boosting) == "boolean" then
-			p.boosting = boosting
-			syncAttributes(p)
-		end
-	end)
-
-	Remotes.ActivateMega.OnServerEvent:Connect(function(player: Player)
-		local p = Roster.byPlayer(player)
-		if p then
-			CarService.activateMega(p)
-		end
-	end)
 
 	Remotes.Horn.OnServerEvent:Connect(function(player: Player)
 		local p = Roster.byPlayer(player)
@@ -175,7 +138,6 @@ function CarService.despawn(p: Participant)
 	p.car = nil
 	p.chassis = nil
 	p.driver = nil
-	p.boosting = false
 end
 
 -- Teleports the car and holds it still (kickoff countdown).
@@ -212,55 +174,58 @@ function CarService.release(p: Participant)
 	end
 end
 
-function CarService.activateMega(p: Participant)
-	if p.car and not p.megaArmed and p.mega >= GameConfig.Mega.Max then
-		p.megaArmed = true
-		p.megaArmedUntil = workspace:GetServerTimeNow() + GameConfig.Mega.ArmedDuration
-		syncAttributes(p)
-	end
+-- How much `amount` of charge is worth to this car: a fused car's combo fills slower, and the Ultimate Rush
+-- twist makes everyone's faster.
+local function scaled(p: Participant, amount: number): number
+	return amount * Powers.chargeRate(Powers.forCar(p.def.Id)) * ultMultiplier
 end
 
--- Called when a Mega Shot hits the ball.
-function CarService.consumeMega(p: Participant)
-	p.megaArmed = false
-	p.mega = 0
-	syncAttributes(p)
-end
-
-function CarService.addMega(p: Participant, amount: number)
-	if p.megaArmed then
+-- Fills `p`'s ultimate meter by `amount` (before the car's own rate and the twist are counted).
+function CarService.chargeUlt(p: Participant, amount: number)
+	if p.ult >= U.Max then
 		return
 	end
-	p.mega = math.clamp(p.mega + amount, 0, GameConfig.Mega.Max)
-	syncAttributes(p)
-end
-
-function CarService.addBoost(p: Participant, amount: number)
-	p.boost = math.clamp(p.boost + amount, 0, 100)
-	syncAttributes(p)
-end
-
-function CarService.resetForKickoff(p: Participant)
-	p.boost = GameConfig.Car.StartingBoost
-	p.boosting = false
-	syncAttributes(p)
-end
-
--- Drains boost for anyone holding the boost button (unless they're on Rocket Fuel), and times out unused
--- Mega Shots.
-function CarService.tick(dt: number, live: boolean)
-	local now = workspace:GetServerTimeNow()
-	for _, p in Roster.all() do
-		if unlimitedBoost or Roster.hasEffect(p, "rocket", now) then
-			p.boost = 100
-		elseif live and p.boosting and p.boost > 0 then
-			p.boost = math.max(0, p.boost - GameConfig.Car.BoostDrainPerSecond * dt)
-		end
-		if p.megaArmed and now > p.megaArmedUntil then
-			p.megaArmed = false -- fizzled, but the meter stays full so it can be armed again
-		end
-		syncAttributes(p)
+	p.ult = math.min(U.Max, p.ult + scaled(p, amount))
+	if p.ult >= U.Max then
+		p.ultReadyAt = workspace:GetServerTimeNow()
 	end
+	syncAttributes(p)
+end
+
+-- Empties a full ultimate meter to set the ultimate off. Returns false if it isn't full.
+function CarService.spendUlt(p: Participant): boolean
+	if p.ult < U.Max then
+		return false
+	end
+	p.ult = 0
+	p.ultReadyAt = math.huge
+	syncAttributes(p)
+	return true
+end
+
+local function score(team: Roster.Team): number
+	local value =
+		stateObject:GetAttribute(if team == "Blue" then MatchState.Attr.BlueScore else MatchState.Attr.OrangeScore)
+	return if type(value) == "number" then value else 0
+end
+
+-- Fills every ultimate meter a little while the ball is in play (faster for a team that's behind), and keeps
+-- the cars' attributes in step as effects wear off.
+function CarService.tick(dt: number, live: boolean)
+	local blue, orange = score("Blue"), score("Orange")
+	for _, p in Roster.all() do
+		if live and p.chassis and p.ult < U.Max then
+			local behind = if p.team == "Blue" then blue < orange else orange < blue
+			CarService.chargeUlt(p, U.PerSecond * dt * (if behind then 1 + U.BehindBonus else 1))
+		else
+			syncAttributes(p)
+		end
+	end
+end
+
+-- The Ultimate Rush twist: meters fill this many times faster.
+function CarService.setUltMultiplier(multiplier: number)
+	ultMultiplier = multiplier
 end
 
 -- Honks the car's horn for everyone to hear (not too often).
@@ -274,12 +239,7 @@ function CarService.honk(p: Participant)
 	Remotes.HornPlayed:FireAllClients(car, p.horn)
 end
 
--- Turbo Mode: boost never runs out.
-function CarService.setUnlimitedBoost(on: boolean)
-	unlimitedBoost = on
-end
-
--- Pushes this car's attributes out now (after an item or power changed something).
+-- Pushes this car's attributes out now (after an ultimate changed something).
 function CarService.sync(p: Participant)
 	syncAttributes(p)
 end

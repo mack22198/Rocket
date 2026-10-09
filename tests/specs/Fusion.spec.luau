@@ -43,7 +43,7 @@ return function(t)
 			expect.equal(#def.StageNames, 4)
 		end)
 
-		t.test(`{def.Id}'s power does both its parts' powers`, function()
+		t.test(`{def.Id}'s ultimate does both its parts' ultimates`, function()
 			local base, flavor = CarCatalog.parents(def)
 			assert(base and flavor)
 			local power = Powers.forCar(def.Id)
@@ -54,7 +54,7 @@ return function(t)
 			expect.truthy(ids[Powers.forCar(base.Id).Id], "has the base car's power")
 			expect.truthy(ids[Powers.forCar(flavor.Id).Id], "has the flavor car's power")
 			for _, part in parts do
-				expect.truthy(power.Cooldown > part.Cooldown, "a combo takes longer to recharge")
+				expect.truthy(Powers.chargeRate(power) < Powers.chargeRate(part), "a combo takes longer to charge")
 			end
 			expect.equal(Powers.power(power.Id), power)
 		end)
@@ -88,7 +88,7 @@ return function(t)
 		end
 	end)
 
-	t.test("an ordinary power is made of just itself", function()
+	t.test("an ordinary ultimate is made of just itself", function()
 		local cheese = Powers.forCar("pizza")
 		local parts = Powers.components(cheese)
 		expect.equal(#parts, 1)
@@ -104,7 +104,7 @@ return function(t)
 			shotLinedUp = false,
 			nearestEnemy = 200,
 			enemyBehind = true,
-			heldFor = 0,
+			readyFor = 0,
 		}
 		expect.falsy(Powers.botWantsPower("dive", view))
 		expect.truthy(Powers.botWantsPower("cheese", view))

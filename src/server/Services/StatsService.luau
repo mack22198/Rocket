@@ -40,7 +40,8 @@ local chains: { [Team]: Chain } = {
 
 local S = GameConfig.Style
 local P = GameConfig.Points
-local megaMultiplier = 1 -- the Mega Madness twist fills meters faster
+local U = GameConfig.Ultimate
+local lastCharge: { [Participant]: number } = {} -- when each car's touches last charged its ultimate
 
 local function announce(kind: string, text: string, team: Team?, name: string?)
 	Remotes.Announce:FireAllClients(kind, text, team or "", name or "")
@@ -88,21 +89,27 @@ local function onTouch(info: BallService.TouchInfo)
 	local ownSide = GameConfig.Teams[team].DefendsSide
 	local before = BallSim.predictGoal(arena, ballCfg, info.before, S.ShotLookahead)
 	local after = BallSim.predictGoal(arena, ballCfg, info.after, S.ShotLookahead)
-	local megaGain = if style then GameConfig.Mega.PerStyleTouch else GameConfig.Mega.PerTouch
+	-- Playing the ball fills your ultimate meter (see GameConfig.Ultimate). Pushing the ball along touches it
+	-- over and over, so plain touches only count every so often.
+	local charge = 0
+	if now - (lastCharge[p] or -math.huge) >= U.TouchGap then
+		lastCharge[p] = now
+		charge = if style then U.PerStyleTouch else U.PerTouch
+	end
 	if before == ownSide and after ~= ownSide then
 		stats.saves += 1
 		stats.points += P.Save
-		megaGain += GameConfig.Mega.PerSave
+		charge += U.PerSave
 		local epic = info.before.velocity.Magnitude > 120
 		announce("save", if epic then "EPIC SAVE!" else "SAVE!", team, p.name)
 		QuickChatService.react("save", team, p)
 	elseif after == -ownSide and before ~= -ownSide then
 		stats.shots += 1
 		stats.points += P.Shot
-		megaGain += GameConfig.Mega.PerShot
+		charge += U.PerShot
 	end
-	if not info.mega then
-		CarService.addMega(p, megaGain * megaMultiplier)
+	if charge > 0 then
+		CarService.chargeUlt(p, charge)
 	end
 
 	-- Combos: consecutive touches by one team chain together.
@@ -136,17 +143,17 @@ local function comboText(chain: Chain, ballSpeed: number): string?
 		count += 1
 	end
 	if count >= 2 then
-		return `🔥 {count + 1}X COMBO!`
+		return `{count + 1}X COMBO!`
 	elseif chain.elements.MEGA then
-		return "💥 MEGA GOAL!"
+		return "MEGA GOAL!"
 	elseif chain.elements.AIR then
-		return "🔥 AIR COMBO!"
+		return "AIR COMBO!"
 	elseif chain.elements.WALL then
-		return "🚀 WALL SHOT!"
+		return "WALL SHOT!"
 	elseif chain.elements.PASS then
-		return "🤝 TEAM GOAL!"
+		return "TEAM GOAL!"
 	elseif ballSpeed > 160 then
-		return "💥 SUPER GOAL!"
+		return "SUPER GOAL!"
 	end
 	return nil
 end
@@ -180,10 +187,12 @@ function StatsService.goal(side: number, ballSpeed: number): GoalSummary
 			stats.styleTouches += 1
 			stats.points += P.Style
 		end
+		CarService.chargeUlt(scorer.participant, U.PerGoal)
 	end
 	if assist then
 		assist.participant.stats.assists += 1
 		assist.participant.stats.points += P.Assist
+		CarService.chargeUlt(assist.participant, U.PerAssist)
 	end
 	resetChain("Blue")
 	resetChain("Orange")
@@ -197,22 +206,20 @@ function StatsService.goal(side: number, ballSpeed: number): GoalSummary
 	}
 end
 
-function StatsService.setMegaMultiplier(multiplier: number)
-	megaMultiplier = multiplier
-end
-
 function StatsService.announce(kind: string, text: string, team: Team?, name: string?)
 	announce(kind, text, team, name)
 end
 
 function StatsService.resetMatch()
 	table.clear(touches)
+	table.clear(lastCharge)
 	resetChain("Blue")
 	resetChain("Orange")
 end
 
 -- Forget the touch history of someone who left (they can't be credited any more).
 function StatsService.forget(p: Participant)
+	lastCharge[p] = nil
 	for i = #touches, 1, -1 do
 		if touches[i].participant == p then
 			table.remove(touches, i)

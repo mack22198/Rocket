@@ -65,23 +65,16 @@ MatchState.CarAttr = {
 	DriverName = "DriverName",
 	Team = "Team",
 	CarId = "CarId",
-	Boost = "Boost",
-	Boosting = "Boosting",
-	Mega = "Mega",
-	MegaArmed = "MegaArmed",
-	Power = "Power", -- the car's power id (see Powers.CarPowers)
-	Item = "Item", -- the item being held ("" = none)
-	ItemReadyAt = "ItemReadyAt", -- server time the item can be used (it spins in the slot until then)
-	PowerReadyAt = "PowerReadyAt", -- server time the power has recharged
-	Shield = "Shield",
-	Frozen = "Frozen",
-	Ghost = "Ghost",
-	Rocket = "Rocket",
-	Pull = "Pull", -- "magnet" / "beam" while pulling the ball, else ""
+	Power = "Power", -- the car's ultimate (see Powers.CarPowers)
+	Ult = "Ult", -- how full the ultimate meter is (0 to GameConfig.Ultimate.Max)
+	Dashing = "Dashing", -- on a Nitro Rocket or Shark Dive (light trails and flames)
+	MegaArmed = "MegaArmed", -- Hot Sauce: the next hit is a Mega Shot
+	Ghost = "Ghost", -- diving like a ghost (nothing can touch it)
+	Pull = "Pull", -- "beam" while a Tractor Beam holds the ball, else ""
 	Demolished = "Demolished", -- smashed to bits; gone until it pops back in at its goal
 	Level = "Level", -- the driver's player level
-	Title = "Title", -- the driver's title, e.g. "🧤 Brick Wall"
-	Vip = "Vip", -- the driver has VIP (a 💎 by their name)
+	Title = "Title", -- the driver's title, e.g. "Brick Wall"
+	Vip = "Vip", -- the driver has VIP (shown by their name)
 }
 
 -- Names of the folders the server puts in Workspace.
@@ -90,8 +83,7 @@ MatchState.Folders = {
 	Lobby = "Lobby",
 	Match = "Match",
 	Cars = "Cars",
-	BoostPads = "BoostPads",
-	ItemBoxes = "ItemBoxes",
+	Orbs = "Orbs",
 	Hazards = "Hazards",
 }
 

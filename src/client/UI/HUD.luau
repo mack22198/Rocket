@@ -1,7 +1,7 @@
 --!strict
--- The in-game HUD: the scoreboard and clock, a boost dial, the Mega Shot meter, your item and car power, big
--- centre text (countdown, GO!, GOAL!) and the MENU button. It's only shown during matches - the menus have
--- their own screens.
+-- The in-game HUD: the scoreboard and clock, your ultimate meter, big centre text (countdown, GO!, GOAL!), a
+-- note about what's happening to your car, and the MENU button. It's only shown during matches - the menus have
+-- their own screens. (On phones and tablets the ultimate meter is the ULT button instead; see TouchControls.)
 --
 -- Everything stays clear of Roblox's own buttons in the top corners.
 
@@ -34,7 +34,7 @@ local Attr = MatchState.Attr
 local CarAttr = MatchState.CarAttr
 local rgb = Color3.fromRGB
 
-local DIAL_SEGMENTS = 20
+local RING_SEGMENTS = 24
 
 local localPlayer = Players.LocalPlayer
 local stateObject = MatchState.getObject()
@@ -49,37 +49,27 @@ local clockNote: TextLabel
 local youTag: TextLabel
 local bigText: TextLabel
 local subText: TextLabel
-local dial: Frame
-local dialSegments: { Frame } = {}
-local dialColors: { Color3 } = {}
-local boostNumber: TextLabel
-local megaPanel: Frame
-local megaBar: Theme.Bar
-local megaLabel: TextLabel
-local camPill: TextLabel
 local menuButton: TextButton
--- Item and power
-type Slot = {
-	frame: Frame,
-	icon: TextLabel,
-	caption: TextLabel,
-	key: TextLabel,
-	cooldown: Frame,
-	timer: TextLabel,
-	stroke: UIStroke,
-}
-local powerPanel: Frame
-local itemSlot: Slot
-local powerSlot: Slot
+-- Your ultimate
+local ultDial: Frame
+local ultRing: Theme.Ring
+local ultNumber: TextLabel
+local ultIcon: TextLabel
+local ultCaption: TextLabel
+local ultKey: TextLabel
+local ultName: TextLabel
+local lastCharge = -1
+-- What's happening to your car
 local statusPill: TextLabel
+local noticeText = ""
+local noticeUntil = 0
+-- Match twist
 local twistBanner: Frame
 local twistName: TextLabel
 local twistText: TextLabel
 local twistPill: TextLabel
 local twistShownFor = -1 -- the match whose twist banner has been shown
 local twistBannerUntil = 0
-local noticeText = ""
-local noticeUntil = 0
 
 local messageUntil = 0
 local lastPhase = ""
@@ -158,70 +148,59 @@ local function buildScoreboard()
 	})
 end
 
-local function buildBoostDial()
-	dial = Instance.new("Frame")
-	dial.Name = "Boost"
-	dial.Size = UDim2.fromOffset(150, 150)
-	dial.Position = UDim2.new(1, -24, 1, -24)
-	dial.AnchorPoint = Vector2.new(1, 1)
-	dial.BackgroundColor3 = C.Panel
-	dial.Parent = gui
-	Theme.corner(dial, 75)
-	Theme.stroke(dial, C.Ink, 4)
-	-- A 270 degree arc of segments, like a speedometer.
-	for i = 1, DIAL_SEGMENTS do
-		local t = (i - 0.5) / DIAL_SEGMENTS
-		local angle = math.rad(-135 + 270 * t)
-		local segment = Instance.new("Frame")
-		segment.Name = `Segment{i}`
-		segment.Size = UDim2.fromOffset(10, 20)
-		segment.AnchorPoint = Vector2.new(0.5, 0.5)
-		segment.Position = UDim2.new(0.5, math.sin(angle) * 57, 0.5, -math.cos(angle) * 57)
-		segment.Rotation = math.deg(angle)
-		segment.BorderSizePixel = 0
-		segment.Parent = dial
-		Theme.corner(segment, 3)
-		table.insert(dialSegments, segment)
-		table.insert(dialColors, rgb(255, 226, 80):Lerp(rgb(255, 96, 30), t))
-	end
-	boostNumber = Theme.heading(dial, {
-		size = UDim2.fromOffset(90, 50),
-		position = UDim2.new(0.5, 0, 0.5, -2),
+-- The ultimate meter: a round dial whose ring fills up, with the ultimate's name above it and its key on it.
+local function buildUltDial()
+	ultDial = Instance.new("Frame")
+	ultDial.Name = "Ultimate"
+	ultDial.Size = UDim2.fromOffset(150, 150)
+	ultDial.Position = UDim2.new(1, -24, 1, -24)
+	ultDial.AnchorPoint = Vector2.new(1, 1)
+	ultDial.BackgroundColor3 = C.Panel
+	ultDial.Parent = gui
+	Theme.corner(ultDial, 75)
+	Theme.stroke(ultDial, C.Ink, 4)
+	ultRing = Theme.ring(ultDial, RING_SEGMENTS, 58, Vector2.new(9, 18))
+	ultNumber = Theme.heading(ultDial, {
+		name = "Charge",
+		size = UDim2.fromOffset(96, 46),
+		position = UDim2.new(0.5, 0, 0.5, -6),
 		anchor = Vector2.new(0.5, 0.5),
-		text = "0",
+		text = "0%",
 		color = C.Text,
-		textSize = 48,
+		textSize = 40,
 	})
-	Theme.label(dial, {
-		size = UDim2.fromOffset(80, 16),
-		position = UDim2.new(0.5, 0, 1, -22),
-		anchor = Vector2.new(0.5, 1),
-		text = "BOOST",
-		font = Theme.Caps,
-		color = C.Boost,
-		textSize = 14,
-	})
-	camPill = Theme.pill(gui, {
-		name = "BallCam",
-		size = UDim2.fromOffset(150, 28),
-		position = UDim2.new(1, -24, 1, -186),
-		anchor = Vector2.new(1, 1),
+	ultIcon = Theme.label(ultDial, {
+		name = "Icon",
+		size = UDim2.fromOffset(60, 60),
+		position = UDim2.new(0.5, 0, 0.5, -10),
+		anchor = Vector2.new(0.5, 0.5),
 		text = "",
-		color = C.Muted,
-	})
-end
-
-local function buildMegaMeter()
-	megaPanel = Theme.slab(gui, "Mega", UDim2.fromOffset(400, 50), UDim2.new(0.5, 0, 1, -24), Vector2.new(0.5, 1))
-	megaBar = Theme.bar(megaPanel, UDim2.new(1, -20, 0, 28), UDim2.fromOffset(10, 8), C.Mega)
-	megaLabel = Theme.heading(megaPanel, {
-		size = UDim2.new(1, -40, 0, 22),
-		position = UDim2.fromOffset(20, 11),
-		text = "MEGA SHOT",
 		color = C.Text,
-		textSize = 22,
-		stroke = true,
-		zIndex = 3,
+	})
+	ultCaption = Theme.label(ultDial, {
+		name = "Caption",
+		size = UDim2.fromOffset(92, 16),
+		position = UDim2.new(0.5, 0, 0.5, 28),
+		anchor = Vector2.new(0.5, 0.5),
+		text = "ULTIMATE",
+		font = Theme.Caps,
+		color = C.Muted,
+		textSize = 13,
+	})
+	ultKey = Theme.pill(ultDial, {
+		name = "Key",
+		size = UDim2.fromOffset(44, 30),
+		position = UDim2.new(1, 6, 0, 0),
+		anchor = Vector2.new(1, 0),
+		text = "E",
+		background = C.Text,
+	})
+	ultName = Theme.pill(ultDial, {
+		name = "Name",
+		size = UDim2.fromOffset(176, 30),
+		position = UDim2.new(0.5, 0, 0, -12),
+		anchor = Vector2.new(0.5, 1),
+		text = "",
 	})
 end
 
@@ -243,90 +222,6 @@ local function buildMenuButton()
 	menuButton.Activated:Connect(function()
 		HUD.MenuRequested:Fire()
 	end)
-end
-
--- One square slot (the item or the power) with a big picture, its key in the corner and its name below.
-local function buildSlot(name: string, x: number): Slot
-	local frame = Theme.slab(powerPanel, name, UDim2.fromOffset(88, 88), UDim2.fromOffset(x, 10))
-	local stroke = frame:FindFirstChildOfClass("UIStroke") :: UIStroke
-	local icon = Theme.label(frame, {
-		name = "Icon",
-		size = UDim2.fromOffset(58, 58),
-		position = UDim2.new(0.5, 0, 0.5, -3),
-		anchor = Vector2.new(0.5, 0.5),
-		text = "",
-		color = C.Text,
-		zIndex = 2,
-	})
-	local cooldown = Instance.new("Frame")
-	cooldown.Name = "Cooldown"
-	cooldown.Size = UDim2.fromScale(1, 0)
-	cooldown.BackgroundColor3 = C.Ink
-	cooldown.BackgroundTransparency = 0.3
-	cooldown.BorderSizePixel = 0
-	cooldown.ZIndex = 3
-	cooldown.Parent = frame
-	Theme.corner(cooldown, 14)
-	local timer = Theme.heading(frame, {
-		name = "Timer",
-		size = UDim2.fromOffset(60, 40),
-		position = UDim2.fromScale(0.5, 0.5),
-		anchor = Vector2.new(0.5, 0.5),
-		text = "",
-		color = C.Text,
-		textSize = 36,
-		stroke = true,
-		zIndex = 4,
-	})
-	local caption = Theme.label(powerPanel, {
-		name = `{name}Caption`,
-		size = UDim2.fromOffset(112, 16),
-		position = UDim2.fromOffset(x + 44, 104),
-		anchor = Vector2.new(0.5, 0),
-		text = "",
-		font = Theme.Caps,
-		color = C.Text,
-		textSize = 13,
-		stroke = true,
-	})
-	local key = Theme.pill(frame, {
-		name = "Key",
-		size = UDim2.fromOffset(36, 24),
-		position = UDim2.new(1, 8, 0, -10),
-		anchor = Vector2.new(1, 0),
-		text = "",
-		background = C.Text,
-	})
-	key.ZIndex = 5
-	return {
-		frame = frame,
-		icon = icon,
-		caption = caption,
-		key = key,
-		cooldown = cooldown,
-		timer = timer,
-		stroke = stroke,
-	}
-end
-
-local function buildPowerPanel()
-	powerPanel = Instance.new("Frame")
-	powerPanel.Name = "Powers"
-	powerPanel.Size = UDim2.fromOffset(216, 124)
-	powerPanel.Position = UDim2.new(0, 24, 1, -20)
-	powerPanel.AnchorPoint = Vector2.new(0, 1)
-	powerPanel.BackgroundTransparency = 1
-	powerPanel.Parent = gui
-	itemSlot = buildSlot("Item", 0)
-	powerSlot = buildSlot("Power", 120)
-	statusPill = Theme.pill(gui, {
-		name = "Status",
-		size = UDim2.fromOffset(340, 34),
-		position = UDim2.new(0.5, 0, 1, -86),
-		anchor = Vector2.new(0.5, 1),
-		text = "",
-	})
-	statusPill.Visible = false
 end
 
 -- "MATCH TWIST: GIANT BALL": shown big at the first kickoff, then as a small tag under the scoreboard all match.
@@ -371,11 +266,17 @@ end
 local function build()
 	gui = Theme.screen("TurboHUD", 5)
 	buildScoreboard()
-	buildBoostDial()
-	buildMegaMeter()
-	buildPowerPanel()
+	buildUltDial()
 	buildTwist()
 	buildMenuButton()
+	statusPill = Theme.pill(gui, {
+		name = "Status",
+		size = UDim2.fromOffset(340, 34),
+		position = UDim2.new(0.5, 0, 1, -24),
+		anchor = Vector2.new(0.5, 1),
+		text = "",
+	})
+	statusPill.Visible = false
 
 	-- Centre messages.
 	bigText = Theme.heading(gui, {
@@ -399,8 +300,7 @@ local function build()
 	subText.ZIndex = 5
 	subText.Visible = false
 
-	local scaledObjects: { GuiObject } =
-		{ scoreboard, bigText, subText, dial, camPill, megaPanel, powerPanel, statusPill, twistBanner, twistPill }
+	local scaledObjects: { GuiObject } = { scoreboard, bigText, subText, ultDial, statusPill, twistBanner, twistPill }
 	for _, object in scaledObjects do
 		Theme.scaled(object)
 	end
@@ -421,99 +321,59 @@ end
 
 -- What's happening to your car right now, for the status pill (most important first).
 local function statusText(car: Model): (string?, Color3)
-	local spin, slow, freeze = CarController.effects()
-	if car:GetAttribute(CarAttr.Frozen) == true or freeze > 0 then
-		return "FROZEN!", rgb(170, 230, 255)
-	elseif spin > 0 then
+	local spin, slow = CarController.effects()
+	if spin > 0 then
 		return "SPUN OUT!", rgb(255, 230, 90)
 	elseif slow > 0 then
 		return "STUCK IN CHEESE!", rgb(255, 200, 60)
-	elseif car:GetAttribute(CarAttr.Shield) == true then
-		return "BUBBLE SHIELD", rgb(140, 190, 255)
+	elseif car:GetAttribute(CarAttr.MegaArmed) == true then
+		return "HOT SAUCE: HIT THE BALL!", C.Gold
 	elseif car:GetAttribute(CarAttr.Ghost) == true then
 		return "SHARK DIVE: UNTOUCHABLE", rgb(110, 220, 255)
-	elseif car:GetAttribute(CarAttr.Rocket) == true then
-		return "ROCKET FUEL: BOOST FOREVER!", rgb(255, 180, 70)
-	elseif car:GetAttribute(CarAttr.Pull) == "magnet" then
-		return "MAGNET ON", rgb(255, 120, 130)
 	elseif car:GetAttribute(CarAttr.Pull) == "beam" then
 		return "TRACTOR BEAM", rgb(150, 255, 130)
 	end
 	return nil, C.Text
 end
 
-local function numberOf(instance: Instance, name: string): number
-	local value = instance:GetAttribute(name)
-	return if type(value) == "number" then value else 0
-end
-
-local function updatePowers(car: Model, now: number, pulse: boolean)
-	-- The item slot: empty, spinning like a slot machine, or ready to use.
-	local item = car:GetAttribute(CarAttr.Item)
-	local itemDef = if type(item) == "string" then Powers.item(item) else nil
-	local itemReadyAt = numberOf(car, CarAttr.ItemReadyAt)
-	itemSlot.key.Text = keyName("R", "RB")
-	itemSlot.cooldown.Size = UDim2.fromScale(1, 0)
-	itemSlot.timer.Text = ""
-	if not itemDef then
-		itemSlot.icon.Text = "?"
-		itemSlot.icon.Font = Theme.Display
-		itemSlot.icon.TextTransparency = 0.5
-		itemSlot.caption.Text = "GRAB A ? BOX"
-		itemSlot.caption.TextColor3 = C.Muted
-		itemSlot.frame.BackgroundColor3 = C.Panel
-		itemSlot.key.Visible = false
-	elseif now < itemReadyAt then
-		local order = Powers.ItemOrder
-		local spinning = Powers.Items[order[math.floor(os.clock() * 14) % #order + 1]]
-		itemSlot.icon.Text = spinning.Emoji
-		itemSlot.icon.Font = Theme.Title
-		itemSlot.icon.TextTransparency = 0
-		itemSlot.caption.Text = "..."
-		itemSlot.caption.TextColor3 = C.Gold
-		itemSlot.frame.BackgroundColor3 = spinning.Color:Lerp(C.Panel, 0.5)
-		itemSlot.key.Visible = false
-	else
-		itemSlot.icon.Text = itemDef.Emoji
-		itemSlot.icon.Font = Theme.Title
-		itemSlot.icon.TextTransparency = 0
-		itemSlot.caption.Text = string.upper(itemDef.Name)
-		itemSlot.caption.TextColor3 = itemDef.Color
-		itemSlot.frame.BackgroundColor3 = itemDef.Color:Lerp(C.Panel, if pulse then 0.2 else 0.4)
-		itemSlot.key.Visible = true
-	end
-
-	-- The power slot: the car's own power, with a shade that drains away as it recharges.
-	local powerId = car:GetAttribute(CarAttr.Power)
+-- The ultimate meter: the ring fills in the ultimate's colour, then the dial glows and pulses when it's ready.
+local function updateUlt(car: Model)
 	local carId = car:GetAttribute(CarAttr.CarId)
 	local power = Powers.forCar(if type(carId) == "string" then carId else "")
-	local left = numberOf(car, CarAttr.PowerReadyAt) - now
-	powerSlot.icon.Text = power.Emoji
-	powerSlot.icon.TextTransparency = 0
-	powerSlot.caption.Text = string.upper(power.Name)
-	powerSlot.key.Text = keyName("G", "LB")
-	if type(powerId) == "string" and left > 0 then
-		powerSlot.cooldown.Size = UDim2.fromScale(1, math.clamp(left / power.Cooldown, 0, 1))
-		powerSlot.timer.Text = tostring(math.ceil(left))
-		powerSlot.caption.TextColor3 = C.Muted
-		powerSlot.frame.BackgroundColor3 = C.Panel
-		powerSlot.key.Visible = false
+	local charge, ready = CarController.ultCharge()
+	local pulse = math.floor(os.clock() * 4) % 2 == 0
+	ultName.Text = string.upper(power.Name)
+	ultName.TextColor3 = power.Color
+	ultKey.Text = keyName("E", "X")
+	ultNumber.Visible = not ready
+	ultIcon.Visible = ready
+	if ready then
+		ultRing.set(1, if pulse then C.Gold else power.Color)
+		ultIcon.Text = power.Emoji
+		ultIcon.Size = UDim2.fromOffset(if pulse then 64 else 58, if pulse then 64 else 58)
+		ultCaption.Text = "READY!"
+		ultCaption.TextColor3 = C.Gold
+		ultDial.BackgroundColor3 = power.Color:Lerp(C.Panel, if pulse then 0.35 else 0.55)
+		ultKey.BackgroundColor3 = C.Gold
 	else
-		powerSlot.cooldown.Size = UDim2.fromScale(1, 0)
-		powerSlot.timer.Text = ""
-		powerSlot.caption.TextColor3 = power.Color
-		powerSlot.frame.BackgroundColor3 = power.Color:Lerp(C.Panel, if pulse then 0.2 else 0.4)
-		powerSlot.key.Visible = true
+		ultRing.set(charge / GameConfig.Ultimate.Max, power.Color)
+		ultNumber.Text = `{math.floor(charge / GameConfig.Ultimate.Max * 100)}%`
+		ultCaption.Text = "ULTIMATE"
+		ultCaption.TextColor3 = C.Muted
+		ultDial.BackgroundColor3 = C.Panel
+		ultKey.BackgroundColor3 = C.Muted
 	end
-
-	-- What's happening to your car (or a quick note, like "no one close enough to freeze").
-	local text, color = statusText(car)
-	if os.clock() < noticeUntil then
-		text, color = noticeText, C.Bad
+	-- "+12" floats up beside the meter when something you did charged it.
+	if lastCharge >= 0 and charge - lastCharge >= 2 and ultDial.Visible then
+		Theme.floatText(
+			ultDial,
+			`+{math.floor(charge - lastCharge)}`,
+			UDim2.new(0, -6, 0.5, 0),
+			Vector2.new(1, 0.5),
+			46
+		)
 	end
-	statusPill.Visible = text ~= nil and megaPanel.Visible
-	statusPill.Text = text or ""
-	statusPill.TextColor3 = color
+	lastCharge = charge
 end
 
 local function update()
@@ -575,49 +435,21 @@ local function update()
 		subText.Visible = false
 	end
 
-	-- Driving widgets. On touch screens the boost amount shows on the BOOST button instead (see TouchControls).
+	-- Your car: the ultimate meter (on touch screens it's on the ULT button instead) and what's happening to it.
 	local showDriving = driving and inMatchPhase
 	local touchOnly = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	dial.Visible = showDriving and not touchOnly
-	megaPanel.Visible = showDriving
-	camPill.Visible = showDriving and not touchOnly
-	powerPanel.Visible = showDriving and not touchOnly
+	ultDial.Visible = showDriving and not touchOnly
 	statusPill.Visible = false
 	youTag.Visible = false
 	if car then
-		local boost = car:GetAttribute(CarAttr.Boost)
-		local boostValue = if type(boost) == "number" then boost else 0
-		boostNumber.Text = tostring(math.floor(boostValue))
-		local lit = math.floor(boostValue / 100 * DIAL_SEGMENTS + 0.5)
-		for i, segment in dialSegments do
-			local on = i <= lit
-			segment.BackgroundColor3 = if on then dialColors[i] else C.PanelLight
+		updateUlt(car)
+		local text, color = statusText(car)
+		if not text and os.clock() < noticeUntil then
+			text, color = noticeText, C.Text
 		end
-
-		local mega = car:GetAttribute(CarAttr.Mega)
-		local megaValue = if type(mega) == "number" then mega else 0
-		local armed = car:GetAttribute(CarAttr.MegaArmed) == true
-		megaBar.set(megaValue / GameConfig.Mega.Max)
-		local key = if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-			then "ARMING"
-			elseif UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled then "PRESS X"
-			else "PRESS F"
-		local pulse = math.floor(os.clock() * 4) % 2 == 0
-		if armed then
-			megaLabel.Text = "ARMED! HIT THE BALL!"
-			megaLabel.TextColor3 = C.Gold
-			megaBar.fill.BackgroundColor3 = C.Gold
-		elseif megaValue >= GameConfig.Mega.Max then
-			megaLabel.Text = `MEGA READY - {key}!`
-			megaLabel.TextColor3 = C.Text
-			megaBar.fill.BackgroundColor3 = if pulse then C.Gold else C.Mega
-		else
-			megaLabel.Text = "MEGA SHOT"
-			megaLabel.TextColor3 = C.Text
-			megaBar.fill.BackgroundColor3 = C.Mega
-		end
-		camPill.Text = if CameraController.isBallCam() then "BALL CAM: ON" else "BALL CAM: OFF"
-		updatePowers(car, now, pulse)
+		statusPill.Visible = text ~= nil and showDriving
+		statusPill.Text = text or ""
+		statusPill.TextColor3 = color
 
 		local team = car:GetAttribute(CarAttr.Team)
 		if team == "Blue" or team == "Orange" then
@@ -637,6 +469,14 @@ function HUD.start()
 	gui.Enabled = false
 	RunService.RenderStepped:Connect(update)
 
+	CarController.CarChanged:Connect(function()
+		lastCharge = -1
+	end)
+	-- A quick note when ball cam is switched on or off (C / Y).
+	CameraController.BallCamChanged:Connect(function(on: boolean)
+		noticeText = if on then "BALL CAM ON" else "BALL CAM OFF"
+		noticeUntil = os.clock() + 1.5
+	end)
 	Remotes.GoalScored.OnClientEvent:Connect(function(team: any, scorer: any, assist: any, _position: any, combo: any)
 		local teamName = if type(team) == "string" then team else ""
 		local line = if type(scorer) == "string" and scorer ~= ""
@@ -653,13 +493,6 @@ function HUD.start()
 	Remotes.Announce.OnClientEvent:Connect(function(kind: any, text: any)
 		if kind == "overtime" and type(text) == "string" then
 			HUD.flash("OVERTIME!", C.Gold, "Next goal wins!", 2.5)
-		end
-	end)
-	-- A quick note from the server, like "No one close enough to freeze!".
-	Remotes.PowerFx.OnClientEvent:Connect(function(kind: any, _position: any, _team: any, message: any)
-		if kind == "fizzle" and type(message) == "string" then
-			noticeText = message
-			noticeUntil = os.clock() + 1.8
 		end
 	end)
 end

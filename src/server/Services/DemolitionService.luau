@@ -1,5 +1,5 @@
 --!strict
--- Demolitions! Smash into a car on the other team at full boost (see Demolition) and it goes POOF - a cloud of
+-- Demolitions! Smash into a car on the other team on a Nitro Rocket (see Demolition) and it goes POOF - a cloud of
 -- smoke, stars and flying bits - then pops back in at its own goal a couple of seconds later. While it's gone
 -- it's out of the game: it stays where it was, hidden on every screen, and can't touch the ball, grab anything,
 -- use anything or be bumped (everything else already ignores a car that's anchored in place).
@@ -59,10 +59,8 @@ function DemolitionService.demolish(attacker: Participant, victim: Participant)
 	if victim.driver then
 		victim.driver:reset()
 	end
-	-- Whatever they had going (a shield, a magnet, a spin-out) is gone; their boost, Mega meter and item stay.
+	-- Whatever they had going (Hot Sauce, a spin-out) is gone; their ultimate meter stays.
 	table.clear(victim.effects)
-	victim.megaArmed = false
-	victim.boosting = false
 	car:SetAttribute(A.Demolished, true)
 	CarService.sync(victim)
 
@@ -78,7 +76,6 @@ function DemolitionService.demolish(attacker: Participant, victim: Participant)
 		end
 		local spot = respawnSpot(victim)
 		CarService.freezeAt(victim, spot)
-		victim.boost = math.max(victim.boost, GameConfig.Car.StartingBoost)
 		restore(victim)
 		CarService.sync(victim)
 		CarService.release(victim)

@@ -7,7 +7,7 @@ local GameConfig = {}
 GameConfig.GameName = "Turbo Ball"
 
 GameConfig.Match = {
-	TeamSize = 3, -- 3v3; empty seats are filled with bots
+	TeamSize = 2, -- 2v2; empty seats are filled with bots
 	Length = 180, -- 3:00 of regulation play: short enough for "just one more"
 	OvertimeLength = 90, -- golden-goal overtime; still tied after this = draw
 	Intermission = 5, -- after someone presses PLAY, wait this long so friends can hop into the same match
@@ -85,9 +85,9 @@ GameConfig.Car = {
 	SpringDamping = 18,
 	AlignStrength = 14, -- how quickly the car tilts to match the surface under it
 	WallStick = 35, -- pushes the car onto walls and ramps so it can drive on them
-	MaxSpeed = 85,
+	MaxSpeed = 100, -- there's no boost, so cars are quick to begin with
 	MaxReverseSpeed = 40,
-	Acceleration = 70,
+	Acceleration = 85,
 	BrakeDeceleration = 150,
 	CoastDeceleration = 18,
 	Grip = 10, -- how quickly sideways sliding is cancelled
@@ -95,10 +95,10 @@ GameConfig.Car = {
 	TurnSpeedRamp = 12, -- the car needs this much speed before it turns at full rate
 	HighSpeedTurnFactor = 0.45, -- turning is this much weaker at top speed
 	SteerResponse = 15,
+	-- (The car physics can still boost, but nothing in the game uses it any more.)
 	BoostAcceleration = 85,
-	MaxBoostedSpeed = 150,
-	BoostDrainPerSecond = 33.3, -- a full tank lasts 3 seconds
-	StartingBoost = 33,
+	MaxBoostedSpeed = 150, -- the fastest any car can go (a Nitro Rocket gets close)
+	OverSpeedDecay = 30, -- going faster than top speed (after a dash), a car slows back down this quickly
 	JumpSpeed = 36,
 	JumpSuspensionPause = 0.2,
 	DoubleJumpSpeed = 24,
@@ -115,7 +115,7 @@ GameConfig.Car = {
 	AutoLevelResponse = 2.5, -- ...easing in at this rate
 	MaxAngularSpeed = 12,
 	AutoRightDelay = 0.8, -- stuck on the roof this long -> hop back onto the wheels
-	-- Item and power effects on a car.
+	-- What ultimates do to a car.
 	SlowFactor = 0.45, -- top speed while stuck in cheese
 	SpinRate = 11, -- radians per second while spinning out on a banana
 	SpinGrip = 0.15, -- tyre grip while spinning out (the car slides)
@@ -129,38 +129,41 @@ GameConfig.Bump = {
 	AttackerSlowdown = 0.2,
 	Cooldown = 0.6,
 	BigBumpSpeed = 60, -- announce bumps faster than this
-	DemoSpeed = 110, -- smashing into the other team this fast (only boosting gets you there) demolishes them...
+	DemoSpeed = 125, -- smashing into the other team this fast (only a Nitro Rocket gets you there) demolishes them...
 	DemoRespawn = 2, -- ...and they pop back in at their own goal this many seconds later
 }
 
-GameConfig.BoostPads = {
-	BigAmount = 100,
-	BigRespawn = 10,
-	BigRadius = 6,
-	SmallAmount = 12,
-	SmallRespawn = 4,
-	SmallRadius = 4.2,
-	-- Pad positions are mirrored into all four quarters of the field unless they sit on an axis.
-	Big = {
-		Vector3.new(75, 0, 115),
-		Vector3.new(85, 0, 0),
-	},
-	Small = {
-		Vector3.new(0, 0, 60),
-		Vector3.new(50, 0, 30),
-		Vector3.new(60, 0, 90),
-		Vector3.new(25, 0, 125),
-		Vector3.new(0, 0, 138),
-	},
+-- Ultimates: every car has one (see Powers). The meter fills up by itself, faster when you play the ball, and
+-- with the charge orb (see OrbService). When it's full, one button sets it off.
+GameConfig.Ultimate = {
+	Max = 100,
+	Start = 25, -- how full it is at the start of a match
+	PerSecond = 0.85, -- fills by itself: a full meter in about two minutes...
+	PerTouch = 3, -- ...and faster when you play
+	PerStyleTouch = 6, -- an air or wall hit
+	TouchGap = 1, -- seconds before a car's touches charge it again (pushing the ball along is lots of touches)
+	PerShot = 5,
+	PerSave = 12,
+	PerGoal = 15,
+	PerAssist = 10,
+	Orb = 30, -- grabbing the charge orb
+	BehindBonus = 0.5, -- a team that's behind fills 50% faster by itself, so matches stay close
 }
 
-GameConfig.Mega = {
-	Max = 100,
-	PerTouch = 10,
-	PerStyleTouch = 18,
-	PerShot = 12,
-	PerSave = 25,
-	ArmedDuration = 10, -- an armed Mega Shot fizzles if the ball isn't touched in time
+-- The charge orb (see OrbService): one at a time, somewhere along the halfway line, so it's a fair race.
+GameConfig.Orb = {
+	FirstDelay = 12, -- seconds after a kickoff before the first one turns up...
+	Every = 18, -- ...and between one going and the next one appearing
+	Lifetime = 15, -- it fades away if nobody grabs it
+	PickupRadius = 8,
+	Height = 5.5, -- how high it floats (cars drive through the bottom of it)
+	Spots = {
+		Vector3.new(0, 0, 0),
+		Vector3.new(45, 0, 0),
+		Vector3.new(-45, 0, 0),
+		Vector3.new(80, 0, 0),
+		Vector3.new(-80, 0, 0),
+	},
 }
 
 -- Points decide the MVP and the scoreboard (not Scrap; see Rewards).

@@ -1,11 +1,11 @@
 --!strict
--- Using items (from the item boxes) and car powers (every car has its own; a fused car's does two at once),
--- and everything they leave lying around: cheese puddles, banana peels and ketchup. What each one does is
--- described in Powers.
+-- Ultimates (every car has its own; a fused car's does two at once) and everything they leave lying around:
+-- cheese, banana peels and ketchup. What each one does is described in Powers; how the meter fills is in
+-- CarService and GameConfig.Ultimate.
 --
--- The server decides everything, then tells the cars: a player's own client drives their car, so spin-outs,
--- slow-downs and freezes are sent to it (CarService.applyEffect), and it launches itself straight away when its
--- player uses a Super Spring, Nitro Dash or Shark Dive so that feels instant.
+-- The server decides everything, then tells the cars: a player's own client drives their car, so spin-outs and
+-- slow-downs are sent to it (CarService.applyEffect), and it launches itself straight away when its player sets
+-- off a Nitro Rocket or Shark Dive so that feels instant.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -40,7 +40,7 @@ type Hazard = {
 local PowerService = {}
 
 local T = Powers.Tuning
-local MAX_HAZARDS_EACH = 3
+local MAX_HAZARDS_EACH = 4
 local SLOW_RESEND = 0.25 -- while a car sits in cheese, its slow-down is topped up this often
 
 local stateObject = MatchState.getObject()
@@ -55,10 +55,10 @@ local function serverNow(): number
 	return workspace:GetServerTimeNow()
 end
 
--- The car, if it can use an item or power right now (not during kickoffs, and not while frozen).
-local function readyChassis(p: Participant, now: number): BasePart?
+-- The car, if it can set off its ultimate right now (not during kickoffs).
+local function readyChassis(p: Participant): BasePart?
 	local chassis = p.chassis
-	if not chassis or chassis.Anchored or Roster.hasEffect(p, "frozen", now) then
+	if not chassis or chassis.Anchored then
 		return nil
 	end
 	if MatchState.phase(stateObject) ~= MatchState.Phases.Playing then
@@ -71,9 +71,9 @@ local function setEffect(p: Participant, name: string, duration: number, now: nu
 	p.effects[name] = math.max(p.effects[name] or 0, now + duration)
 end
 
--- Bubble Shields and diving sharks shrug off the other team's items and powers.
+-- Diving sharks shrug off the other team's ultimates.
 local function protected(p: Participant, now: number): boolean
-	return Roster.hasEffect(p, "shield", now) or Roster.hasEffect(p, "ghost", now)
+	return Roster.hasEffect(p, "ghost", now)
 end
 
 local function fx(kind: string, position: Vector3, team: Team, extra: any?)
@@ -82,7 +82,7 @@ end
 
 -- Bots are pushed here; a player's own client already launched their car when they pressed the button.
 local function launch(p: Participant, kind: string, chassis: BasePart)
-	local change = Powers.launch(kind, chassis.CFrame, chassis.AssemblyLinearVelocity)
+	local change = Powers.launch(kind, chassis.CFrame)
 	if change and p.driver then
 		p.driver:addVelocity(change)
 	end
@@ -106,10 +106,11 @@ local function clearHazards()
 	table.clear(slowedAt)
 end
 
--- Where something dropped behind `chassis` lands (`back` studs behind it): on whatever surface is under there.
-local function dropSpot(chassis: BasePart, back: number): (Vector3?, Vector3?)
+-- Where something dropped behind `chassis` lands (`back` studs behind it, `side` studs to the right): on
+-- whatever surface is under there.
+local function dropSpot(chassis: BasePart, back: number, side: number): (Vector3?, Vector3?)
 	local cframe = chassis.CFrame
-	local origin = cframe:PointToWorldSpace(Vector3.new(0, 0, back))
+	local origin = cframe:PointToWorldSpace(Vector3.new(side, 0, back))
 	local hit = workspace:Raycast(origin, -cframe.UpVector * 12, rayParams)
 		or workspace:Raycast(origin, Vector3.new(0, -80, 0), rayParams)
 	if hit then
@@ -118,10 +119,10 @@ local function dropSpot(chassis: BasePart, back: number): (Vector3?, Vector3?)
 	return nil, nil
 end
 
-local function dropHazard(p: Participant, kind: string, chassis: BasePart, duration: number, now: number)
+local function dropHazard(p: Participant, kind: string, chassis: BasePart, duration: number, now: number, side: number?)
 	-- A ketchup slick starts just behind the car and runs back from there.
 	local back = if kind == "ketchup" then T.HazardDrop + T.KetchupLength / 2 - 3 else T.HazardDrop
-	local position, normal = dropSpot(chassis, back)
+	local position, normal = dropSpot(chassis, back, side or 0)
 	if not position or not normal then
 		return
 	end
@@ -167,82 +168,7 @@ local function dropHazard(p: Participant, kind: string, chassis: BasePart, durat
 end
 
 ---------------------------------------------------------------------------------------------------------------
--- Items
----------------------------------------------------------------------------------------------------------------
-
--- The closest car on the other team that isn't protected, within `range`.
-local function nearestEnemy(p: Participant, from: Vector3, range: number, now: number): Participant?
-	local best: Participant? = nil
-	local bestDistance = range
-	for _, other in Roster.all() do
-		local chassis = other.chassis
-		if other.team ~= p.team and chassis and not chassis.Anchored and not protected(other, now) then
-			local distance = (chassis.CFrame.Position - from).Magnitude
-			if distance <= bestDistance then
-				best, bestDistance = other, distance
-			end
-		end
-	end
-	return best
-end
-
-local function tellPlayer(p: Participant, message: string, position: Vector3)
-	if p.player then
-		Remotes.PowerFx:FireClient(p.player, "fizzle", position, p.team, message)
-	end
-end
-
-function PowerService.useItem(p: Participant)
-	local now = serverNow()
-	local item = p.item
-	local chassis = readyChassis(p, now)
-	if not item or not chassis or now < p.itemReadyAt then
-		return
-	end
-	local def = Powers.item(item)
-	if not def then
-		p.item = nil
-		CarService.sync(p)
-		return
-	end
-	local position = chassis.CFrame.Position
-	local extra: any = p.car
-	if item == "freeze" then
-		local target = nearestEnemy(p, position, T.FreezeRange, now)
-		if not target then
-			tellPlayer(p, "No one close enough to freeze!", position)
-			return -- keep it for later
-		end
-		setEffect(target, "frozen", def.Duration, now)
-		CarService.applyEffect(target, "freeze", def.Duration)
-		CarService.sync(target)
-		extra = target.car
-		StatsService.announce("power", `❄️ {p.name} froze {target.name}!`, p.team, p.name)
-	elseif item == "magnet" then
-		setEffect(p, "magnet", def.Duration, now)
-	elseif item == "spring" then
-		launch(p, "spring", chassis)
-	elseif item == "rocket" then
-		p.boost = 100
-		setEffect(p, "rocket", def.Duration, now)
-	elseif item == "shield" then
-		setEffect(p, "shield", def.Duration, now)
-	elseif item == "mega" then
-		p.mega = GameConfig.Mega.Max
-		if p.megaArmed then
-			p.megaArmedUntil = now + GameConfig.Mega.ArmedDuration
-		else
-			CarService.activateMega(p)
-		end
-	end
-	p.item = nil
-	p.stats.items += 1
-	CarService.sync(p)
-	fx(item, position, p.team, extra)
-end
-
----------------------------------------------------------------------------------------------------------------
--- Car powers
+-- Ultimates
 ---------------------------------------------------------------------------------------------------------------
 
 local function groundPound(p: Participant, chassis: BasePart, now: number)
@@ -266,7 +192,7 @@ local function groundPound(p: Participant, chassis: BasePart, now: number)
 	end
 	if hits > 0 then
 		local cars = if hits == 1 then "a car" else `{hits} cars`
-		StatsService.announce("power", `💢 {p.name} pounded {cars}!`, p.team, p.name)
+		StatsService.announce("power", `{p.name} pounded {cars}!`, p.team, p.name)
 	end
 end
 
@@ -287,25 +213,32 @@ local function quack(p: Participant, chassis: BasePart, now: number)
 	end
 	if hits > 0 then
 		local cars = if hits == 1 then "a car" else `{hits} cars`
-		StatsService.announce("power", `🦆 {p.name} quacked {cars} into a spin!`, p.team, p.name)
+		StatsService.announce("power", `{p.name} quacked {cars} into a spin!`, p.team, p.name)
 	end
 end
 
--- Does one power (a fused car's combo does two of these at once).
+-- Does one ultimate (a fused car's combo does two of these at once).
 local function doPower(p: Participant, power: Powers.PowerDef, chassis: BasePart, now: number)
 	local id = power.Id
-	if id == "cheese" or id == "peel" or id == "ketchup" then
+	if id == "cheese" or id == "ketchup" then
 		dropHazard(p, id, chassis, power.Duration, now)
 		return -- (the drop shows its own effect)
+	elseif id == "peel" then
+		for _, side in Powers.peelOffsets() do
+			dropHazard(p, id, chassis, power.Duration, now, side)
+		end
+		return
 	elseif id == "hotsauce" then
 		setEffect(p, "hotsauce", power.Duration, now)
 	elseif id == "quack" then
 		quack(p, chassis, now)
 	elseif id == "nitro" then
 		launch(p, "nitro", chassis)
+		setEffect(p, "dash", power.Duration, now)
 	elseif id == "dive" then
 		launch(p, "dive", chassis)
 		setEffect(p, "ghost", power.Duration, now)
+		setEffect(p, "dash", power.Duration, now)
 	elseif id == "pound" then
 		groundPound(p, chassis, now)
 	elseif id == "beam" then
@@ -314,15 +247,17 @@ local function doPower(p: Participant, power: Powers.PowerDef, chassis: BasePart
 	fx(id, chassis.CFrame.Position, p.team, p.car)
 end
 
-function PowerService.usePower(p: Participant)
+-- Sets off `p`'s ultimate, if its meter is full.
+function PowerService.useUltimate(p: Participant)
 	local now = serverNow()
-	local chassis = readyChassis(p, now)
-	if not chassis or now < p.powerReadyAt then
+	local chassis = readyChassis(p)
+	if not chassis or not CarService.spendUlt(p) then
 		return
 	end
 	local power = Powers.forCar(p.def.Id)
-	p.powerReadyAt = now + power.Cooldown
 	p.stats.powers += 1
+	StatsService.announce("ult", string.upper(power.Name), p.team, p.name)
+	fx("ult", chassis.CFrame.Position, p.team, p.car)
 	for _, part in Powers.components(power) do
 		doPower(p, part, chassis, now)
 	end
@@ -333,15 +268,11 @@ end
 -- Bots
 ---------------------------------------------------------------------------------------------------------------
 
--- A bot thinking about its item and power (a dozen times a second; it reacts after a short moment).
+-- A bot thinking about its ultimate (a dozen times a second; it reacts after a short moment).
 function PowerService.botThink(p: Participant, view: Powers.BotView)
-	local now = serverNow()
-	if p.item and now >= p.itemReadyAt and rng:NextNumber() < 0.3 and Powers.botWantsItem(p.item, view) then
-		PowerService.useItem(p)
-	end
-	if now >= p.powerReadyAt and rng:NextNumber() < 0.3 then
+	if p.ult >= GameConfig.Ultimate.Max and rng:NextNumber() < 0.3 then
 		if Powers.botWantsPower(Powers.forCar(p.def.Id).Id, view) then
-			PowerService.usePower(p)
+			PowerService.useUltimate(p)
 		end
 	end
 end
@@ -381,18 +312,13 @@ function PowerService.update()
 					CarService.applyEffect(p, "spin", T.KetchupSpin, if rng:NextNumber() < 0.5 then -1 else 1)
 					fx("slip", position, hazard.team, p.car)
 					if not last then
-						StatsService.announce(
-							"power",
-							`🌭 {p.name} skidded on ketchup!`,
-							hazard.team,
-							hazard.ownerName
-						)
+						StatsService.announce("power", `{p.name} skidded on ketchup!`, hazard.team, hazard.ownerName)
 					end
 				end
 			else
 				CarService.applyEffect(p, "spin", T.SpinTime, if rng:NextNumber() < 0.5 then -1 else 1)
 				fx("slip", chassis.CFrame.Position, hazard.team, p.car)
-				StatsService.announce("power", `🍌 {p.name} slipped on a banana!`, hazard.team, hazard.ownerName)
+				StatsService.announce("power", `{p.name} slipped on a banana!`, hazard.team, hazard.ownerName)
 				removeHazard(i)
 				break
 			end
@@ -400,13 +326,11 @@ function PowerService.update()
 	end
 end
 
--- A fresh start for a kickoff: effects wear off, traps are swept away and every power is recharged.
--- (Items you're holding are kept.)
+-- A fresh start for a kickoff: effects wear off and traps are swept away. (Ultimate meters keep their charge.)
 function PowerService.resetForKickoff()
 	clearHazards()
 	for _, p in Roster.all() do
 		table.clear(p.effects)
-		p.powerReadyAt = 0
 		CarService.sync(p)
 	end
 end
@@ -427,16 +351,10 @@ function PowerService.init(arena: Instance)
 	folder.Parent = matchFolder
 	hazardsFolder = folder
 
-	Remotes.UseItem.OnServerEvent:Connect(function(player: Player)
+	Remotes.UseUltimate.OnServerEvent:Connect(function(player: Player)
 		local p = Roster.byPlayer(player)
 		if p then
-			PowerService.useItem(p)
-		end
-	end)
-	Remotes.UsePower.OnServerEvent:Connect(function(player: Player)
-		local p = Roster.byPlayer(player)
-		if p then
-			PowerService.usePower(p)
+			PowerService.useUltimate(p)
 		end
 	end)
 end

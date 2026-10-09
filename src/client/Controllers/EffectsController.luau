@@ -1,5 +1,5 @@
 --!strict
--- The juice: boost flames, name tags over cars, sparks and thumps on hits, screen shake, and a proper party
+-- The juice: dash flames, name tags over cars, sparks and thumps on hits, screen shake, and a proper party
 -- for every goal - a shockwave and fireball in the net, confetti over the goal and fireworks above the stands.
 --
 -- Every sound is listed in Sounds (paste Toolbox sound IDs there).
@@ -388,35 +388,21 @@ local function decorateCar(model: Instance)
 	end
 
 	local exhaust = chassis:WaitForChild("Exhaust", 5)
-	local flames = if exhaust then exhaust:WaitForChild("BoostFlames", 5) else nil
+	local flames = if exhaust then exhaust:WaitForChild("DashFlames", 5) else nil
 	local megaGlow = chassis:WaitForChild("MegaGlow", 5)
 	local function refresh()
 		local shown = not LocalHide.isHidden(model)
-		if flames and flames:IsA("ParticleEmitter") and not isMine then
-			flames.Enabled = shown and model:GetAttribute(A.Boosting) == true
+		if flames and flames:IsA("ParticleEmitter") then
+			flames.Enabled = shown and model:GetAttribute(A.Dashing) == true
 		end
 		if megaGlow and megaGlow:IsA("ParticleEmitter") then
 			megaGlow.Enabled = shown and model:GetAttribute(A.MegaArmed) == true
 		end
 	end
-	model:GetAttributeChangedSignal(A.Boosting):Connect(refresh)
+	model:GetAttributeChangedSignal(A.Dashing):Connect(refresh)
 	model:GetAttributeChangedSignal(A.MegaArmed):Connect(refresh)
 	model:GetAttributeChangedSignal("HiddenLocally"):Connect(refresh)
 	refresh()
-end
-
--- Your own flames react to your key presses instantly instead of waiting for the server.
-local function updateMyFlames()
-	local car = CarController.getCar()
-	local chassis = CarController.getChassis()
-	if not car or not chassis then
-		return
-	end
-	local exhaust = chassis:FindFirstChild("Exhaust")
-	local flames = if exhaust then exhaust:FindFirstChild("BoostFlames") else nil
-	if flames and flames:IsA("ParticleEmitter") then
-		flames.Enabled = not chassis.Anchored and CarController.isBoosting() and not LocalHide.isHidden(car)
-	end
 end
 
 ---------------------------------------------------------------------------------------------------------------
@@ -703,8 +689,6 @@ function EffectsController.start()
 	for _, child in cars:GetChildren() do
 		task.defer(decorateCar, child)
 	end
-
-	RunService.Heartbeat:Connect(updateMyFlames)
 
 	BallView.Hit:Connect(function(position: Vector3, strength: number, mine: boolean)
 		burst(position, Color3.fromRGB(255, 255, 255), math.floor(6 + strength * 18), 25 + strength * 40, 1.2, 0.5)

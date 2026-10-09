@@ -1,7 +1,7 @@
 --!strict
 -- Tips for your first few matches: one short hint at a time, near the bottom of the screen, when it's useful
--- ("Hold SHIFT to boost!" while you're cruising) - and each one only until you've done what it says. The
--- buttons it names are the ones you're using: keyboard, gamepad or touch.
+-- ("Your Cheese Flood is ready! Press E!") - and each one only until you've done what it says. The buttons it
+-- names are the ones you're using: keyboard, gamepad or touch.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -30,17 +30,15 @@ local ROOKIE_MATCHES = 3 -- the coach helps out until you've finished this many 
 local SHOW_FOR = 6 -- seconds a hint stays up (unless you do it first)
 local GAP = 2.5 -- seconds between hints
 
-type Keys = { boost: string, jump: string, item: string, power: string }
+type Keys = { jump: string, ult: string }
 
 -- What the coach looks at.
 type Situation = {
 	sinceKickoff: number,
-	speed: number,
-	boost: number,
 	ballHigh: boolean,
-	item: string?,
-	powerReady: boolean,
-	power: string,
+	ultReady: boolean,
+	ultName: string,
+	orbNear: boolean,
 }
 
 type Hint = {
@@ -60,12 +58,12 @@ local HINTS: { Hint } = {
 		end,
 	},
 	{
-		id = "boost",
+		id = "ult",
 		when = function(s)
-			return s.sinceKickoff > 6 and s.boost > 30 and s.speed > 15 and s.speed < 70
+			return s.ultReady
 		end,
-		text = function(_, keys)
-			return `Hold {keys.boost} to boost. It's super fast!`
+		text = function(s, keys)
+			return `Your {s.ultName} is ready! Press {keys.ult} to use it!`
 		end,
 	},
 	{
@@ -78,23 +76,21 @@ local HINTS: { Hint } = {
 		end,
 	},
 	{
-		id = "item",
+		id = "orb",
 		when = function(s)
-			return s.item ~= nil
+			return s.orbNear and not s.ultReady
 		end,
-		text = function(s, keys)
-			local def = Powers.item(s.item or "")
-			local name = if def then `{def.Emoji} {def.Name}` else "an item"
-			return `You got a {name}! Press {keys.item} to use it.`
+		text = function()
+			return "Grab the glowing orb to charge up your ultimate!"
 		end,
 	},
 	{
-		id = "power",
+		id = "charge",
 		when = function(s)
-			return s.sinceKickoff > 20 and s.powerReady
+			return s.sinceKickoff > 15 and not s.ultReady
 		end,
-		text = function(s, keys)
-			return `Press {keys.power} for your car's power: {s.power}!`
+		text = function()
+			return "Every touch of the ball charges your ultimate faster!"
 		end,
 	},
 }
@@ -107,15 +103,15 @@ local shownAt = 0
 local hiddenAt = -math.huge
 local kickoffAt = 0
 local visible = true
-local hadItem = false
+local ORB_NEAR = 90 -- the orb hint shows when it's this close
 
 local function keys(): Keys
 	if InputController.isTouch() then
-		return { boost = "BOOST", jump = "JUMP", item = "ITEM", power = "POWER" }
+		return { jump = "JUMP", ult = "ULT" }
 	elseif UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled then
-		return { boost = "B", jump = "A", item = "RB", power = "LB" }
+		return { jump = "A", ult = "X" }
 	end
-	return { boost = "SHIFT", jump = "SPACE", item = "R", power = "G" }
+	return { jump = "SPACE", ult = "E" }
 end
 
 local function isRookie(): boolean
@@ -150,9 +146,20 @@ local function show(hint: Hint, situation: Situation)
 	}):Play()
 end
 
-local function numberOf(car: Model, name: string): number
-	local value = car:GetAttribute(name)
-	return if type(value) == "number" then value else 0
+-- Is the charge orb out, and close to `position`?
+local function orbNear(position: Vector3): boolean
+	local match = workspace:FindFirstChild(MatchState.Folders.Match)
+	local orbFolder = if match then match:FindFirstChild(MatchState.Folders.Orbs) else nil
+	if not orbFolder then
+		return false
+	end
+	for _, orb in orbFolder:GetChildren() do
+		local home = orb:GetAttribute("Home")
+		if typeof(home) == "Vector3" and (home - position).Magnitude < ORB_NEAR then
+			return true
+		end
+	end
+	return false
 end
 
 local function update()
@@ -165,29 +172,23 @@ local function update()
 		end
 		return
 	end
-	local now = workspace:GetServerTimeNow()
-	local held = car:GetAttribute(A.Item)
-	local itemReady = type(held) == "string" and held ~= "" and now >= numberOf(car, A.ItemReadyAt)
 	local ball = BallView.getPosition()
 	local carId = car:GetAttribute(A.CarId)
+	local _, ultReady = CarController.ultCharge()
 	local situation: Situation = {
 		sinceKickoff = os.clock() - kickoffAt,
-		speed = chassis.AssemblyLinearVelocity.Magnitude,
-		boost = numberOf(car, A.Boost),
 		ballHigh = BallView.isVisible()
 			and ball.Y > BallView.radius() + 5
 			and Vector3.new(ball.X - chassis.Position.X, 0, ball.Z - chassis.Position.Z).Magnitude < 30,
-		item = if itemReady then held :: string else nil,
-		powerReady = now >= numberOf(car, A.PowerReadyAt),
-		power = Powers.forCar(if type(carId) == "string" then carId else "").Name,
+		ultReady = ultReady,
+		ultName = Powers.forCar(if type(carId) == "string" then carId else "").Name,
+		orbNear = orbNear(chassis.Position),
 	}
 
 	-- Did what the hint says (or it's been up long enough)?
 	local current = showing
 	if current then
-		local didIt = (current.id == "boost" and CarController.isBoosting())
-			or (current.id == "item" and hadItem and not itemReady)
-			or (current.id == "power" and not situation.powerReady)
+		local didIt = (current.id == "ult" and not ultReady) or (current.id == "orb" and not situation.orbNear)
 		if didIt or os.clock() - shownAt > SHOW_FOR then
 			hide()
 		end
@@ -199,7 +200,6 @@ local function update()
 			end
 		end
 	end
-	hadItem = itemReady
 end
 
 -- Hidden while replays and the podium are on screen (the same as the HUD).

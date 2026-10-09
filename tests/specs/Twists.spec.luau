@@ -29,6 +29,13 @@ return function(t)
 		expect.equal(GameConfig.Ball.Radius, 8, "the normal settings are never changed")
 	end)
 
+	t.test("the speed and ultimate twists do what they say", function()
+		expect.truthy(Twists.carConfig("speed").MaxSpeed > GameConfig.Car.MaxSpeed * 1.2)
+		local rush = Twists.get("rush")
+		assert(rush and rush.UltMultiplier)
+		expect.atLeast(rush.UltMultiplier, 2)
+	end)
+
 	t.test("a giant ball still fits in the goal and scores", function()
 		local cfg = Twists.ballConfig("giant")
 		expect.truthy(cfg.Radius * 2 < GameConfig.Arena.GoalHeight - 2)

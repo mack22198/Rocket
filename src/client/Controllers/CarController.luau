@@ -1,9 +1,9 @@
 --!strict
 -- Finds this player's car and drives it every physics step. The server gives each player physics ownership
 -- of their own car, so steering and jumping respond instantly on their screen.
--- Items and powers are the server's call, but the ones that launch your own car (Super Spring, Nitro Dash,
--- Shark Dive and the Pizza Shark's Cheesy Dive) launch it here the moment you press the button, and the
--- server tells this car when it has been spun out, slowed down or frozen.
+-- Ultimates are the server's call, but the ones that launch your own car (Nitro Rocket, Shark Dive and the
+-- Pizza Shark's Cheesy Dive) launch it here the moment you press the button, and the server tells this car when
+-- it has been spun out or slowed down.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,17 +38,8 @@ local ballInfo: (() -> (Vector3, Vector3, number, boolean))? = nil
 
 local myCar: Model? = nil
 local driver: CarDriver.CarDriver? = nil
-local sentBoosting = false
-local boosting = false
--- Your own record of when you last used your item and power, so a second press can't sneak in before the
--- server's answer arrives.
-local itemUsedAt = -math.huge
-local powerUsedAt = -math.huge
-local megaAskedAt = -math.huge
-
-local function serverNow(): number
-	return workspace:GetServerTimeNow()
-end
+-- When you last set off your ultimate, so a second press can't sneak in before the server's answer arrives.
+local ultUsedAt = -math.huge
 
 local function numberAttribute(instance: Instance, name: string): number
 	local value = instance:GetAttribute(name)
@@ -61,8 +52,6 @@ local function setCar(model: Model?)
 	end
 	myCar = model
 	driver = nil
-	sentBoosting = false
-	boosting = false
 	if not model then
 		InputController.setDriving(false)
 		CarController.CarChanged:Fire(nil)
@@ -128,26 +117,9 @@ local function step(dt: number)
 			end
 		end
 	end
-	local hasBoost = numberAttribute(car, A.Boost) > 0
-	local result = d:step(dt, input, hasBoost, assist)
-	boosting = canDrive and result ~= nil and result.boosting
-	if boosting ~= sentBoosting then
-		sentBoosting = boosting
-		Remotes.SetBoosting:FireServer(boosting)
-	end
+	local result = d:step(dt, input, false, assist)
 	if result and (result.jumped or result.dodged) then
 		CarController.Jumped:Fire()
-	end
-	-- On phones and tablets the Mega Shot arms itself as soon as the meter is full (one button fewer).
-	if
-		canDrive
-		and InputController.isTouch()
-		and numberAttribute(car, A.Mega) >= GameConfig.Mega.Max
-		and car:GetAttribute(A.MegaArmed) ~= true
-		and os.clock() - megaAskedAt > 1
-	then
-		megaAskedAt = os.clock()
-		Remotes.ActivateMega:FireServer()
 	end
 end
 
@@ -185,84 +157,50 @@ function CarController.start()
 			CarController.EffectApplied:Fire(effect, duration)
 		end
 	end)
-	InputController.ItemPressed:Connect(CarController.useItem)
-	InputController.PowerPressed:Connect(CarController.usePower)
+	InputController.UltimatePressed:Connect(CarController.useUltimate)
 	InputController.HornPressed:Connect(function()
 		if myCar then
 			Remotes.Horn:FireServer()
 		end
 	end)
-
-	InputController.MegaPressed:Connect(function()
-		local car = myCar
-		if car and numberAttribute(car, A.Mega) >= GameConfig.Mega.Max and car:GetAttribute(A.MegaArmed) ~= true then
-			Remotes.ActivateMega:FireServer()
-		end
-	end)
 end
 
--- Can your car use an item or power right now? (Returns the chassis if so.)
-local function readyToAct(): BasePart?
+-- How full your ultimate meter is (0 to GameConfig.Ultimate.Max), and whether it's ready to go.
+function CarController.ultCharge(): (number, boolean)
+	local car = myCar
+	local charge = if car then numberAttribute(car, A.Ult) else 0
+	return charge, charge >= GameConfig.Ultimate.Max
+end
+
+-- Sets off your car's ultimate (E / X / ULT), if the meter is full and the ball is in play.
+function CarController.useUltimate()
 	local car, d = myCar, driver
-	if not car or not d or d.chassis.Anchored or car:GetAttribute(A.Frozen) == true or d.state.freezeTimer > 0 then
-		return nil
-	end
-	if MatchState.phase(stateObject) ~= MatchState.Phases.Playing then
-		return nil
-	end
-	return d.chassis
-end
-
--- Launches your own car straight away for the items and powers that do that.
-local function launchNow(kind: string, chassis: BasePart)
-	local change = Powers.launch(kind, chassis.CFrame, chassis.AssemblyLinearVelocity)
-	if change and driver then
-		(driver :: CarDriver.CarDriver):addVelocity(change)
-	end
-end
-
--- Uses the item you're holding (R / RB / ITEM).
-function CarController.useItem()
-	local car = myCar
-	local chassis = readyToAct()
-	local item = if car then car:GetAttribute(A.Item) else nil
-	if not car or not chassis or type(item) ~= "string" or item == "" then
+	local _, ready = CarController.ultCharge()
+	if not car or not d or not ready or d.chassis.Anchored then
 		return
 	end
-	local now = serverNow()
-	if now < numberAttribute(car, A.ItemReadyAt) or now - itemUsedAt < 0.5 then
+	if MatchState.phase(stateObject) ~= MatchState.Phases.Playing or os.clock() - ultUsedAt < 1 then
 		return
 	end
-	itemUsedAt = now
-	launchNow(item, chassis)
-	Remotes.UseItem:FireServer()
-end
-
--- Uses your car's power (G / LB / POWER).
-function CarController.usePower()
-	local car = myCar
-	local chassis = readyToAct()
-	local power = if car then car:GetAttribute(A.Power) else nil
-	if not car or not chassis or type(power) ~= "string" then
-		return
-	end
-	local now = serverNow()
-	if now < numberAttribute(car, A.PowerReadyAt) or now - powerUsedAt < 1 then
-		return
-	end
-	powerUsedAt = now
-	local def = Powers.power(power)
+	ultUsedAt = os.clock()
+	local power = car:GetAttribute(A.Power)
+	local def = if type(power) == "string" then Powers.power(power) else nil
 	if def then
+		-- The ultimates that launch your car launch it now, so it feels instant.
 		for _, part in Powers.components(def) do
-			launchNow(part.Id, chassis)
+			local change = Powers.launch(part.Id, d.chassis.CFrame)
+			if change then
+				d:addVelocity(change)
+			end
 		end
 	end
-	Remotes.UsePower:FireServer()
+	Remotes.UseUltimate:FireServer()
 end
 
--- Is your car boosting right now (after spin-outs and goo have had their say)?
-function CarController.isBoosting(): boolean
-	return boosting
+-- Is your car dashing right now (a Nitro Rocket or Shark Dive)?
+function CarController.isDashing(): boolean
+	local car = myCar
+	return car ~= nil and car:GetAttribute(A.Dashing) == true
 end
 
 -- What's happening to your car: seconds left spinning out, stuck in goo and frozen.

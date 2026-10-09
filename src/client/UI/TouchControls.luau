@@ -1,7 +1,7 @@
 --!strict
 -- On-screen controls for phones and tablets: a thumbstick wherever your left thumb lands (with easy steering,
--- point where you want to go) and big buttons on the right - BOOST and JUMP biggest, ITEM and POWER next to
--- them, and small CAM and horn buttons out of the way. The Mega Shot arms itself (see CarController).
+-- point where you want to go) and two big buttons on the right - JUMP, and ULT, which fills up like the
+-- ultimate meter and glows when it's ready - plus small CAM and HORN buttons out of the way.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,6 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local MatchState = require(Shared.Match.MatchState)
 local Powers = require(Shared.Config.Powers)
+local GameConfig = require(Shared.Config.GameConfig)
 
 local CameraController = require(script.Parent.Parent.Controllers.CameraController)
 local CarController = require(script.Parent.Parent.Controllers.CarController)
@@ -204,89 +205,74 @@ local function build()
 		end
 	end)
 
-	-- The BOOST button also shows how much boost is left.
-	local boost = makeButton("Boost", "0", C.Mega, 126, 100, 118)
-	local boostCaption = Theme.label(boost, {
+	local jump = makeButton("Jump", "JUMP", C.Sky, 132, 104, 122)
+	holdButton(jump, function(held)
+		InputController.setTouchButton("jump", held)
+	end)
+
+	-- ULT: a ring around it fills up with the ultimate meter; when it's full the button glows in the
+	-- ultimate's colour and shows its picture. It goes off the moment you touch it.
+	local ult = makeButton("Ultimate", "0%", C.Panel, 104, 262, 120)
+	local ring = Theme.ring(ult, 20, 64, Vector2.new(8, 16))
+	-- (The button's padding makes its inside 76% as wide and 50% as tall as the button.)
+	local ultName = Theme.label(ult, {
 		name = "Caption",
-		size = UDim2.fromScale(1, 0.3),
-		position = UDim2.fromScale(0.5, 1.42),
-		anchor = Vector2.new(0.5, 1),
-		text = "BOOST",
+		size = UDim2.fromScale(1.9, 0.42),
+		position = UDim2.fromScale(0.5, 1.9),
+		anchor = Vector2.new(0.5, 0),
+		text = "",
 		font = Theme.Caps,
 		color = C.Text,
 		stroke = true,
 	})
-	boostCaption.ZIndex = 2
-	holdButton(boost, function(held)
-		InputController.setTouchButton("boost", held)
+	ultName.ZIndex = 2
+	ult.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			InputController.UltimatePressed:Fire()
+		end
 	end)
+	local lastCharge = -1
 	RunService.RenderStepped:Connect(function()
 		local car = CarController.getCar()
-		local amount = if car then car:GetAttribute(MatchState.CarAttr.Boost) else nil
-		boost.Text = tostring(math.floor(if type(amount) == "number" then amount else 0))
+		if not car then
+			lastCharge = -1
+			return
+		end
+		local carId = car:GetAttribute(MatchState.CarAttr.CarId)
+		local power = Powers.forCar(if type(carId) == "string" then carId else "")
+		local charge, ready = CarController.ultCharge()
+		local pulse = math.floor(os.clock() * 4) % 2 == 0
+		ultName.Text = string.upper(power.Name)
+		if ready then
+			ring.set(1, if pulse then C.Gold else C.Text)
+			ult.Text = power.Emoji
+			ult.Font = Theme.Title
+			ult.BackgroundColor3 = if pulse then power.Color else power.Color:Lerp(C.Gold, 0.4)
+		else
+			ring.set(charge / GameConfig.Ultimate.Max, power.Color)
+			ult.Text = `{math.floor(charge / GameConfig.Ultimate.Max * 100)}%`
+			ult.Font = Theme.Display
+			ult.BackgroundColor3 = C.Panel
+		end
+		if lastCharge >= 0 and charge - lastCharge >= 2 then
+			Theme.floatText(
+				ult,
+				`+{math.floor(charge - lastCharge)}`,
+				UDim2.new(0.5, 0, 0, -50),
+				Vector2.new(0.5, 1),
+				40
+			)
+		end
+		lastCharge = charge
 	end)
-	local jump = makeButton("Jump", "JUMP", C.Sky, 108, 238, 76)
-	holdButton(jump, function(held)
-		InputController.setTouchButton("jump", held)
-	end)
+
 	local cam = makeButton("BallCam", "CAM", C.Panel, 54, 62, 395)
 	cam.Activated:Connect(function()
 		CameraController.toggleBallCam()
 	end)
-
-	-- ITEM shows the item you're holding; POWER shows your car's power and counts down while it recharges.
-	local item = makeButton("Item", "?", C.Panel, 88, 112, 268)
-	item.Activated:Connect(function()
-		InputController.ItemPressed:Fire()
-	end)
-	local power = makeButton("Power", "", C.Panel, 88, 250, 215)
-	power.Activated:Connect(function()
-		InputController.PowerPressed:Fire()
-	end)
-	local horn = makeButton("Horn", "HORN", C.Panel, 50, 360, 140)
+	local horn = makeButton("Horn", "HORN", C.Panel, 54, 130, 395)
 	horn.Activated:Connect(function()
 		InputController.HornPressed:Fire()
-	end)
-
-	-- Little names under the two new buttons (the padding makes the button's inside 50% of its height).
-	local captions: { { button: TextButton, text: string } } = {
-		{ button = item, text = "ITEM" },
-		{ button = power, text = "POWER" },
-	}
-	for _, entry in captions do
-		local caption = Theme.label(entry.button, {
-			name = "Caption",
-			size = UDim2.fromScale(1.5, 0.42),
-			position = UDim2.fromScale(0.5, 1.58),
-			anchor = Vector2.new(0.5, 0),
-			text = entry.text,
-			font = Theme.Caps,
-			color = C.Text,
-			stroke = true,
-		})
-		caption.ZIndex = 2
-	end
-	local A = MatchState.CarAttr
-	RunService.RenderStepped:Connect(function()
-		local car = CarController.getCar()
-		if not car then
-			return
-		end
-		local now = workspace:GetServerTimeNow()
-		local held = car:GetAttribute(A.Item)
-		local itemDef = if type(held) == "string" then Powers.item(held) else nil
-		local readyAt = car:GetAttribute(A.ItemReadyAt)
-		local spinning = itemDef ~= nil and type(readyAt) == "number" and now < readyAt
-		item.Text = if itemDef and not spinning then itemDef.Emoji elseif spinning then "..." else "?"
-		item.Font = if itemDef and not spinning then Theme.Title else Theme.Display
-		item.BackgroundColor3 = if itemDef and not spinning then itemDef.Color else C.Panel
-		local carId = car:GetAttribute(A.CarId)
-		local powerDef = Powers.forCar(if type(carId) == "string" then carId else "")
-		local powerReadyAt = car:GetAttribute(A.PowerReadyAt)
-		local left = if type(powerReadyAt) == "number" then powerReadyAt - now else 0
-		power.Text = if left > 0 then tostring(math.ceil(left)) else powerDef.Emoji
-		power.Font = if left > 0 then Theme.Display else Theme.Title
-		power.BackgroundColor3 = if left > 0 then C.Panel else powerDef.Color
 	end)
 	placeAll(Theme.getScale())
 	Theme.onScaleChanged(placeAll)

@@ -1,6 +1,6 @@
 --!strict
 -- The garage, laid over the 3D showroom: your cars on the left, the chosen car big on the turntable in the
--- middle, and on the right its special power, its strengths and weaknesses, its evolution track and the button
+-- middle, and on the right its ultimate, its strengths and weaknesses, its evolution track and the button
 -- for the next step (unlock, FUSE, drive it, EVOLVE, or pick one of the looks it has earned). Prices are fixed
 -- and shown up front; evolving is earned by driving the car, and a fused car is made from two cars you own
 -- (you keep both). Changes apply from your next match.
@@ -296,7 +296,7 @@ local function refresh()
 	local power = Powers.forCar(def.Id)
 	powerIcon.Text = power.Emoji
 	powerIcon.BackgroundColor3 = power.Color
-	powerName.Text = `POWER: {string.upper(power.Name)}`
+	powerName.Text = `ULTIMATE: {string.upper(power.Name)}`
 	powerText.Text = power.Description
 	for _, row in statBars do
 		local value = (def.Stats :: any)[row.key] :: number
@@ -608,7 +608,7 @@ local function buildRight()
 		textSize = 12,
 		align = Enum.TextXAlignment.Left,
 	})
-	-- The car's special power.
+	-- The car's ultimate.
 	local powerCard = Theme.well(panel, "Power", UDim2.new(1, 0, 0, 58), UDim2.fromOffset(0, 72))
 	powerIcon = Theme.label(powerCard, {
 		name = "Icon",

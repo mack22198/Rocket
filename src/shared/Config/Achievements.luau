@@ -38,8 +38,9 @@ export type View = { [string]: number }
 -- A badge for everyone the first time they play (0 = none).
 Achievements.WelcomeBadge = 0
 
--- View numbers: matches, wins, goals, assists, saves, shots, megaShots, demos, mvps, styleTouches, items, powers,
--- bestStreak (wins in a row), friendMatches, level, carsOwned, evolvedCars (fully evolved), fusedCars, loginStreak, and at the end
+-- View numbers: matches, wins, goals, assists, saves, shots, megaShots, demos, mvps, styleTouches, orbs, powers
+-- (ultimates used), bestStreak (wins in a row), friendMatches, level, carsOwned, evolvedCars (fully evolved),
+-- fusedCars, loginStreak, and at the end
 -- of a match: matchGoals, cleanSheetWin (1 = won without letting a goal in), comebackWin (1 = won after being
 -- 2 goals behind).
 Achievements.List = {
@@ -201,31 +202,22 @@ Achievements.List = {
 		Title = "Air Ace",
 	},
 	{
-		Id = "mega_10",
-		Emoji = "🔥",
-		Name = "Mega Blaster",
-		Text = "Hit 10 Mega Shots",
-		Stat = "megaShots",
-		Target = 10,
-		Reward = 200,
-	},
-	{
-		Id = "items_50",
-		Emoji = "🎁",
-		Name = "Gadget Fan",
-		Text = "Use 50 items",
-		Stat = "items",
-		Target = 50,
+		Id = "orbs_25",
+		Emoji = "🔮",
+		Name = "Orb Hunter",
+		Text = "Grab 25 charge orbs",
+		Stat = "orbs",
+		Target = 25,
 		Reward = 150,
 	},
 	{
-		Id = "powers_50",
+		Id = "ults_25",
 		Emoji = "⚡",
-		Name = "Power Player",
-		Text = "Use your car's power 50 times",
+		Name = "Ultimate Player",
+		Text = "Use your ultimate 25 times",
 		Stat = "powers",
-		Target = 50,
-		Reward = 150,
+		Target = 25,
+		Reward = 200,
 	},
 	{
 		Id = "wins_25",

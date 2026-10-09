@@ -9,7 +9,7 @@ return function(t)
 	local function frames(times: { number }): { Replay.Frame }
 		local list = {}
 		for _, time in times do
-			table.insert(list, { t = time, ball = Vector3.new(time * 10, 6, 0), cars = {}, boosting = {} })
+			table.insert(list, { t = time, ball = Vector3.new(time * 10, 6, 0), cars = {}, dashing = {} })
 		end
 		return list
 	end

@@ -1,7 +1,7 @@
 --!strict
 -- Plays the game's sounds (see Sounds): one-off effects, the music and crowd that loop in the background (menu
 -- music in the menus; the crowd and match music in the stadium), the referee's whistle at kickoffs and full
--- time, the crowd's cheer after a goal, and your own car's engine (higher the faster you go) and boost roar.
+-- time, the crowd's cheer after a goal, and your own car's engine (higher the faster you go) and dash roar.
 -- Sounds without an ID yet are simply skipped.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -74,7 +74,7 @@ function SoundController.setScene(newScene: string)
 	setLoop("Crowd", newScene == "match")
 end
 
--- Your car's engine and boost, every frame while you're driving.
+-- Your car's engine (and its roar while it dashes), every frame while you're driving.
 local engine: Sound? = nil
 local roar: Sound? = nil
 local function looped(name: string, parent: Instance): Sound?
@@ -112,7 +112,7 @@ local function updateCar(dt: number)
 		if roar then
 			roar:Destroy()
 		end
-		engine, roar = looped("Engine", chassis), looped("BoostLoop", chassis)
+		engine, roar = looped("Engine", chassis), looped("DashLoop", chassis)
 	end
 	local speed = chassis.AssemblyLinearVelocity.Magnitude / GameConfig.Car.MaxSpeed
 	local blend = math.min(1, dt * 8)
@@ -123,7 +123,7 @@ local function updateCar(dt: number)
 	end
 	local r = roar
 	if r then
-		local wanted = if CarController.isBoosting() then Sounds.List.BoostLoop.Volume else 0
+		local wanted = if CarController.isDashing() then Sounds.List.DashLoop.Volume else 0
 		r.Volume += (wanted - r.Volume) * math.min(1, dt * 12)
 	end
 end

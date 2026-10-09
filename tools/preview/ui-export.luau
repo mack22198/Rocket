@@ -1,8 +1,8 @@
 -- Builds the game's real screens (HUD, garage, results...) in Lune with pretend services, then writes the
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
---   scenarios: menu, queued, live, garage, evolve, howto, match, touch, goal, pause, results, podium, replay,
---              streak, chest, collection, twist, style, fuse, season, chat, profile, titles, toast,
+--   scenarios: menu, queued, live, garage, evolve, howto, match, ultready, touch, goal, pause, results, podium,
+--              replay, streak, chest, collection, twist, style, fuse, season, chat, profile, titles, toast,
 --              gifts, leaderboard, shop
 
 local fs = require("@lune/fs")
@@ -311,22 +311,18 @@ data.stats = {
 	demos = 12,
 	mvps = 6,
 	styleTouches = 11,
-	items = 40,
+	orbs = 12,
 	powers = 28,
 	bestStreak = 4,
 }
 local carAttrs = {
-	Boost = 67,
-	Mega = 100,
+	-- The ultimate meter: charging in "match", full and ready on a keyboard ("ultready") and on a phone ("touch").
+	Ult = if scenario == "ultready" or scenario == "touch" then 100 else 72,
 	MegaArmed = false,
 	Team = "Blue",
 	Stage = 2,
 	CarId = "banana",
 	Power = "peel",
-	Item = "freeze",
-	ItemReadyAt = NOW - 1,
-	PowerReadyAt = NOW + 4.2,
-	Shield = scenario == "match",
 }
 local driving = attrs.Phase == "Playing" and scenario ~= "live"
 local car = {
@@ -367,16 +363,20 @@ harness.preload(controllers .. "CarController", {
 	EffectApplied = signal(),
 	start = function() end,
 	addVelocity = function() end,
-	isBoosting = function()
+	isDashing = function()
 		return false
 	end,
 	effects = function()
 		return 0, 0, 0
 	end,
-	useItem = function() end,
-	usePower = function() end,
+	ultCharge = function()
+		return carAttrs.Ult, carAttrs.Ult >= 100
+	end,
+	useUltimate = function() end,
 })
 harness.preload(controllers .. "CameraController", {
+	BallCamChanged = signal(),
+	toggleBallCam = function() end,
 	isBallCam = function()
 		return true
 	end,
@@ -384,9 +384,8 @@ harness.preload(controllers .. "CameraController", {
 	start = function() end,
 })
 local fakeInput = {
-	MegaPressed = signal(),
-	ItemPressed = signal(),
-	PowerPressed = signal(),
+	UltimatePressed = signal(),
+	HornPressed = signal(),
 	BallCamToggled = signal(),
 	setTouchStick = function() end,
 	setTouchButton = function() end,
@@ -566,8 +565,9 @@ if scenario == "goal" then
 	remotes.GoalScored.OnClientEvent:Fire("Blue", "Player1", "Sparky (bot)", roblox.Vector3.new(0, 10, 160), "AIR HIT")
 	remotes.Announce.OnClientEvent:Fire("style", "AIR HIT!", "Blue", "Player1")
 	remotes.Announce.OnClientEvent:Fire("save", "EPIC SAVE!", "Orange", "Bolt (bot)")
-	remotes.Announce.OnClientEvent:Fire("power", "❄️ Player1 froze Bolt (bot)!", "Blue", "Player1")
-	remotes.Announce.OnClientEvent:Fire("power", "🍌 Comet (bot) slipped on a banana!", "Blue", "Zippy (bot)")
+	remotes.Announce.OnClientEvent:Fire("ult", "CHEESE FLOOD", "Orange", "Bolt (bot)")
+	remotes.Announce.OnClientEvent:Fire("orb", "Player1 grabbed the charge orb!", "Blue", "Player1")
+	remotes.Announce.OnClientEvent:Fire("power", "Comet (bot) slipped on a banana!", "Blue", "Zippy (bot)")
 elseif scenario == "shop" then
 	ShopPanel.open()
 elseif scenario == "gifts" then

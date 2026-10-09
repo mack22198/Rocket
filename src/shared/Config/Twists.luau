@@ -1,5 +1,5 @@
 --!strict
--- Match twists: a surprise rule for a whole match, shown when it starts ("🏀 GIANT BALL!"). Most matches get
+-- Match twists: a surprise rule for a whole match, shown when it starts ("GIANT BALL!"). Most matches get
 -- one; each week one twist is "featured" and turns up more often; and on weekends there's a Twist Weekend
 -- event - every match has a twist and pays extra Scrap.
 --
@@ -19,9 +19,7 @@ export type TwistDef = {
 	Weight: number, -- how often it's picked, compared with the others
 	Ball: { [string]: number }?, -- changes to GameConfig.Ball
 	Car: { [string]: number }?, -- changes to GameConfig.Car
-	UnlimitedBoost: boolean?,
-	MegaMultiplier: number?, -- the Mega meter fills this many times faster
-	BoxRespawn: number?, -- item boxes come back after this many seconds
+	UltMultiplier: number?, -- ultimate meters fill this many times faster
 	Night: boolean?, -- the match is played at night (just the looks)
 }
 
@@ -74,21 +72,20 @@ Twists.List = {
 		Ball = { RollingFriction = 1.2 },
 	},
 	{
-		Id = "turbo",
-		Name = "Turbo Mode",
+		Id = "speed",
+		Name = "Speed Demons",
 		Emoji = "⚡",
-		Description = "Boost never runs out!",
+		Description = "Every car is super fast!",
 		Weight = 2,
-		UnlimitedBoost = true,
+		Car = { MaxSpeed = 130, Acceleration = 110 },
 	},
 	{
-		Id = "mega",
-		Name = "Mega Madness",
+		Id = "rush",
+		Name = "Ultimate Rush",
 		Emoji = "💥",
-		Description = "Mega meters fill 3x faster and item boxes come back quickly.",
+		Description = "Ultimates charge up three times as fast!",
 		Weight = 2,
-		MegaMultiplier = 3,
-		BoxRespawn = 4,
+		UltMultiplier = 3,
 	},
 	{
 		Id = "night",

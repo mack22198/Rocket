@@ -142,13 +142,13 @@ local function buildStadium()
 		model.Parent = showcase
 	end
 
-	-- Kickoff line-up in the arena: blue cars on their spots, orange cars on theirs.
-	local kick = { { -48, 70 }, { 48, 70 }, { 0, 125 } }
+	-- Kickoff line-up in the arena (2v2): blue cars on their spots, orange cars on theirs.
+	local kick = { { -48, 70 }, { 0, 125 } }
 	for t, team in { "Blue", "Orange" } do
 		local side = GameConfig.Teams[team].DefendsSide
-		for slot = 1, 3 do
-			local def = CarCatalog.ordered()[((t - 1) * 3 + slot - 1) % #CarCatalog.ordered() + 1]
-			local stage = ((t - 1) * 3 + slot - 1) % GameConfig.Evolution.Stages + 1
+		for slot = 1, GameConfig.Match.TeamSize do
+			local def = CarCatalog.ordered()[((t - 1) * 2 + slot - 1) % #CarCatalog.ordered() + 1]
+			local stage = ((t - 1) * 2 + slot - 1) % GameConfig.Evolution.Stages + 1
 			local model =
 				CarModelBuilder.build(def, { preview = true, stage = stage, teamColor = GameConfig.Teams[team].Color })
 			local pos = roblox.Vector3.new(kick[slot][1] * side, CarModelBuilder.restHeight(def), kick[slot][2] * side)
@@ -161,7 +161,7 @@ local function buildStadium()
 	end
 
 	if which == "podium" then
-		-- The winners' podium in the middle of the pitch (instead of the ball and the item boxes).
+		-- The winners' podium in the middle of the pitch (instead of the ball and the charge orb).
 		local PodiumBuilder = harness.require(harness.Client.Showroom.PodiumBuilder)
 		PodiumBuilder.build(workspaceInstance, {
 			{ name = "Player1", team = "Blue", carId = "banana", stage = 2, points = 412 },
@@ -176,15 +176,13 @@ local function buildStadium()
 	pivotTo(ball, roblox.CFrame.new(0, GameConfig.Ball.Radius, 0))
 	ball.Parent = showcase
 
-	-- The item boxes, plus a cheese puddle and a banana peel near the middle, as they'd look mid-match.
+	-- The charge orb, plus a cheese puddle and a banana peel near the middle, as they'd look mid-match.
 	local PropBuilder = harness.require(Server.Arena.PropBuilder)
-	local Powers = harness.require(Shared.Config.Powers)
 	local props = roblox.Instance.new("Folder")
 	props.Name = "Props"
 	props.Parent = workspaceInstance
-	for i, position in Powers.Tuning.BoxPositions do
-		PropBuilder.itemBox(props, position, i)
-	end
+	local orbSpot = GameConfig.Orb.Spots[2]
+	PropBuilder.chargeOrb(props, roblox.Vector3.new(orbSpot.X, GameConfig.Orb.Height, orbSpot.Z))
 	local cheese = PropBuilder.hazard("cheese", roblox.CFrame.new(30, 0, -30), GameConfig.Teams.Orange.Color)
 	cheese.Parent = props
 	local peel = PropBuilder.hazard("peel", roblox.CFrame.new(16, 0, -50), GameConfig.Teams.Blue.Color)

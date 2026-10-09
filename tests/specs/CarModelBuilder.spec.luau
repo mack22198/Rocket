@@ -52,7 +52,7 @@ return function(t)
 			end
 			local exhaust = chassis:FindFirstChild("Exhaust")
 			assert(exhaust, "missing exhaust attachment")
-			expect.truthy(exhaust:FindFirstChild("BoostFlames"))
+			expect.truthy(exhaust:FindFirstChild("DashFlames"))
 			expect.truthy(chassis:FindFirstChild("MegaGlow"))
 		end)
 

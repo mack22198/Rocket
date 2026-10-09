@@ -1,6 +1,7 @@
 --!strict
--- Hype popups for cool moments ("AIR HIT!", "EPIC SAVE!", "MEGA SHOT!") plus a small feed on the right
--- (which also tells you who froze whom, who slipped on a banana, who demolished whom, and so on).
+-- Hype popups for cool moments ("AIR HIT!", "EPIC SAVE!", "CHEESE FLOOD!") plus a small feed on the right
+-- (which also tells you who set off their ultimate, who slipped on a banana, who grabbed the charge orb, who
+-- demolished whom, and so on).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,6 +16,7 @@ local Theme = require(script.Parent.Theme)
 local Announcer = {}
 
 local localPlayer = Players.LocalPlayer
+local ORB_COLOR = Color3.fromRGB(80, 220, 255)
 local gui: ScreenGui
 local feed: Frame
 local popup: TextLabel
@@ -171,9 +173,23 @@ function Announcer.start()
 		if kind == "join" then
 			addFeedLine(text, color)
 			return
+		elseif kind == "ult" then
+			-- Someone set off their ultimate ("CHEESE FLOOD"): everyone gets a popup, so they see it coming.
+			local mine = who ~= nil and who == localPlayer.DisplayName
+			addFeedLine(if mine then `You used {text}!` else `{who or "Someone"} used {text}!`, color)
+			Announcer.popup(if mine or not who then `{text}!` else `{who}: {text}!`, color)
+			return
+		elseif kind == "orb" then
+			-- "Bolt grabbed the charge orb!" (and a popup when it was you).
+			local line, aboutMe = personal(text, localPlayer.DisplayName)
+			addFeedLine(line, color)
+			if aboutMe then
+				Announcer.popup("CHARGE ORB!", ORB_COLOR)
+			end
+			return
 		elseif kind == "power" then
-			-- Items and powers: the text says it all ("Bolt froze Sparky!"), with "you" for you. Yours get a
-			-- popup too.
+			-- What ultimates did: the text says it all ("Bolt quacked 2 cars into a spin!"), with "you" for you.
+			-- Yours get a popup too.
 			local line = personal(text, localPlayer.DisplayName)
 			addFeedLine(line, color)
 			if who ~= nil and who == localPlayer.DisplayName then

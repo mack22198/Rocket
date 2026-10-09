@@ -529,6 +529,61 @@ function Theme.bar(parent: Instance, size: UDim2, position: UDim2, color: Color3
 	}
 end
 
+export type Ring = { segments: { Frame }, set: (fraction: number, color: Color3) -> () }
+
+-- A circle of little segments around the middle of `parent` (a round dial or button) that light up clockwise
+-- from the top as ring.set goes from 0 to 1: the whole ring is lit only at 1. `radius` is in pixels.
+function Theme.ring(parent: GuiObject, count: number, radius: number, segment: Vector2): Ring
+	local segments: { Frame } = {}
+	for i = 1, count do
+		local angle = math.rad(360 * (i - 0.5) / count)
+		local piece = Instance.new("Frame")
+		piece.Name = `Segment{i}`
+		piece.Size = UDim2.fromOffset(segment.X, segment.Y)
+		piece.AnchorPoint = Vector2.new(0.5, 0.5)
+		piece.Position = UDim2.new(0.5, math.sin(angle) * radius, 0.5, -math.cos(angle) * radius)
+		piece.Rotation = math.deg(angle)
+		piece.BackgroundColor3 = C.PanelLight
+		piece.BorderSizePixel = 0
+		piece.Parent = parent
+		Theme.corner(piece, 3)
+		table.insert(segments, piece)
+	end
+	return {
+		segments = segments,
+		set = function(fraction: number, color: Color3)
+			local lit = math.floor(math.clamp(fraction, 0, 1) * count + 1e-6)
+			for i, piece in segments do
+				piece.BackgroundColor3 = if i <= lit then color else C.PanelLight
+			end
+		end,
+	}
+end
+
+-- Big text that floats up `rise` pixels and fades away, like "+12" beside a meter that just filled a little.
+function Theme.floatText(parent: Instance, text: string, position: UDim2, anchor: Vector2, rise: number)
+	local label = Theme.heading(parent, {
+		name = "Float",
+		size = UDim2.fromOffset(90, 36),
+		position = position,
+		anchor = anchor,
+		text = text,
+		color = C.Gold,
+		textSize = 34,
+		stroke = true,
+		zIndex = 6,
+	})
+	local info = TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(label, info, { Position = position + UDim2.fromOffset(0, -rise), TextTransparency = 1 }):Play()
+	local outline = label:FindFirstChildOfClass("UIStroke")
+	if outline then
+		TweenService:Create(outline, info, { Transparency = 1 }):Play()
+	end
+	task.delay(1, function()
+		label:Destroy()
+	end)
+end
+
 -- Scrap's coin: a gold washer with a dark outline. `size` is its width in pixels.
 function Theme.scrapIcon(parent: Instance, size: number, position: UDim2?, anchor: Vector2?): Frame
 	local coin = Instance.new("Frame")

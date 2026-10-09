@@ -15,7 +15,7 @@ export type Frame = {
 	t: number,
 	ball: Vector3,
 	cars: { [any]: CFrame },
-	boosting: { [any]: boolean },
+	dashing: { [any]: boolean },
 }
 
 -- How many real seconds a clip of `clipLength` seconds takes to play.

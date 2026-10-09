@@ -1,4 +1,4 @@
--- Demolitions: only a full-boost smash into the other team counts, and bots leave brand-new players alone.
+-- Demolitions: only a Nitro Rocket smash into the other team counts, and bots leave brand-new players alone.
 local Demolition = require(Shared.Match.Demolition)
 local GameConfig = require(Shared.Config.GameConfig)
 local Rewards = require(Shared.Config.Rewards)
@@ -8,24 +8,28 @@ return function(t)
 	local fast = GameConfig.Bump.DemoSpeed + 5
 	local veteran = GameConfig.Bots.RookieMatches
 
+	-- (Everyone below is mid-dash unless they say otherwise.)
 	local function player(team: string, matches: number?): Demolition.Side
-		return { team = team, bot = false, matches = matches or veteran }
+		return { team = team, bot = false, matches = matches or veteran, dashing = true }
 	end
 	local function bot(team: string): Demolition.Side
-		return { team = team, bot = true, matches = 0 }
+		return { team = team, bot = true, matches = 0, dashing = true }
 	end
 
-	t.test("only boosting is fast enough", function()
+	t.test("only a dash is fast enough", function()
 		local cfg = GameConfig.Bump
-		expect.truthy(cfg.DemoSpeed > GameConfig.Car.MaxSpeed, "driving flat out without boost isn't enough")
-		expect.truthy(cfg.DemoSpeed < GameConfig.Car.MaxBoostedSpeed - 20, "boosting gets you there")
+		expect.truthy(cfg.DemoSpeed > GameConfig.Car.MaxSpeed, "driving flat out isn't enough")
+		expect.truthy(cfg.DemoSpeed < GameConfig.Car.MaxBoostedSpeed - 20, "a dash gets you there")
 		expect.truthy(cfg.DemoSpeed > cfg.BigBumpSpeed)
 		expect.truthy(cfg.DemoRespawn >= 1 and cfg.DemoRespawn <= 3, "back in the game quickly")
 	end)
 
-	t.test("a fast smash into the other team is a demolition", function()
+	t.test("a Nitro Rocket smash into the other team is a demolition", function()
 		expect.truthy(Demolition.check(player("Blue"), player("Orange"), fast))
 		expect.falsy(Demolition.check(player("Blue"), player("Orange"), GameConfig.Bump.DemoSpeed - 1))
+		local cruising = player("Blue")
+		cruising.dashing = false
+		expect.falsy(Demolition.check(cruising, player("Orange"), fast * 1.5), "not without a dash")
 		expect.truthy(Demolition.check(player("Blue"), bot("Orange"), fast))
 		expect.truthy(Demolition.check(bot("Blue"), bot("Orange"), fast))
 	end)

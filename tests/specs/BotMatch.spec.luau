@@ -1,4 +1,4 @@
--- End-to-end check of the gameplay logic without Roblox: six bots drive with CarPhysics, touch the ball with
+-- End-to-end check of the gameplay logic without Roblox: four bots (2v2) drive with CarPhysics, touch the ball with
 -- HitModel, the ball moves with BallSim, and goals are detected by ArenaShape. If the bots can't find the ball
 -- or never score, something in that chain is broken.
 local ArenaShape = require(Shared.Arena.ArenaShape)
@@ -14,21 +14,21 @@ local Sim = harness.loadFile("tests/sim.luau")(Shared)
 return function(t)
 	local expect = t.expect
 
-	t.test("six bots play a match: they chase, touch and score", function()
+	t.test("four bots play a 2v2 match: they chase, touch and score", function()
 		local arena = ArenaShape.new(GameConfig.Arena)
 		local ballCfg = GameConfig.Ball
 		local dt = ballCfg.FixedStep
 		local THINK = 1 / 8
 		local SECONDS = 75
-		local KICKOFF = { Vector2.new(-48, 70), Vector2.new(48, 70), Vector2.new(0, 125) }
+		local KICKOFF = { Vector2.new(-48, 70), Vector2.new(0, 125) } -- (as MatchService places them)
 
 		local ball = BallSim.newState(Vector3.new(0, ballCfg.Radius, 0))
 		local bots = {}
 		for _, team in { "Blue", "Orange" } do
 			local side = GameConfig.Teams[team].DefendsSide
-			for slot = 1, 3 do
+			for slot = 1, GameConfig.Match.TeamSize do
 				local ids = GameConfig.Bots.CarIds
-				local def = CarCatalog.get(ids[(slot + (if team == "Blue" then 0 else 3) - 1) % #ids + 1])
+				local def = CarCatalog.get(ids[(slot + (if team == "Blue" then 0 else 2) - 1) % #ids + 1])
 				table.insert(bots, {
 					key = `{team}{slot}`,
 					team = team,
@@ -39,7 +39,6 @@ return function(t)
 					memory = BotBrain.newMemory(),
 					input = CarPhysics.NoInput,
 					lastHit = -math.huge,
-					boost = GameConfig.Car.StartingBoost,
 				})
 			end
 		end
@@ -52,7 +51,6 @@ return function(t)
 				bot.car =
 					Sim.newCar(bot.def, MathUtil.lookAlong(position, Vector3.new(-position.X, 0, -position.Z)), arena)
 				bot.memory = BotBrain.newMemory()
-				bot.boost = GameConfig.Car.StartingBoost
 			end
 		end
 		kickoff()
@@ -105,8 +103,6 @@ return function(t)
 								carCFrame = bot.car.cframe,
 								carVelocity = bot.car.velocity,
 								grounded = bot.car.state.grounded,
-								boost = bot.boost,
-								megaReady = false,
 								ballPosition = ball.position,
 								ballVelocity = ball.velocity,
 								ballRadius = ballCfg.Radius,
@@ -123,12 +119,7 @@ return function(t)
 			end
 
 			for _, bot in bots do
-				bot.car.hasBoost = bot.boost > 0
 				bot.car.step(bot.input, dt)
-				if bot.car.lastResult.boosting then
-					bot.boost = math.max(0, bot.boost - GameConfig.Car.BoostDrainPerSecond * dt)
-				end
-				bot.boost = math.min(100, bot.boost + 8 * dt) -- stands in for the boost pads
 			end
 
 			BallSim.step(arena, ballCfg, ball, dt)

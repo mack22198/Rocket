@@ -2413,14 +2413,14 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 		glow.Parent = glowPoint
 	end
 
-	-- Boost flames come out of the back.
+	-- Flames come out of the back when the car dashes.
 	local exhaust = Instance.new("Attachment")
 	exhaust.Name = "Exhaust"
 	exhaust.Position = Vector3.new(0, -0.2, hitbox.Z / 2 + 0.2)
 	exhaust.Parent = chassis
 
 	local flames = Instance.new("ParticleEmitter")
-	flames.Name = "BoostFlames"
+	flames.Name = "DashFlames"
 	flames.Texture = "rbxasset://textures/particles/fire_main.dds"
 	flames.Color = FLAMES[stage] or ColorSequence.new(rgb(255, 240, 120), rgb(255, 90, 20))
 	flames.LightEmission = 1
@@ -2434,7 +2434,7 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 	flames.Enabled = false
 	flames.Parent = exhaust
 
-	-- Fire glow for an armed Mega Shot.
+	-- Fire glow while the next hit is a Mega Shot (Hot Sauce).
 	local megaGlow = particles(chassis, "MegaGlow", ColorSequence.new(rgb(255, 200, 60), rgb(255, 60, 20)), 1.2, 40)
 	megaGlow.Lifetime = NumberRange.new(0.4, 0.7)
 	megaGlow.Speed = NumberRange.new(2, 5)

@@ -17,7 +17,7 @@ return function(t)
 			styleTouches = 0,
 			megaShots = 0,
 			points = 0,
-			items = 0,
+			orbs = 0,
 			powers = 0,
 			demos = 0,
 		}
@@ -86,6 +86,23 @@ return function(t)
 
 		Daily.rollover(state, 55, DAY + 4) -- missed two days
 		expect.equal(state.streak, 1)
+	end)
+
+	t.test("a quest that's been retired is swapped for one that's still around", function()
+		local state = Daily.newState()
+		Daily.rollover(state, 55, DAY)
+		state.quests[2] = { id = "items", progress = 3, claimed = false } -- item boxes are gone
+		expect.truthy(Daily.hasRetired(state))
+		expect.truthy(Daily.rollover(state, 55, DAY), "swapped straight away, even later the same day")
+		expect.falsy(Daily.hasRetired(state))
+		local replacement = Daily.quest(state.quests[2].id)
+		assert(replacement)
+		expect.equal(state.quests[2].progress, 0)
+		local ids = {}
+		for _, quest in state.quests do
+			expect.falsy(ids[quest.id], "no quest twice")
+			ids[quest.id] = true
+		end
 	end)
 
 	t.test("streak rewards grow to day 7 and stay there", function()

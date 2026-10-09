@@ -1,6 +1,6 @@
 --!strict
 -- The game loop. Everyone starts in the main menu. Pressing PLAY puts you in the queue; a match starts a few
--- seconds after someone is waiting (3v3, 3:00 clock, goals, overtime), then results + Scrap, then back to the
+-- seconds after someone is waiting (2v2, 3:00 clock, goals, overtime), then results + Scrap, then back to the
 -- menu (or straight into the next match with PLAY AGAIN).
 -- Empty seats are filled with bots. Pressing PLAY while a match is on takes over a bot's seat straight away,
 -- and a bot takes over for anyone who leaves the match or the game.
@@ -18,7 +18,6 @@ local Evolution = require(Shared.Config.Evolution)
 local GameConfig = require(Shared.Config.GameConfig)
 local MatchState = require(Shared.Match.MatchState)
 local MathUtil = require(Shared.Util.MathUtil)
-local Powers = require(Shared.Config.Powers)
 local Remotes = require(Shared.Net.Remotes)
 local Rewards = require(Shared.Config.Rewards)
 local Teams = require(Shared.Match.Teams)
@@ -27,13 +26,12 @@ local Twists = require(Shared.Config.Twists)
 local Roster = require(script.Parent.Parent.Match.Roster)
 local BallService = require(script.Parent.BallService)
 local BotService = require(script.Parent.BotService)
-local BoostPadService = require(script.Parent.BoostPadService)
 local BumpService = require(script.Parent.BumpService)
 local CarService = require(script.Parent.CarService)
 local DailyService = require(script.Parent.DailyService)
 local DataService = require(script.Parent.DataService)
 local DemolitionService = require(script.Parent.DemolitionService)
-local ItemService = require(script.Parent.ItemService)
+local OrbService = require(script.Parent.OrbService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local PowerService = require(script.Parent.PowerService)
 local ProgressService = require(script.Parent.ProgressService)
@@ -71,11 +69,12 @@ local PlayerAttr = MatchState.PlayerAttr
 -- Players who pressed PLAY, first come first served.
 local queue: { Player } = {}
 
--- Kickoff spots for one team, as (x, distance from the centre line). Mirrored for the other team.
+-- Kickoff spots for one team, as (x, distance from the centre line), in the order seats fill: in 2v2 one car
+-- goes for the ball from the side and the other waits back in goal. Mirrored for the other team.
 local KICKOFF_SPOTS = {
 	Vector2.new(-48, 70),
-	Vector2.new(48, 70),
 	Vector2.new(0, 125),
+	Vector2.new(48, 70),
 }
 
 local function serverNow(): number
@@ -240,6 +239,14 @@ local function makeBot(team: Team, slot: number): Participant
 	return bot
 end
 
+-- Whoever takes over a seat (a player from a bot, or a bot from a player who left) keeps its ultimate charge.
+local function takeOverMeter(to: Participant, from: Participant)
+	if from.ult > to.ult then
+		to.ult = from.ult
+		to.ultReadyAt = from.ultReadyAt
+	end
+end
+
 local function makePlayerParticipant(player: Player, team: Team, slot: number): Participant
 	local def, stage = equippedCar(player)
 	local p = Roster.newParticipant({
@@ -305,7 +312,7 @@ local function joinInProgress(player: Player): boolean
 	Roster.remove(seat)
 
 	local p = makePlayerParticipant(player, seat.team, seat.slot)
-	p.boost = math.max(seat.boost, GameConfig.Car.StartingBoost)
+	takeOverMeter(p, seat)
 	Roster.add(p)
 	setStatus(player, Status.Playing)
 	player:SetAttribute(PlayerAttr.Team, p.team)
@@ -336,7 +343,7 @@ local function replaceWithBot(p: Participant)
 		return
 	end
 	local bot = makeBot(p.team, p.slot)
-	bot.boost = p.boost
+	takeOverMeter(bot, p)
 	Roster.add(bot)
 	CarService.spawn(bot, cframe)
 	if isLivePhase() then
@@ -355,9 +362,7 @@ local function applyTwist(id: string)
 	set(Attr.Twist, id)
 	BallService.setConfig(Twists.ballConfig(id))
 	CarDriver.setConfig(Twists.carConfig(id))
-	CarService.setUnlimitedBoost(twist ~= nil and twist.UnlimitedBoost == true)
-	StatsService.setMegaMultiplier(if twist and twist.MegaMultiplier then twist.MegaMultiplier else 1)
-	ItemService.setRespawn(if twist and twist.BoxRespawn then twist.BoxRespawn else Powers.Tuning.BoxRespawn)
+	CarService.setUltMultiplier(if twist and twist.UltMultiplier then twist.UltMultiplier else 1)
 end
 
 local function setupMatch()
@@ -382,7 +387,7 @@ local function setupMatch()
 	set(Attr.Banner, "")
 	applyTwist(Twists.pick(os.time(), rng:NextNumber(), rng:NextNumber()))
 
-	-- First come, first served for the six seats; anyone else keeps waiting and gets the next free seat.
+	-- First come, first served for the seats; anyone else keeps waiting and gets the next free seat.
 	local humans: { Player } = {}
 	for _, player in queue do
 		if #humans < M.TeamSize * 2 and player.Parent == Players then
@@ -422,13 +427,11 @@ end
 local function kickoff()
 	pendingGoal = nil
 	BallService.reset(Vector3.new(0, BallService.config().Radius, 0))
-	BoostPadService.resetAll()
-	ItemService.resetAll()
+	OrbService.reset()
 	BumpService.reset()
 	DemolitionService.reset()
 	for _, p in Roster.all() do
 		CarService.freezeAt(p, kickoffCFrame(p))
-		CarService.resetForKickoff(p)
 	end
 	PowerService.resetForKickoff()
 	setPhase(Phases.Countdown, M.CountdownLength)
@@ -588,6 +591,7 @@ local function finishMatch(aborted: boolean)
 	matchRunning = false
 	BallService.hide()
 	PowerService.clear()
+	OrbService.clear()
 	DemolitionService.reset()
 	local winner: Team? = if blueScore > orangeScore then "Blue" elseif orangeScore > blueScore then "Orange" else nil
 	local mvp: Participant? = nil
@@ -674,7 +678,7 @@ local function finishMatch(aborted: boolean)
 				data.stats.scrapEarned += summary.total
 				data.stats.demos += p.stats.demos
 				data.stats.styleTouches += p.stats.styleTouches
-				data.stats.items += p.stats.items
+				data.stats.orbs += p.stats.orbs
 				data.stats.powers += p.stats.powers
 				if mvp == p then
 					data.stats.mvps += 1
@@ -888,10 +892,9 @@ function MatchService.start()
 		BallService.update(dt)
 		local phase = MatchState.phase(stateObject)
 		local live = phase == Phases.Playing
-		CarService.tick(dt, live or phase == Phases.GoalScored)
+		CarService.tick(dt, live)
 		if live then
-			BoostPadService.update()
-			ItemService.update()
+			OrbService.update()
 			PowerService.update()
 			BumpService.update()
 		end
@@ -910,6 +913,7 @@ function MatchService.start()
 					warn(`[Match] The match crashed: {err}`)
 					matchRunning = false
 					PowerService.clear()
+					OrbService.clear()
 					DemolitionService.reset()
 					applyTwist("")
 					for _, p in Roster.all() do

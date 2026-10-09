@@ -3,10 +3,7 @@
 --
 -- Client -> Server
 --   BallHit(id, time, carCFrame, carVelocity, ballPosition, ballVelocity)   "my car just touched the ball"
---   SetBoosting(isBoosting)                                                  boost button held / released
---   ActivateMega()                                                           arm a full Mega Shot
---   UseItem()                                                                use the item you're holding
---   UsePower()                                                               use your car's power
+--   UseUltimate()                                                            set off your car's ultimate
 --   Horn()                                                                   honk!
 --   Garage(action, carId, extra) -> result                                   unlock / equip / evolve cars
 --   Daily(action, index) -> result                                           claim streak / quest / chest prize
@@ -24,7 +21,7 @@
 --   BallHitResult(id, accepted, serverTime)                    answer to BallHit
 --   Bumped(velocityChange)                                     your car got bumped
 --   CarEffect(effect, duration, direction)                     your car spun out / got slowed / got frozen
---   PowerFx(kind, position, team, target)                      show an item or power going off
+--   PowerFx(kind, position, team, target)                      show an ultimate (or a charge orb) going off
 --   HornPlayed(car, hornId)                                    someone honked
 --   QuickChatShown(car, phraseIndex, name, team)               someone said a QuickChat phrase
 --   Progress(kind, info)                                       you reached a level or finished an achievement
@@ -84,10 +81,7 @@ end
 
 local Remotes = {
 	BallHit = event("BallHit"),
-	SetBoosting = event("SetBoosting"),
-	ActivateMega = event("ActivateMega"),
-	UseItem = event("UseItem"),
-	UsePower = event("UsePower"),
+	UseUltimate = event("UseUltimate"),
 	Horn = event("Horn"),
 	Garage = func("Garage"),
 	Daily = func("Daily"),
