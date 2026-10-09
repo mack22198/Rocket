@@ -20,8 +20,8 @@ return function(t)
 
 	local entries = {
 		{ name = "Player1", team = "Blue", carId = "monster", stage = 3, points = 420 },
-		{ name = "Bolt (bot)", team = "Orange", carId = "ufo", stage = 1, points = 250 },
-		{ name = "Sparky (bot)", team = "Blue", carId = "kart", stage = 4, points = 180 },
+		{ name = "TurboTaco9", team = "Orange", carId = "ufo", stage = 1, points = 250 },
+		{ name = "PixelPanda22", team = "Blue", carId = "kart", stage = 4, points = 180 },
 	}
 
 	local function lowestWheel(car: Model): number

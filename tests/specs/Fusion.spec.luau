@@ -104,6 +104,7 @@ return function(t)
 			shotLinedUp = false,
 			nearestEnemy = 200,
 			enemyBehind = true,
+			enemyAhead = false,
 			readyFor = 0,
 		}
 		expect.falsy(Powers.botWantsPower("dive", view))

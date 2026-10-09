@@ -73,7 +73,7 @@ return function(t)
 			assertInside(s.position)
 		end)
 		expect.atLeast(maxY, 30)
-		expect.atMost(state.position.X, 100)
+		expect.atMost(state.position.X, GameConfig.Arena.Width / 2 - 15, "it came back off the wall")
 	end)
 
 	t.test("a shot straight at the goal scores", function()

@@ -1,6 +1,7 @@
 --!strict
--- The in-game HUD: the scoreboard and clock, your ultimate meter, big centre text (countdown, GO!, GOAL!), a
--- note about what's happening to your car, and the MENU button. It's only shown during matches - the menus have
+-- The in-game HUD: the scoreboard and clock, your ultimate meter (and a big banner and flash of colour when you set
+-- it off), big centre text (countdown, GO!, GOAL!), a note about what's happening to your car, and the MENU
+-- button. It's only shown during matches - the menus have
 -- their own screens. (On phones and tablets the ultimate meter is the ULT button instead; see TouchControls.)
 --
 -- Everything stays clear of Roblox's own buttons in the top corners.
@@ -59,6 +60,13 @@ local ultCaption: TextLabel
 local ultKey: TextLabel
 local ultName: TextLabel
 local lastCharge = -1
+-- Setting it off
+local ultFlash: Frame
+local ultBanner: Frame
+local ultBannerPop: UIScale
+local ultBannerIcon: TextLabel
+local ultBannerName: TextLabel
+local ultBannerShown = 0
 -- What's happening to your car
 local statusPill: TextLabel
 local noticeText = ""
@@ -204,6 +212,80 @@ local function buildUltDial()
 	})
 end
 
+-- The moment you set off your ultimate: the screen flashes its colour and its name bursts onto the screen.
+local function buildUltBanner()
+	ultFlash = Instance.new("Frame")
+	ultFlash.Name = "UltFlash"
+	ultFlash.Size = UDim2.fromScale(1, 1)
+	ultFlash.BackgroundTransparency = 1
+	ultFlash.BorderSizePixel = 0
+	ultFlash.Parent = gui
+
+	ultBanner = Instance.new("Frame")
+	ultBanner.Name = "UltBanner"
+	ultBanner.Size = UDim2.fromOffset(760, 210)
+	ultBanner.Position = UDim2.fromScale(0.5, 0.42)
+	ultBanner.AnchorPoint = Vector2.new(0.5, 0.5)
+	ultBanner.BackgroundTransparency = 1
+	ultBanner.Visible = false
+	ultBanner.Parent = gui
+	local inner = Instance.new("Frame")
+	inner.Name = "Pop"
+	inner.Size = UDim2.fromScale(1, 1)
+	inner.BackgroundTransparency = 1
+	inner.Parent = ultBanner
+	ultBannerPop = Instance.new("UIScale")
+	ultBannerPop.Parent = inner
+	ultBannerIcon = Theme.label(inner, {
+		name = "Icon",
+		size = UDim2.fromOffset(84, 84),
+		position = UDim2.fromScale(0.5, 0),
+		anchor = Vector2.new(0.5, 0),
+		text = "",
+		color = C.Text,
+	})
+	Theme.pill(inner, {
+		name = "Kicker",
+		size = UDim2.fromOffset(170, 30),
+		position = UDim2.new(0.5, 0, 0, 84),
+		anchor = Vector2.new(0.5, 0),
+		text = "ULTIMATE!",
+		background = C.Gold,
+	})
+	ultBannerName = Theme.heading(inner, {
+		name = "Name",
+		size = UDim2.new(1, 0, 0, 92),
+		position = UDim2.fromOffset(0, 116),
+		text = "",
+		textSize = 80,
+		stroke = true,
+	})
+	Theme.outline(ultBannerName, 5)
+end
+
+local function showUltBanner(power: Powers.PowerDef)
+	ultBannerShown += 1
+	local shown = ultBannerShown
+	ultFlash.BackgroundColor3 = power.Color
+	ultFlash.BackgroundTransparency = 0.6
+	TweenService:Create(ultFlash, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 1,
+	}):Play()
+	ultBannerIcon.Text = power.Emoji
+	ultBannerName.Text = `{string.upper(power.Name)}!`
+	ultBannerName.TextColor3 = power.Color
+	ultBanner.Visible = true
+	ultBannerPop.Scale = 0.3
+	TweenService:Create(ultBannerPop, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Scale = 1,
+	}):Play()
+	task.delay(1.5, function()
+		if shown == ultBannerShown then
+			ultBanner.Visible = false
+		end
+	end)
+end
+
 local function buildMenuButton()
 	local holder = Instance.new("Frame")
 	holder.Name = "Menu"
@@ -267,6 +349,7 @@ local function build()
 	gui = Theme.screen("TurboHUD", 5)
 	buildScoreboard()
 	buildUltDial()
+	buildUltBanner()
 	buildTwist()
 	buildMenuButton()
 	statusPill = Theme.pill(gui, {
@@ -300,7 +383,8 @@ local function build()
 	subText.ZIndex = 5
 	subText.Visible = false
 
-	local scaledObjects: { GuiObject } = { scoreboard, bigText, subText, ultDial, statusPill, twistBanner, twistPill }
+	local scaledObjects: { GuiObject } =
+		{ scoreboard, bigText, subText, ultDial, ultBanner, statusPill, twistBanner, twistPill }
 	for _, object in scaledObjects do
 		Theme.scaled(object)
 	end
@@ -493,6 +577,17 @@ function HUD.start()
 	Remotes.Announce.OnClientEvent:Connect(function(kind: any, text: any)
 		if kind == "overtime" and type(text) == "string" then
 			HUD.flash("OVERTIME!", C.Gold, "Next goal wins!", 2.5)
+		end
+	end)
+	-- You set off your ultimate.
+	Remotes.PowerFx.OnClientEvent:Connect(function(kind: any, _position: any, _team: any, car: any)
+		local mine = CarController.getCar()
+		if kind == "ult" and mine and car == mine then
+			local id = mine:GetAttribute(CarAttr.Power)
+			local power = if type(id) == "string" then Powers.power(id) else nil
+			if power then
+				showUltBanner(power)
+			end
 		end
 	end)
 end

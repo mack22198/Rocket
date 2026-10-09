@@ -29,6 +29,9 @@ local smoothedFocus: Vector3? = nil
 local heading = Vector3.new(0, 0, -1)
 local shakeUntil = 0
 local shakeStrength = 0
+local punchStarted = -math.huge
+local punchAmount = 0
+local punchLength = 0
 
 local DISTANCE = 18.5
 local HEIGHT = 7.2
@@ -41,10 +44,12 @@ type Provider = (dt: number) -> (CFrame?, number)
 local provider: Provider? = nil
 local speedFeel = 0
 
--- Nothing to follow (e.g. between the menu and your car appearing): a slow flight around the stadium.
+-- Nothing to follow (e.g. between the menu and your car appearing): a slow flight around the stadium, above
+-- the roof.
 local function overview(camera: Camera)
 	local t = os.clock() * 0.05
-	local position = Vector3.new(math.cos(t) * 250, 105, math.sin(t) * 250)
+	local radius = GameConfig.Arena.Length / 2 + 60
+	local position = Vector3.new(math.cos(t) * radius, 160, math.sin(t) * radius)
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.FieldOfView = 55
 	camera.CFrame = MathUtil.lookAlong(position, Vector3.new(0, 10, 0) - position, Vector3.yAxis)
@@ -118,7 +123,10 @@ local function update(dt: number)
 		shake = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * s
 	end
 	camera.CameraType = Enum.CameraType.Scriptable
-	camera.FieldOfView = FOV + DASH_FOV * speedFeel
+	-- A punch: the view widens in a flash, then eases back.
+	local punched = os.clock() - punchStarted
+	local punch = if punched < punchLength then punchAmount * (1 - punched / punchLength) ^ 2 else 0
+	camera.FieldOfView = FOV + DASH_FOV * speedFeel + punch
 	camera.CFrame = MathUtil.lookAlong(position + shake, smoothFocus - position, Vector3.yAxis)
 end
 
@@ -169,6 +177,13 @@ end
 
 function CameraController.isBallCam(): boolean
 	return ballCam
+end
+
+-- Widens the view by `amount` degrees in a flash, easing back over `duration` seconds (an ultimate going off).
+function CameraController.punch(amount: number, duration: number)
+	punchStarted = os.clock()
+	punchAmount = amount
+	punchLength = duration
 end
 
 function CameraController.shake(strength: number, duration: number)

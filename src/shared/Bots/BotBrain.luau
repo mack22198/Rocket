@@ -160,7 +160,7 @@ function BotBrain.adaptiveSkill(base: number, playersLead: number, rookie: boole
 end
 
 -- Bots that aren't chasing the ball go for the charge orb when it's at most this far away.
-local ORB_RANGE = 110
+local ORB_RANGE = 130
 
 -- Decides this frame's controls.
 function BotBrain.decide(ctx: Context, memory: Memory, dt: number): CarPhysics.Input
@@ -170,7 +170,7 @@ function BotBrain.decide(ctx: Context, memory: Memory, dt: number): CarPhysics.I
 	local ownGoal = Vector3.new(0, 0, ctx.defendsSide * halfLength)
 	local enemyGoal = Vector3.new(0, 0, -ctx.defendsSide * halfLength)
 	local ballFlatDistance = MathUtil.flat(ctx.ballPosition - carPos).Magnitude
-	local ballNearOurGoal = MathUtil.flat(ctx.ballPosition - ownGoal).Magnitude < 75
+	local ballNearOurGoal = MathUtil.flat(ctx.ballPosition - ownGoal).Magnitude < halfLength * 0.45
 
 	local target: Vector3
 	local urgent = false

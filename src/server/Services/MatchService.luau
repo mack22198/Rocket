@@ -11,6 +11,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Achievements = require(Shared.Config.Achievements)
+local BotNames = require(Shared.Config.BotNames)
 local CarCatalog = require(Shared.Config.CarCatalog)
 local CarDriver = require(Shared.Cars.CarDriver)
 local Cosmetics = require(Shared.Config.Cosmetics)
@@ -72,9 +73,9 @@ local queue: { Player } = {}
 -- Kickoff spots for one team, as (x, distance from the centre line), in the order seats fill: in 2v2 one car
 -- goes for the ball from the side and the other waits back in goal. Mirrored for the other team.
 local KICKOFF_SPOTS = {
-	Vector2.new(-48, 70),
-	Vector2.new(0, 125),
-	Vector2.new(48, 70),
+	Vector2.new(-56, 88),
+	Vector2.new(0, 156),
+	Vector2.new(56, 88),
 }
 
 local function serverNow(): number
@@ -196,17 +197,36 @@ local function equippedCar(player: Player): (CarCatalog.CarDef, number)
 	return CarCatalog.get(CarCatalog.StarterId) :: CarCatalog.CarDef, 1
 end
 
+-- A name for a new bot, like a player's username: one nobody in the match or the server is using.
+local function botName(): string
+	local taken: { [string]: boolean } = {}
+	for _, p in Roster.all() do
+		taken[string.lower(p.name)] = true
+	end
+	for _, player in Players:GetPlayers() do
+		taken[string.lower(player.Name)] = true
+		taken[string.lower(player.DisplayName)] = true
+	end
+	local start = rng:NextInteger(1, #BotNames)
+	for i = 0, #BotNames - 1 do
+		local name = BotNames[(start + i - 1) % #BotNames + 1]
+		if not taken[string.lower(name)] then
+			return name
+		end
+	end
+	return `{BotNames[start]}{rng:NextInteger(10, 99)}`
+end
+
 local function makeBot(team: Team, slot: number): Participant
 	botCounter += 1
 	local bots = GameConfig.Bots
-	local names = bots.Names
 	local carIds = if rng:NextNumber() < bots.FusedChance then bots.FusedCarIds else bots.CarIds
 	local def = CarCatalog.get(carIds[rng:NextInteger(1, #carIds)])
 		or CarCatalog.get(CarCatalog.StarterId) :: CarCatalog.CarDef
 	local bot = Roster.newParticipant({
 		key = `bot:{botCounter}`,
 		player = nil,
-		name = `{names[(botCounter - 1) % #names + 1]} (bot)`,
+		name = botName(),
 		team = team,
 		slot = slot,
 		def = def,
@@ -328,7 +348,7 @@ local function joinInProgress(player: Player): boolean
 	return true
 end
 
--- A player leaves (or quits) mid-match: a bot takes over their seat.
+-- A player leaves (or quits) mid-match: a bot takes over their seat (and joins like a player would).
 local function replaceWithBot(p: Participant)
 	local chassis = p.chassis
 	local cframe = if DemolitionService.isDemolished(p)
@@ -349,6 +369,7 @@ local function replaceWithBot(p: Participant)
 	if isLivePhase() then
 		CarService.release(bot)
 	end
+	StatsService.announce("join", `{bot.name} joined {string.upper(bot.team)}!`, bot.team, bot.name)
 end
 
 ---------------------------------------------------------------------------------------------------------------

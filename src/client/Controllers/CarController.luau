@@ -192,6 +192,14 @@ function CarController.useUltimate()
 			if change then
 				d:addVelocity(change)
 			end
+			if part.Id == "pound" then
+				-- The Monster Truck's leap: up, then thrown back down for the slam.
+				task.delay(Powers.Tuning.PoundSlamAt, function()
+					if driver == d then
+						d:addVelocity(Vector3.new(0, -Powers.Tuning.PoundSlam, 0))
+					end
+				end)
+			end
 		end
 	end
 	Remotes.UseUltimate:FireServer()

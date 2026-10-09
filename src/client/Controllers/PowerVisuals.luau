@@ -1,8 +1,11 @@
 --!strict
--- What ultimates look like: see-through diving sharks, the glowing Tractor Beam reaching for the ball, and a
--- burst of effects whenever an ultimate goes off. The charge orb too: it bobs and glows on the pitch under a beam
--- of light, with a tag saying what it's worth, so you can spot it from anywhere. And demolitions: the POOF, the
--- car vanishing, and the sparkle when it pops back in at its goal.
+-- What ultimates look like. Every one goes off with a flash, a ring racing across the ground and a burst in its
+-- colour, and the car glows in that colour while it lasts. Then each does its own thing where you can see it:
+-- the cheese floods out from under the car, banana peels fly through the air and land in front of you, ketchup
+-- squirts forward, the Monster Truck leaps and slams down, diving sharks go see-through and the Tractor Beam
+-- reaches for the ball. Cars stuck in cheese drip with it. The charge orb too: it bobs and glows on the pitch
+-- under a beam of light, with a tag saying what it's worth, so you can spot it from anywhere. And demolitions:
+-- the POOF, the car vanishing, and the sparkle when it pops back in at its goal.
 -- It's all just for looks; the server decides what actually happens (see PowerService, OrbService and
 -- DemolitionService).
 
@@ -28,6 +31,9 @@ type CarLook = {
 	model: Model,
 	chassis: BasePart,
 	pullBeam: Beam,
+	aura: ParticleEmitter, -- sparks in the ultimate's colour while it's going...
+	auraLight: PointLight, -- ...and a glow
+	goo: ParticleEmitter, -- cheese dripping off a car stuck in a Cheese Flood
 	ghostParts: { BasePart },
 	ghosted: boolean?, -- nil = needs setting again (after the car was hidden for a replay)
 }
@@ -40,6 +46,8 @@ local T = Powers.Tuning
 local rgb = Color3.fromRGB
 local ORB_COLOR = rgb(80, 220, 255)
 local ORB_CORE_SIZE = 4.6 -- (as PropBuilder.chargeOrb builds it)
+local SPREAD_SPEED = 80 -- studs a second a new trap spreads out from where it came from
+local CHEESE = rgb(255, 204, 64)
 
 local folder: Folder
 local cars: { [Model]: CarLook } = {}
@@ -82,6 +90,45 @@ local function track(model: Instance)
 	beam.Enabled = false
 	beam.Parent = chassis
 
+	-- While its ultimate is going, the car sparkles and glows in the ultimate's colour.
+	local powerId = model:GetAttribute(A.Power)
+	local power = if type(powerId) == "string" then Powers.power(powerId) else nil
+	local color = if power then power.Color else rgb(255, 255, 255)
+	local aura = Instance.new("ParticleEmitter")
+	aura.Name = "UltAura"
+	aura.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	aura.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
+	aura.LightEmission = 1
+	aura.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.6), NumberSequenceKeypoint.new(1, 0) })
+	aura.Transparency = NumberSequence.new(0.15, 1)
+	aura.Lifetime = NumberRange.new(0.5, 0.9)
+	aura.Speed = NumberRange.new(3, 8)
+	aura.SpreadAngle = Vector2.new(180, 180)
+	aura.Rate = 50
+	aura.Enabled = false
+	aura.Parent = chassis
+	local auraLight = Instance.new("PointLight")
+	auraLight.Name = "UltGlow"
+	auraLight.Color = color
+	auraLight.Range = 16
+	auraLight.Brightness = 2
+	auraLight.Shadows = false
+	auraLight.Enabled = false
+	auraLight.Parent = chassis
+	-- Stuck in a Cheese Flood: blobs of cheese drip off the car.
+	local goo = Instance.new("ParticleEmitter")
+	goo.Name = "CheeseDrip"
+	goo.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	goo.Color = ColorSequence.new(CHEESE, rgb(255, 170, 30))
+	goo.LightEmission = 0.3
+	goo.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.2), NumberSequenceKeypoint.new(1, 0.4) })
+	goo.Lifetime = NumberRange.new(0.5, 0.8)
+	goo.Speed = NumberRange.new(1, 3)
+	goo.Acceleration = Vector3.new(0, -40, 0)
+	goo.Rate = 30
+	goo.Enabled = false
+	goo.Parent = chassis
+
 	local ghostParts: { BasePart } = {}
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") and d.Transparency < 1 then
@@ -92,6 +139,9 @@ local function track(model: Instance)
 		model = model,
 		chassis = chassis,
 		pullBeam = beam,
+		aura = aura,
+		auraLight = auraLight,
+		goo = goo,
 		ghostParts = ghostParts,
 		ghosted = false,
 	}
@@ -114,9 +164,17 @@ local function updateCar(look: CarLook, ballPosition: Vector3, ballShown: boolea
 	if LocalHide.isHidden(model) then
 		-- A replay or the podium is showing a stand-in; keep everything of the real car out of sight.
 		look.pullBeam.Enabled = false
+		look.aura.Enabled = false
+		look.auraLight.Enabled = false
+		look.goo.Enabled = false
 		look.ghosted = nil
 		return
 	end
+
+	local glowing = model:GetAttribute(A.UltActive) == true
+	look.aura.Enabled = glowing
+	look.auraLight.Enabled = glowing
+	look.goo.Enabled = model:GetAttribute(A.Goo) == true
 
 	-- Shark Dive: the car goes see-through.
 	local ghost = model:GetAttribute(A.Ghost) == true
@@ -238,8 +296,83 @@ local function updateOrbs()
 end
 
 ---------------------------------------------------------------------------------------------------------------
+-- Cheese, banana peels and ketchup
+---------------------------------------------------------------------------------------------------------------
+
+-- A new trap appears the way it was made: it spreads out from where it came from (the car), so a Cheese Flood
+-- floods outwards and a Ketchup Slick squirts forwards. (A thrown peel just lands.)
+local function spreadOut(model: Instance)
+	if not model:IsA("Model") then
+		return
+	end
+	task.wait() -- (its parts can arrive a moment after the model)
+	local from = model:GetAttribute("From")
+	local origin = if typeof(from) == "Vector3" then from else model:GetPivot().Position
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			local size = part.Size
+			part.LocalTransparencyModifier = 1
+			part.Size = size * 0.15
+			task.delay((part.Position - origin).Magnitude / SPREAD_SPEED, function()
+				if part.Parent then
+					part.LocalTransparencyModifier = 0
+					TweenService:Create(part, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+						Size = size,
+					}):Play()
+				end
+			end)
+		end
+	end
+end
+
+-- A banana peel flying in an arc from the car that threw it to where it lands.
+local function tossPeel(thrower: unknown, landing: Vector3)
+	local start = landing
+	if typeof(thrower) == "Instance" and thrower:IsA("Model") then
+		local chassis = thrower:FindFirstChild("Chassis")
+		if chassis and chassis:IsA("BasePart") then
+			start = chassis.CFrame.Position + Vector3.new(0, 3, 0)
+		end
+	end
+	local peel = Instance.new("Part")
+	peel.Name = "FlyingPeel"
+	peel.Size = Vector3.new(1.6, 1.6, 3.4)
+	peel.Color = rgb(255, 222, 60)
+	peel.Anchored = true
+	peel.CanCollide = false
+	peel.CanQuery = false
+	peel.CanTouch = false
+	peel.CastShadow = false
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Sphere
+	mesh.Parent = peel
+	peel.Parent = folder
+	local height = 8 + (landing - start).Magnitude * 0.3
+	local started = os.clock()
+	local connection: RBXScriptConnection
+	connection = RunService.RenderStepped:Connect(function()
+		local t = math.clamp((os.clock() - started) / T.PeelFlight, 0, 1)
+		local position = start:Lerp(landing, t) + Vector3.new(0, 4 * height * t * (1 - t), 0)
+		peel.CFrame = CFrame.new(position) * CFrame.Angles(t * 11, t * 7, 0)
+		if t >= 1 then
+			connection:Disconnect()
+			peel:Destroy()
+		end
+	end)
+end
+
+---------------------------------------------------------------------------------------------------------------
 -- One-off effects
 ---------------------------------------------------------------------------------------------------------------
+
+-- The ultimate a car has (from its Power attribute).
+local function powerOf(car: unknown): Powers.PowerDef?
+	if typeof(car) == "Instance" then
+		local id = car:GetAttribute(A.Power)
+		return if type(id) == "string" then Powers.power(id) else nil
+	end
+	return nil
+end
 
 local function teamColor(team: unknown): Color3
 	if team == "Blue" or team == "Orange" then
@@ -307,12 +440,25 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 	local at = carPosition(extra, position)
 	local mine = typeof(extra) == "Instance" and extra == CarController.getCar()
 	local E = EffectsController
+	local ground = at - Vector3.new(0, 2, 0)
 	if kind == "ult" then
-		-- Someone set off their ultimate: a flash and a ring in their team's colour (then the ultimate's own).
-		E.flash(at, color, 50, 6, 0.5)
-		E.shockwave(at, color, 14, 0.4)
-		E.burst(at, color, 40, 30, 1.6, 0.6)
-		E.play("Ultimate", 0.9, 1)
+		-- Someone set off their ultimate: a flash, a ring racing across the ground and a burst, all in the
+		-- ultimate's colour (then the ultimate's own effects). Your own also kicks the camera.
+		local power = powerOf(extra)
+		local glow = if power then power.Color else color
+		E.flash(at, glow, 60, 8, 0.6)
+		E.shockwave(at, glow, 16, 0.45)
+		E.ring(ground, glow, 30, 0.7)
+		E.burst(at, glow, 70, 40, 2, 0.7)
+		E.play("Ultimate", 1, 1)
+		if mine then
+			CameraController.punch(14, 0.8)
+			CameraController.shake(0.7, 0.35)
+		end
+		return
+	elseif kind == "peeltoss" then
+		tossPeel(extra, position)
+		return
 	elseif kind == "orb" then
 		E.burst(position, ORB_COLOR, 30, 22, 1.4, 0.7)
 		E.shockwave(position, ORB_COLOR, 8, 0.4)
@@ -333,12 +479,20 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 		E.burst(at, rgb(255, 170, 60), 36, 36, 1.8, 0.6)
 		E.flash(at, rgb(255, 160, 60), 30, 4, 0.4)
 		E.play("Whoosh", 0.8, 1)
-	elseif kind == "cheese" or kind == "peel" then
-		E.burst(position + Vector3.new(0, 1, 0), rgb(255, 214, 70), 18, 16, 1.2, 0.5, 30)
-		E.play("Hit", 0.4, 0.7)
+	elseif kind == "cheese" then
+		-- A wave of cheese: goo splashes up everywhere as the puddle floods out.
+		E.burst(position + Vector3.new(0, 2, 0), CHEESE, 110, 45, 2.6, 1.1, 60)
+		E.ring(position, CHEESE, T.CheeseRadius + 3, 0.5)
+		E.play("Hit", 0.8, 0.5)
+	elseif kind == "peel" then
+		-- A peel landing.
+		E.burst(position + Vector3.new(0, 1, 0), rgb(255, 214, 70), 16, 14, 1.1, 0.4, 30)
+		E.play("Click", 0.4, 1.4)
+		return
 	elseif kind == "ketchup" then
-		E.burst(position + Vector3.new(0, 1, 0), rgb(230, 30, 30), 30, 22, 1.4, 0.6, 30)
-		E.play("Hit", 0.5, 0.6)
+		-- `position` is the car's nose: ketchup sprays out of it.
+		E.burst(position + Vector3.new(0, 1, 0), rgb(230, 30, 30), 70, 36, 1.6, 0.7, 40)
+		E.play("Whoosh", 0.8, 0.6)
 	elseif kind == "hotsauce" then
 		E.burst(at, rgb(255, 80, 30), 44, 32, 1.8, 0.7)
 		E.flash(at, rgb(255, 80, 40), 40, 5, 0.5)
@@ -346,6 +500,7 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 		E.play("Whoosh", 0.9, 0.8)
 	elseif kind == "quack" then
 		E.shockwave(at, rgb(255, 224, 80), T.QuackRadius, 0.5)
+		E.ring(ground, rgb(255, 224, 80), T.QuackRadius, 0.5)
 		shout(extra, "QUACK!", rgb(255, 220, 60))
 		E.play("Click", 1, 0.45)
 		if nearMe(at, T.QuackRadius * 1.5) then
@@ -356,12 +511,16 @@ local function onPowerFx(kind: unknown, position: unknown, team: unknown, extra:
 		E.shockwave(at, rgb(120, 220, 255), 9, 0.35)
 		E.play("Whoosh", 0.8, 1.2)
 	elseif kind == "pound" then
-		E.shockwave(position, color:Lerp(rgb(255, 90, 60), 0.5), T.PoundRadius, 0.55)
-		E.burst(position, rgb(170, 140, 110), 60, 45, 2.2, 0.9, 30)
-		E.flash(position, rgb(255, 120, 80), 50, 6, 0.4)
-		E.play("Hit", 1, 0.5)
+		-- The slam: a shockwave, a ring of dust racing out and the ground shaking.
+		local slam = color:Lerp(rgb(255, 90, 60), 0.5)
+		E.shockwave(position, slam, T.PoundRadius, 0.55)
+		E.ring(position - Vector3.new(0, 2, 0), slam, T.PoundRadius, 0.5)
+		E.burst(position, rgb(170, 140, 110), 90, 50, 2.6, 1, 30)
+		E.flash(position, rgb(255, 120, 80), 50, 7, 0.4)
+		E.play("Hit", 1, 0.45)
+		E.play("Poof", 0.8, 0.8)
 		if nearMe(position, T.PoundRadius * 1.6) then
-			CameraController.shake(1.2, 0.45)
+			CameraController.shake(1.4, 0.5)
 		end
 	elseif kind == "beam" then
 		E.burst(at, rgb(150, 255, 130), 28, 16, 1.2, 0.7)
@@ -415,6 +574,13 @@ function PowerVisuals.start()
 	for _, child in carsFolder:GetChildren() do
 		task.spawn(track, child)
 	end
+
+	task.spawn(function()
+		local hazardFolder = matchFolder:WaitForChild(MatchState.Folders.Hazards)
+		hazardFolder.ChildAdded:Connect(function(child)
+			task.spawn(spreadOut, child)
+		end)
+	end)
 
 	task.spawn(function()
 		local orbFolder = matchFolder:WaitForChild(MatchState.Folders.Orbs)

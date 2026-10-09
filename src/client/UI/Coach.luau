@@ -90,7 +90,7 @@ local HINTS: { Hint } = {
 			return s.sinceKickoff > 15 and not s.ultReady
 		end,
 		text = function()
-			return "Every touch of the ball charges your ultimate faster!"
+			return "Hitting the ball charges up your ultimate!"
 		end,
 	},
 }

@@ -59,6 +59,8 @@ local function syncAttributes(p: Participant)
 	local ghost = Roster.hasEffect(p, "ghost", now)
 	setIfChanged(car, A.Ghost, ghost)
 	setIfChanged(car, A.Pull, if Roster.hasEffect(p, "beam", now) then "beam" else "")
+	setIfChanged(car, A.UltActive, Roster.hasEffect(p, "ult", now))
+	setIfChanged(car, A.Goo, Roster.hasEffect(p, "goo", now))
 	local chassis = p.chassis
 	local group = if ghost then GHOST_GROUP else CAR_GROUP
 	if chassis and chassis.CollisionGroup ~= group then
@@ -209,8 +211,8 @@ local function score(team: Roster.Team): number
 	return if type(value) == "number" then value else 0
 end
 
--- Fills every ultimate meter a little while the ball is in play (faster for a team that's behind), and keeps
--- the cars' attributes in step as effects wear off.
+-- Fills every ultimate meter a little while the ball is in play (faster for a team that's behind; the rest comes
+-- from playing), and keeps the cars' attributes in step as effects wear off.
 function CarService.tick(dt: number, live: boolean)
 	local blue, orange = score("Blue"), score("Orange")
 	for _, p in Roster.all() do

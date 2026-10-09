@@ -17,10 +17,12 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
   Players team up: two play together against bots (only more than that are split between the teams),
   and someone pressing PLAY mid-match takes over a bot on their team. Bot team-mates play *for* you - they leave
   the ball to you and pass it up to you - and the bots you play against ease off while you're behind (and for
-  your first few matches) and push harder while you're ahead, so matches stay close.
+  your first few matches) and push harder while you're ahead, so matches stay close. Bots play under made-up
+  usernames (a different set every match, from [`BotNames.luau`](src/shared/Config/BotNames.luau)) with levels
+  and titles, so a match with bots in it feels like a match with other kids.
 - **Simple to play:** there are only three things to do - drive, jump and set off your **ultimate** - so the
   only buttons are JUMP and ULT (E on a keyboard). No boost to manage, nothing to pick up and juggle.
-- **Car soccer:** a curved-wall arena with glowing goals and nets, kickoff countdowns, a scoreboard and clock, a
+- **Car soccer:** a roomy curved-wall arena with glowing goals and nets, kickoff countdowns, a scoreboard and clock, a
   play-on-at-0:00 rule, and golden-goal overtime.
 - **A real stadium:** team-coloured stands packed with fans (who jump when someone scores and do Mexican waves),
   scrolling LED advert boards that flash team colours after a goal, the game's name painted on the pitch, glass
@@ -43,18 +45,23 @@ a kid who finishes one match immediately wants to play another. "Turbo Ball" is 
 - **Demolitions:** smash into the other team on a Tiny Kart's **Nitro Rocket** and their car goes **POOF** - a
   cartoon cloud, stars and toy-car bits flying everywhere - then pops back in at its own goal two seconds later. Each one is worth a
   little Scrap (and there's a daily quest for it). Bots never demolish players in their first five matches.
-- **Every car has its own ultimate**, like the big moves in hero shooters: the Pizza Car floods the pitch behind
-  it with gooey **Cheese**, the Banana Car drops a **Banana Storm** of peels, the Tiny Kart fires off a **Nitro
-  Rocket** (the only way to demolish a car), the Neon Shark does a **Shark Dive** that makes it untouchable, the
-  Monster Truck a **Ground Pound** shockwave, the UFO a **Tractor Beam** that lifts the ball up for the perfect
-  shot, the Taco Truck **Hot Sauce** (your next hit is a flaming Mega Shot), the Rubber Duck a **Quack Attack**
-  that spins out everyone nearby, and the Hot Dog a **Ketchup Slick** trail. Fused cars get a **combo** of both
-  their parents' ultimates (their meter fills a little slower).
-- **The ultimate meter** fills up by itself as the match goes on (a team that's behind fills faster), and much
-  faster when you play: every touch of the ball, air and wall hits, shots, saves, goals and assists all charge
-  it. When it's full the meter glows and one press (E, X or ULT) sets it off; everyone sees a big "CHEESE
-  FLOOD!" so they know what's coming. A full meter takes about a minute and a half by itself, less when you're
-  busy, so everyone gets two or three ultimates a match.
+- **Every car has its own ultimate**, like the big moves in hero shooters: the Pizza Car floods the pitch all
+  around it with gooey **Cheese**, the Banana Car throws a **Banana Storm** of peels out in front, the Tiny Kart
+  fires off a **Nitro Rocket** (the only way to demolish a car), the Neon Shark does a **Shark Dive** that makes
+  it untouchable, the Monster Truck leaps up and comes down in a **Ground Pound** shockwave, the UFO's **Tractor
+  Beam** grabs the ball from far away and lifts it up for the perfect shot, the Taco Truck catches fire with
+  **Hot Sauce** (your next hit is a flaming Mega Shot), the Rubber Duck lets out a **Quack Attack** that spins out
+  everyone nearby, and the Hot Dog squirts a **Ketchup Slick** out in front. Fused cars get a **combo** of both
+  their parents' ultimates.
+- **Ultimates are made to be seen:** when you set yours off, the screen flashes its colour, its name bursts
+  onto the screen and the camera kicks; your car glows while it lasts, and everything it does happens where
+  your camera is looking - the cheese floods out from under you, the peels fly through the air and land ahead
+  of you, the ketchup squirts forward. Everyone else gets a popup ("TurboTaco9: CHEESE FLOOD!") so they see it
+  coming, and cars stuck in the cheese drip with it.
+- **The ultimate meter fills mostly from playing:** every touch of the ball (once a second at most), air and wall
+  hits, shots, saves, goals, assists, big bumps and the charge orb. It only creeps up by itself (faster for a
+  team that's behind), so everyone's is ready at a different moment - and each car's fills at its own pace.
+  When it's full the meter glows and one press (E, X or ULT) sets it off.
 - **The charge orb:** every so often one glowing orb appears somewhere on the halfway line, under a beam of
   light with a "ULT +30%" tag. Whoever drives through it first gets a big chunk of ultimate charge. There's only
   ever one, so the pitch stays clear and it's always a race.
@@ -225,9 +232,9 @@ lost or given twice.
 
 Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
 
-- [`GameConfig.luau`](src/shared/Config/GameConfig.luau): team size, match length, arena and goal size, ball
-  size and bounciness, car speed, jump height, gravity, bot skill, how fast the ultimate meter fills and what
-  charges it (`Ultimate`), the charge orb (`Orb`: how often, where, how long it stays), how much hits bend
+- [`GameConfig.luau`](src/shared/Config/GameConfig.luau): team size, match length, arena and goal size (the
+  stands, the VIP deck and the scenery all move to fit), ball size and bounciness, car speed, jump height,
+  gravity, bot skill, how fast the ultimate meter fills and what charges it (`Ultimate`), the charge orb (`Orb`: how often, where, how long it stays), how much hits bend
   toward the goal with driving help (`Hit.ShotAssist`) and Studio shortcuts.
 - [`DriveAssist.luau`](src/shared/Cars/DriveAssist.luau): how strong the rest of the driving help is (keyboard
   steering, aim assist, jump assist).
@@ -238,7 +245,8 @@ Almost everything is a number in [`src/shared/Config/`](src/shared/Config):
 - [`Season.luau`](src/shared/Config/Season.luau): when seasons start, how much XP a tier takes, and each season's
   rewards.
 - [`Powers.luau`](src/shared/Config/Powers.luau): every car's ultimate, what it does and how strong it is
-  (`Tuning`), and how fast a fused car's meter fills.
+  (`Tuning`), where the Banana Storm's peels land, and how fast each car's meter fills (`ChargeRate`).
+- [`BotNames.luau`](src/shared/Config/BotNames.luau): the made-up usernames bots play under.
 - [`Daily.luau`](src/shared/Config/Daily.luau): the streak rewards, the daily quests and the chest prizes.
 - [`Twists.luau`](src/shared/Config/Twists.luau): the match twists (what each one changes and how often it
   turns up) and the weekend event.
@@ -309,7 +317,8 @@ src/
                   quests, daily chest), Twists (match twists and weekend events), Cosmetics (hats, horns,
                   goal parties), Season (the free season reward track), Sounds (every sound, for Toolbox IDs),
                   QuickChat (the quick chat phrases), Levels (player levels), Achievements (achievements and
-                  titles), Gifts (playtime gifts), Leaderboard (the weekly leaderboard), Shop (Robux products)
+                  titles), Gifts (playtime gifts), Leaderboard (the weekly leaderboard), Shop (Robux products),
+                  BotNames (the bots' usernames)
     Arena/        ArenaShape: the arena's exact math shape (walls, curved ramps, goals)
     Physics/      BallSim (ball physics), CarPhysics (car handling), HitModel (car-ball hits)
     Match/        MatchState (score/clock/phase), HitValidation (anti-cheat checks for hits), Replay (replay

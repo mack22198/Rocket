@@ -25,7 +25,7 @@ local CARDS = {
 	},
 	{
 		title = "YOUR ULTIMATE",
-		text = "Every car has its own big move, like Cheese Flood or Quack Attack. It charges up as you play, faster when you hit the ball. Full? Press E or ULT!",
+		text = "Every car has its own big move, like Cheese Flood or Quack Attack. Hit the ball, shoot, save and score to charge it up. Full? Press E or ULT!",
 		color = C.Gold,
 	},
 	{

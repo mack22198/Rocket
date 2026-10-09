@@ -93,6 +93,7 @@ function BumpService.update()
 			push(attacker, -flat * (speed * cfg.AttackerSlowdown / power) * strength)
 			if not teammates and speed >= cfg.BigBumpSpeed then
 				StatsService.announce("bump", "BUMP!", attacker.team, attacker.name)
+				CarService.chargeUlt(attacker, GameConfig.Ultimate.PerBump)
 			end
 		end
 	end

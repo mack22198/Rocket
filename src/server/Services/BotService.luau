@@ -100,15 +100,18 @@ local function botView(
 	local ballDirection = MathUtil.safeUnit(toBall, look)
 	local goalDirection = MathUtil.safeUnit(MathUtil.flat(enemyGoal - ball), look)
 	local nearest = math.huge
-	local behind = false
+	local behind, ahead = false, false
 	for _, other in Roster.all() do
 		local otherChassis = other.chassis
 		if other.team ~= p.team and otherChassis then
 			local offset = otherChassis.CFrame.Position - position
 			local distance = offset.Magnitude
 			nearest = math.min(nearest, distance)
-			if distance < 32 and MathUtil.flat(offset):Dot(look) < -distance * 0.5 then
+			local along = MathUtil.flat(offset):Dot(look)
+			if distance < 32 and along < -distance * 0.5 then
 				behind = true
+			elseif along > 10 and along < 45 and along > distance * 0.8 then
+				ahead = true -- in front, where thrown peels and ketchup land
 			end
 		end
 	end
@@ -120,6 +123,7 @@ local function botView(
 		shotLinedUp = ballDirection:Dot(goalDirection) > 0.6,
 		nearestEnemy = nearest,
 		enemyBehind = behind,
+		enemyAhead = ahead,
 		readyFor = math.max(0, workspace:GetServerTimeNow() - p.ultReadyAt),
 	}
 end

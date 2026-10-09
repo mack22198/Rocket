@@ -18,10 +18,10 @@ GameConfig.Match = {
 }
 
 GameConfig.Arena = {
-	Width = 220, -- x axis
-	Length = 320, -- z axis, goal line to goal line
+	Width = 280, -- x axis
+	Length = 400, -- z axis, goal line to goal line
 	Height = 90, -- floor to ceiling
-	CornerCut = 40, -- 45 degree corner walls cut this much off each axis
+	CornerCut = 50, -- 45 degree corner walls cut this much off each axis
 	CurveRadius = 20, -- radius of the curved ramp between the floor and the walls
 	CurveSegments = 8, -- how many flat parts approximate each curved ramp
 	GoalWidth = 88,
@@ -133,21 +133,23 @@ GameConfig.Bump = {
 	DemoRespawn = 2, -- ...and they pop back in at their own goal this many seconds later
 }
 
--- Ultimates: every car has one (see Powers). The meter fills up by itself, faster when you play the ball, and
--- with the charge orb (see OrbService). When it's full, one button sets it off.
+-- Ultimates: every car has one (see Powers). The meter fills mostly from what you do - touching the ball,
+-- shots, saves, goals, big bumps and the charge orb (see OrbService) - and only a little by itself, so everyone's
+-- is ready at a different moment. When it's full, one button sets it off.
 GameConfig.Ultimate = {
 	Max = 100,
-	Start = 25, -- how full it is at the start of a match
-	PerSecond = 0.85, -- fills by itself: a full meter in about two minutes...
-	PerTouch = 3, -- ...and faster when you play
-	PerStyleTouch = 6, -- an air or wall hit
+	Start = 10, -- how full it is at the start of a match
+	PerSecond = 0.3, -- fills by itself, slowly: waiting a whole match isn't enough...
+	BehindBonus = 1, -- ...but twice as fast for a team that's behind, so matches stay close
+	PerTouch = 5,
+	PerStyleTouch = 10, -- an air or wall hit
 	TouchGap = 1, -- seconds before a car's touches charge it again (pushing the ball along is lots of touches)
-	PerShot = 5,
-	PerSave = 12,
-	PerGoal = 15,
-	PerAssist = 10,
+	PerShot = 8,
+	PerSave = 15,
+	PerGoal = 20,
+	PerAssist = 15,
+	PerBump = 4, -- a big bump into a car on the other team
 	Orb = 30, -- grabbing the charge orb
-	BehindBonus = 0.5, -- a team that's behind fills 50% faster by itself, so matches stay close
 }
 
 -- The charge orb (see OrbService): one at a time, somewhere along the halfway line, so it's a fair race.
@@ -159,10 +161,10 @@ GameConfig.Orb = {
 	Height = 5.5, -- how high it floats (cars drive through the bottom of it)
 	Spots = {
 		Vector3.new(0, 0, 0),
-		Vector3.new(45, 0, 0),
-		Vector3.new(-45, 0, 0),
-		Vector3.new(80, 0, 0),
-		Vector3.new(-80, 0, 0),
+		Vector3.new(55, 0, 0),
+		Vector3.new(-55, 0, 0),
+		Vector3.new(100, 0, 0),
+		Vector3.new(-100, 0, 0),
 	},
 }
 
@@ -187,8 +189,8 @@ GameConfig.Style = {
 	ShotLookahead = 3, -- seconds of ball path to check when deciding shots and saves
 }
 
+-- (Bots' names are in BotNames.)
 GameConfig.Bots = {
-	Names = { "Sparky", "Nitro Nell", "Bolt", "Zippy", "Rusty", "Turbo Tom", "Pickles", "Dash", "Comet", "Blip" },
 	Skill = 0.45, -- 0 = sleepy, 1 = sweaty. Kids should be able to beat the default bots.
 	-- Bots playing against players adjust so matches stay close (see BotBrain.adaptiveSkill).
 	SkillPerGoal = 0.08, -- harder for every goal the players are ahead, easier for every goal behind
@@ -229,7 +231,8 @@ GameConfig.Evolution = {
 
 -- The lobby is a VIP deck built into the stands on the +X side, looking out over the pitch.
 GameConfig.Lobby = {
-	Center = Vector3.new(194, 52, 0), -- middle of the deck's floor, on its top surface
+	-- The middle of the deck's floor, on its top surface: in the stands on the +X side of the pitch.
+	Center = Vector3.new(GameConfig.Arena.Width / 2 + 84, 52, 0),
 	Size = Vector3.new(92, 2, 192),
 }
 

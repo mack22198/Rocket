@@ -1,7 +1,7 @@
 -- Builds the game's real screens (HUD, garage, results...) in Lune with pretend services, then writes the
 -- GUI tree to JSON so ui.html can draw it. This is only a preview: nothing here runs in the game.
 -- Usage (from the repository root):  lune run tools/preview/ui-export <scenario> <out.json>
---   scenarios: menu, queued, live, garage, evolve, howto, match, ultready, touch, goal, pause, results, podium,
+--   scenarios: menu, queued, live, garage, evolve, howto, match, ultready, ultfire, touch, goal, pause, results, podium,
 --              replay, streak, chest, collection, twist, style, fuse, season, chat, profile, titles, toast,
 --              gifts, leaderboard, shop
 
@@ -562,12 +562,14 @@ end
 frame()
 
 if scenario == "goal" then
-	remotes.GoalScored.OnClientEvent:Fire("Blue", "Player1", "Sparky (bot)", roblox.Vector3.new(0, 10, 160), "AIR HIT")
+	remotes.GoalScored.OnClientEvent:Fire("Blue", "Player1", "PixelPanda22", roblox.Vector3.new(0, 10, 160), "AIR HIT")
 	remotes.Announce.OnClientEvent:Fire("style", "AIR HIT!", "Blue", "Player1")
-	remotes.Announce.OnClientEvent:Fire("save", "EPIC SAVE!", "Orange", "Bolt (bot)")
-	remotes.Announce.OnClientEvent:Fire("ult", "CHEESE FLOOD", "Orange", "Bolt (bot)")
+	remotes.Announce.OnClientEvent:Fire("save", "EPIC SAVE!", "Orange", "TurboTaco9")
+	remotes.Announce.OnClientEvent:Fire("ult", "CHEESE FLOOD", "Orange", "TurboTaco9")
 	remotes.Announce.OnClientEvent:Fire("orb", "Player1 grabbed the charge orb!", "Blue", "Player1")
-	remotes.Announce.OnClientEvent:Fire("power", "Comet (bot) slipped on a banana!", "Blue", "Zippy (bot)")
+	remotes.Announce.OnClientEvent:Fire("power", "CosmicPickle slipped on a banana!", "Blue", "NeonNarwhal")
+elseif scenario == "ultfire" then
+	remotes.PowerFx.OnClientEvent:Fire("ult", roblox.Vector3.new(0, 3, 40), "Blue", car)
 elseif scenario == "shop" then
 	ShopPanel.open()
 elseif scenario == "gifts" then
@@ -599,10 +601,10 @@ elseif scenario == "chat" then
 		model:SetAttribute("OwnerUserId", owner)
 		return model
 	end
-	remotes.Announce.OnClientEvent:Fire("demo", "Player1 demolished Bolt (bot)!", "Blue", "Player1")
-	remotes.QuickChatShown.OnClientEvent:Fire(chatCar(0), 1, "Sparky (bot)", "Blue")
+	remotes.Announce.OnClientEvent:Fire("demo", "Player1 demolished TurboTaco9!", "Blue", "Player1")
+	remotes.QuickChatShown.OnClientEvent:Fire(chatCar(0), 1, "PixelPanda22", "Blue")
 	remotes.QuickChatShown.OnClientEvent:Fire(chatCar(1), 8, "Player1", "Blue")
-	remotes.QuickChatShown.OnClientEvent:Fire(chatCar(0), 7, "Bolt (bot)", "Orange")
+	remotes.QuickChatShown.OnClientEvent:Fire(chatCar(0), 7, "TurboTaco9", "Orange")
 elseif scenario == "garage" then
 	Garage.open()
 elseif scenario == "style" then
@@ -678,11 +680,11 @@ elseif scenario == "results" or scenario == "podium" then
 		},
 		scoreboard = {
 			{ name = "Player1", team = "Blue", points = 412, goals = 2, assists = 0, saves = 1, isBot = false },
-			{ name = "Sparky (bot)", team = "Blue", points = 180, goals = 1, assists = 1, saves = 0, isBot = true },
-			{ name = "Zippy (bot)", team = "Blue", points = 96, goals = 0, assists = 1, saves = 1, isBot = true },
-			{ name = "Bolt (bot)", team = "Orange", points = 250, goals = 1, assists = 0, saves = 2, isBot = true },
-			{ name = "Comet (bot)", team = "Orange", points = 210, goals = 1, assists = 1, saves = 0, isBot = true },
-			{ name = "Dash (bot)", team = "Orange", points = 88, goals = 0, assists = 0, saves = 1, isBot = true },
+			{ name = "PixelPanda22", team = "Blue", points = 180, goals = 1, assists = 1, saves = 0, isBot = true },
+			{ name = "NeonNarwhal", team = "Blue", points = 96, goals = 0, assists = 1, saves = 1, isBot = true },
+			{ name = "TurboTaco9", team = "Orange", points = 250, goals = 1, assists = 0, saves = 2, isBot = true },
+			{ name = "CosmicPickle", team = "Orange", points = 210, goals = 1, assists = 1, saves = 0, isBot = true },
+			{ name = "DashDragon", team = "Orange", points = 88, goals = 0, assists = 0, saves = 1, isBot = true },
 		},
 		stats = { goals = 2, assists = 0, saves = 1, shots = 4, touches = 31, styleTouches = 3 },
 		car = {
@@ -709,7 +711,7 @@ elseif scenario == "results" or scenario == "podium" then
 	end
 end
 -- Let delayed animations (reward lines counting up, etc.) finish, then take the picture.
-task.wait(if scenario == "goal" then 0.3 else 2.5)
+task.wait(if scenario == "goal" or scenario == "ultfire" then 0.3 else 2.5)
 frame()
 
 ---------------------------------------------------------------------------------------------------------------

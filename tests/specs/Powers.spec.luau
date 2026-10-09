@@ -1,5 +1,5 @@
--- Ultimates: every car has its own, the meter fills at a sensible pace, the Tractor Beam really brings the
--- ball in and holds it, launches and ground pounds push the right way, and traps catch the right cars.
+-- Ultimates: every car has its own, the meter fills mostly from playing, the Tractor Beam really brings the
+-- ball in and holds it, launches and ground pounds push the right way, and traps land and catch the right cars.
 local ArenaShape = require(Shared.Arena.ArenaShape)
 local BallSim = require(Shared.Physics.BallSim)
 local CarCatalog = require(Shared.Config.CarCatalog)
@@ -20,13 +20,15 @@ return function(t)
 			seen[power.Id] = true
 			expect.atLeast(power.Duration, 0)
 			expect.truthy(#power.Description > 10)
-			-- A fused car's combo does two ultimates at once, so its meter fills a little slower.
+			-- Each car's meter fills at its own pace, but never very differently; a fused car's combo does two
+			-- ultimates at once, so its meter fills a little slower than either part's.
 			local rate = Powers.chargeRate(power)
+			expect.truthy(rate >= 0.6 and rate <= 1.2, `{power.Id} charges at a fair pace`)
 			if power.Combo then
 				expect.equal(#Powers.components(power), 2, `{power.Id} is two ultimates`)
-				expect.truthy(rate < 1 and rate >= 0.6, `{power.Id} charges a little slower`)
-			else
-				expect.equal(rate, 1)
+				for _, part in Powers.components(power) do
+					expect.truthy(rate < Powers.chargeRate(part), `{power.Id} charges slower than {part.Id}`)
+				end
 			end
 		end
 		for _, id in GameConfig.Bots.CarIds do
@@ -34,14 +36,15 @@ return function(t)
 		end
 	end)
 
-	t.test("the meter fills at a sensible pace", function()
-		-- By itself, about once every minute and a half; playing the ball makes it come much sooner.
-		local alone = (U.Max - U.Start) / U.PerSecond
-		expect.atLeast(alone, 60)
-		expect.atMost(alone, 120)
-		expect.truthy(alone / (1 + U.BehindBonus) < alone * 0.8, "a team that's behind charges faster")
-		local busy = (U.Max - U.Start - 8 * U.PerTouch - U.Orb) / U.PerSecond
-		expect.atMost(busy, alone * 0.5, "eight touches and an orb halve the wait")
+	t.test("the meter fills mostly from playing", function()
+		-- Waiting a whole match isn't enough on its own (so nobody's is ready at the same moment as everyone
+		-- else's)...
+		local waiting = U.Start + U.PerSecond * GameConfig.Match.Length
+		expect.truthy(waiting < U.Max, "a whole match of just driving around doesn't fill it")
+		expect.truthy(U.BehindBonus > 0, "a team that's behind charges faster")
+		-- ...but a busy minute does: a dozen touches, a shot and the orb.
+		local busy = U.Start + U.PerSecond * 60 + 12 * U.PerTouch + U.PerShot + U.Orb
+		expect.atLeast(busy, U.Max)
 		expect.truthy(U.Orb < U.Max / 2, "an orb is a big chunk, not a whole ultimate")
 		expect.truthy(U.PerStyleTouch > U.PerTouch and U.PerGoal > U.PerShot, "better plays charge more")
 		expect.atLeast(U.TouchGap, 0.5, "pushing the ball along can't fill it in a flash")
@@ -88,6 +91,10 @@ return function(t)
 		local dive = Powers.launch("dive", car)
 		assert(dive)
 		expect.near(dive.X, -T.DiveBurst, 1e-3)
+		local leap = Powers.launch("pound", car)
+		assert(leap)
+		expect.near(leap.Y, T.PoundHop, 1e-6, "the Monster Truck leaps straight up")
+		expect.truthy(T.PoundSlamAt < T.PoundDelay, "it comes down before the shockwave goes off")
 		expect.equal(Powers.launch("cheese", car), nil)
 	end)
 
@@ -101,17 +108,31 @@ return function(t)
 		expect.truthy(rocket > GameConfig.Bump.DemoSpeed + 10, "a Nitro Rocket gets there")
 	end)
 
-	t.test("a banana storm spreads its peels side to side", function()
-		local offsets = Powers.peelOffsets()
-		expect.equal(#offsets, T.PeelCount)
+	t.test("a banana storm throws its peels out in front, where you can see them", function()
+		expect.atLeast(#Powers.PeelSpots, 3)
 		local sum = 0
-		for i, offset in offsets do
-			sum += offset
-			if i > 1 then
-				expect.near(offset - offsets[i - 1], T.PeelSpread, 1e-6)
+		for i, spot in Powers.PeelSpots do
+			expect.truthy(spot.Y > 12, "ahead of the car (and clear of it)")
+			for j = 1, i - 1 do
+				local other = Powers.PeelSpots[j]
+				expect.truthy((spot - other).Magnitude > T.PeelRadius * 2, "peels don't land on top of each other")
 			end
+			sum += spot.X
 		end
-		expect.near(sum, 0, 1e-6, "centred behind the car")
+		expect.near(sum, 0, 1e-6, "an even fan, left and right")
+		expect.truthy(T.PeelFlight > 0.2 and T.PeelFlight < 1, "they're in the air long enough to see")
+	end)
+
+	t.test("the cheese floods out around the car, and ketchup squirts out in front", function()
+		expect.truthy(
+			Powers.inHazard("cheese", Vector3.zero, Vector3.yAxis, Vector3.new(0, 2.3, 0)),
+			"the car is in the middle of it"
+		)
+		expect.truthy(
+			Powers.inHazard("cheese", Vector3.zero, Vector3.yAxis, Vector3.new(T.CheeseRadius - 2, 2.3, 0)),
+			"and it reaches all around"
+		)
+		expect.truthy(T.KetchupLength >= 25, "a long slick")
 	end)
 
 	t.test("a ground pound shoves things away, harder up close", function()
@@ -153,9 +174,11 @@ return function(t)
 			shotLinedUp = true,
 			nearestEnemy = 100,
 			enemyBehind = false,
+			enemyAhead = false,
 			readyFor = 0,
 		}
-		expect.falsy(Powers.botWantsPower("peel", view), "nobody behind to trip")
+		expect.falsy(Powers.botWantsPower("peel", view), "nobody in front to trip")
+		expect.falsy(Powers.botWantsPower("cheese", view), "nobody close to get stuck")
 		expect.falsy(Powers.botWantsPower("quack", view), "nobody close to quack at")
 		expect.truthy(Powers.botWantsPower("beam", view))
 		expect.truthy(Powers.botWantsPower("hotsauce", view))
@@ -164,6 +187,10 @@ return function(t)
 		chased.nearestEnemy = 20
 		expect.truthy(Powers.botWantsPower("cheese", chased))
 		expect.truthy(Powers.botWantsPower("quack", chased))
+		local blocked = table.clone(view)
+		blocked.enemyAhead = true
+		expect.truthy(Powers.botWantsPower("peel", blocked))
+		expect.truthy(Powers.botWantsPower("ketchup", blocked))
 		local bored = table.clone(view)
 		bored.role = "defend"
 		bored.readyFor = 13

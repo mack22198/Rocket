@@ -165,8 +165,8 @@ local function buildStadium()
 		local PodiumBuilder = harness.require(harness.Client.Showroom.PodiumBuilder)
 		PodiumBuilder.build(workspaceInstance, {
 			{ name = "Player1", team = "Blue", carId = "banana", stage = 2, points = 412 },
-			{ name = "Bolt (bot)", team = "Orange", carId = "monster", stage = 3, points = 250 },
-			{ name = "Sparky (bot)", team = "Blue", carId = "kart", stage = 4, points = 180 },
+			{ name = "TurboTaco9", team = "Orange", carId = "monster", stage = 3, points = 250 },
+			{ name = "PixelPanda22", team = "Blue", carId = "kart", stage = 4, points = 180 },
 		})
 		return
 	end

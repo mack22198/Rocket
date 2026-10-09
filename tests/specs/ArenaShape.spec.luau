@@ -3,7 +3,21 @@ local GameConfig = require(Shared.Config.GameConfig)
 
 return function(t)
 	local expect = t.expect
-	local arena = ArenaShape.new(GameConfig.Arena)
+	-- The shape maths, checked on a fixed test arena: the positions below are for this size, so the game's own
+	-- arena can change size without these tests changing.
+	local CFG = {
+		Width = 220,
+		Length = 320,
+		Height = 90,
+		CornerCut = 40,
+		CurveRadius = 20,
+		CurveSegments = 8,
+		GoalWidth = 88,
+		GoalHeight = 32,
+		GoalDepth = 24,
+		WallThickness = 6,
+	}
+	local arena = ArenaShape.new(CFG)
 	local r = GameConfig.Ball.Radius
 
 	t.test("ball floating mid-field touches nothing", function()
@@ -37,7 +51,7 @@ return function(t)
 
 	t.test("ball resting on the ramp surface is in balance", function()
 		-- A point exactly (R - r) from the curve's axis touches the ramp with zero depth.
-		local R = GameConfig.Arena.CurveRadius
+		local R = CFG.CurveRadius
 		local angle = math.rad(40)
 		local axis = Vector3.new(110 - R, R, 0)
 		local pos = axis + Vector3.new(math.sin(angle), -math.cos(angle), 0) * (R - r)
@@ -65,7 +79,7 @@ return function(t)
 	end)
 
 	t.test("goal post edge gives a rounded push", function()
-		local halfGoal = GameConfig.Arena.GoalWidth / 2
+		local halfGoal = CFG.GoalWidth / 2
 		local n = arena:deepestContact(Vector3.new(halfGoal - 3, 23, 157), r)
 		expect.truthy(n)
 		expect.near(n.X, -math.sqrt(0.5), 1e-4)
@@ -73,13 +87,13 @@ return function(t)
 	end)
 
 	t.test("crossbar blocks from above", function()
-		local n = arena:deepestContact(Vector3.new(0, GameConfig.Arena.GoalHeight + 3, 163), r)
+		local n = arena:deepestContact(Vector3.new(0, CFG.GoalHeight + 3, 163), r)
 		expect.truthy(n)
 		expect.near(n.Y, -1, 1e-6)
 	end)
 
 	t.test("ramp next to the goal has a flat end face", function()
-		local halfGoal = GameConfig.Arena.GoalWidth / 2
+		local halfGoal = CFG.GoalWidth / 2
 		local n, depth = arena:deepestContact(Vector3.new(halfGoal - 3, 7, 157), r)
 		expect.truthy(n)
 		expect.truthy(depth > 0)

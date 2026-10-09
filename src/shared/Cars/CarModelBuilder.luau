@@ -2435,10 +2435,13 @@ function CarModelBuilder.build(def: CarDef, options: BuildOptions?): Model
 	flames.Enabled = false
 	flames.Parent = exhaust
 
-	-- Fire glow while the next hit is a Mega Shot (Hot Sauce).
-	local megaGlow = particles(chassis, "MegaGlow", ColorSequence.new(rgb(255, 200, 60), rgb(255, 60, 20)), 1.2, 40)
-	megaGlow.Lifetime = NumberRange.new(0.4, 0.7)
-	megaGlow.Speed = NumberRange.new(2, 5)
+	-- The car is on fire while the next hit is a Mega Shot (Hot Sauce).
+	local megaGlow = particles(chassis, "MegaGlow", ColorSequence.new(rgb(255, 230, 120), rgb(255, 50, 20)), 3, 70)
+	megaGlow.Texture = "rbxasset://textures/particles/fire_main.dds"
+	megaGlow.Lifetime = NumberRange.new(0.35, 0.6)
+	megaGlow.Speed = NumberRange.new(4, 9)
+	megaGlow.SpreadAngle = Vector2.new(25, 25)
+	megaGlow.EmissionDirection = Enum.NormalId.Top
 	megaGlow.Enabled = false
 
 	-- Evolved cars give off embers (lava) or stardust (galaxy).

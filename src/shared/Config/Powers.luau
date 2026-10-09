@@ -1,8 +1,13 @@
 --!strict
 -- Ultimates: every car has its own big move (the Pizza Car floods the pitch with cheese, the Rubber Duck QUACKs
--- everyone into a spin...). The ultimate meter fills up by itself, faster when you play the ball, and with the
--- charge orb (see GameConfig.Ultimate); when it's full, one button sets it off (E / X / ULT). A fused car (see
--- CarCatalog) gets a combo: both its parents' ultimates at once, but its meter fills a little slower.
+-- everyone into a spin...). The ultimate meter fills mostly from playing - touching the ball, shots, saves,
+-- goals, big bumps and the charge orb - and a little by itself (see GameConfig.Ultimate); when it's full, one
+-- button sets it off (E / X / ULT). Each car's meter fills at its own pace (ChargeRate), and a fused car (see
+-- CarCatalog) gets a combo: both its parents' ultimates at once, with a meter that fills a little slower.
+--
+-- Every ultimate is made to be seen from your own seat (the camera sits behind your car, looking ahead): the
+-- cheese floods out all around you, peels and ketchup go out in front, the Monster Truck leaps up before it
+-- slams down.
 --
 -- (In the code an ultimate is a "power", the name it had before it charged up like this.)
 --
@@ -19,7 +24,8 @@ export type PowerDef = {
 	Color: Color3,
 	Description: string,
 	Duration: number, -- seconds the effect lasts (0 = instant)
-	ChargeRate: number?, -- how fast its meter fills compared with the others (1 when not given)
+	ChargeRate: number?, -- how fast its meter fills compared with the others (1 when not given), so cars' ultimates
+	-- aren't all ready at once
 	Combo: { string }?, -- a fused car's ultimate: the ids of the two it does at once
 }
 
@@ -29,16 +35,17 @@ Powers.CarPowers = {
 		Name = "Cheese Flood",
 		Emoji = "🧀",
 		Color = rgb(255, 204, 64),
-		Description = "Floods the pitch behind you with gooey cheese. Cars in it slow right down.",
-		Duration = 10,
+		Description = "Floods the pitch all around you with gooey cheese. Cars on the other team get stuck in it!",
+		Duration = 8,
 	},
 	banana = {
 		Id = "peel",
 		Name = "Banana Storm",
 		Emoji = "🍌",
 		Color = rgb(255, 226, 70),
-		Description = "Drops three banana peels behind you. Anyone who drives over one spins out!",
+		Description = "Throws five banana peels out in front of you. Anyone who drives over one spins out!",
 		Duration = 15,
+		ChargeRate = 1.1,
 	},
 	kart = {
 		Id = "nitro",
@@ -47,6 +54,7 @@ Powers.CarPowers = {
 		Color = rgb(255, 110, 40),
 		Description = "A rocket-powered dash. Smash into a car on the other team and it goes POOF!",
 		Duration = 1.2,
+		ChargeRate = 0.9,
 	},
 	shark = {
 		Id = "dive",
@@ -55,21 +63,23 @@ Powers.CarPowers = {
 		Color = rgb(60, 200, 255),
 		Description = "Dive like a ghost: a burst of speed, and nothing can touch you.",
 		Duration = 2.4,
+		ChargeRate = 1.05,
 	},
 	monster = {
 		Id = "pound",
 		Name = "Ground Pound",
 		Emoji = "💢",
 		Color = rgb(255, 80, 60),
-		Description = "A huge shockwave that knocks nearby cars flying and blasts the ball away.",
+		Description = "Leaps up and slams down: a huge shockwave knocks nearby cars flying and blasts the ball away.",
 		Duration = 0,
+		ChargeRate = 0.9,
 	},
 	taco = {
 		Id = "hotsauce",
 		Name = "Hot Sauce",
 		Emoji = "🌶️",
 		Color = rgb(255, 70, 40),
-		Description = "Hit the ball in the next 6 seconds and it's a flaming Mega Shot!",
+		Description = "Sets your car on fire: hit the ball in the next 6 seconds and it's a flaming Mega Shot!",
 		Duration = 6,
 	},
 	duck = {
@@ -79,22 +89,25 @@ Powers.CarPowers = {
 		Color = rgb(255, 214, 46),
 		Description = "A mighty QUACK that spins out every car on the other team nearby.",
 		Duration = 0,
+		ChargeRate = 0.95,
 	},
 	hotdog = {
 		Id = "ketchup",
 		Name = "Ketchup Slick",
 		Emoji = "🌭",
 		Color = rgb(235, 44, 40),
-		Description = "Squirts a long ketchup trail behind you. Other cars that drive through it spin out!",
+		Description = "Squirts a long ketchup slick out in front of you. Cars on the other team that cross it spin out!",
 		Duration = 9,
+		ChargeRate = 1.1,
 	},
 	ufo = {
 		Id = "beam",
 		Name = "Tractor Beam",
 		Emoji = "🛸",
 		Color = rgb(130, 255, 110),
-		Description = "Lifts the ball up in front of you. Line up the perfect shot!",
+		Description = "Grabs the ball from far away and lifts it up in front of you. Line up the perfect shot!",
 		Duration = 3.5,
+		ChargeRate = 0.95,
 	},
 	-- Fused cars
 	pizzashark = {
@@ -135,30 +148,42 @@ for _, def in Powers.CarPowers do
 end
 
 Powers.Tuning = {
-	CheeseRadius = 15,
+	CheeseRadius = 18, -- the cheese floods out this far all around the car
 	CheeseSlowTime = 0.5,
-	HazardDrop = 7, -- cheese and peels land this far behind the car
 	PeelRadius = 5,
-	PeelCount = 3, -- a Banana Storm drops this many peels...
-	PeelSpread = 10, -- ...this far apart, side to side
+	PeelFlight = 0.5, -- seconds a thrown peel is in the air
 	SpinTime = 1.2,
 	NitroBurst = 75,
 	DiveBurst = 55,
+	PoundHop = 32, -- the Monster Truck leaps up this fast...
+	PoundSlamAt = 0.38, -- ...is thrown back down this long after...
+	PoundSlam = 85, -- ...this hard...
+	PoundDelay = 0.55, -- ...and the shockwave goes off when it lands, this long after the leap
 	PoundRadius = 38,
 	PoundKnockback = 75,
 	PoundPop = 32,
 	PoundBallRadius = 34,
 	PoundBallSpeed = 95,
-	BeamRange = 60,
-	BeamPull = 95,
+	BeamRange = 100,
+	BeamPull = 110,
 	BeamDamping = 2.4,
 	BeamLift = 13,
 	BeamReach = 11,
 	QuackRadius = 34,
 	QuackSpin = 1.4,
-	KetchupLength = 26,
-	KetchupWidth = 4.6,
+	KetchupLength = 32,
+	KetchupWidth = 5.5,
+	KetchupAhead = 3, -- the slick starts this far in front of the car's nose
 	KetchupSpin = 0.8,
+}
+
+-- Where a Banana Storm's peels land, from the car: (studs to the right, studs ahead). A fan out in front.
+Powers.PeelSpots = {
+	Vector2.new(-16, 18),
+	Vector2.new(-8, 27),
+	Vector2.new(0, 34),
+	Vector2.new(8, 27),
+	Vector2.new(16, 18),
 }
 
 -- The power that comes with a car (every car has one).
@@ -203,25 +228,18 @@ function Powers.pullTarget(carCFrame: CFrame): Vector3
 	return carCFrame.Position + flatForward(carCFrame) * t.BeamReach + Vector3.new(0, t.BeamLift, 0)
 end
 
--- The push a car gives itself with a Nitro Rocket or Shark Dive (nil for anything else).
+-- The push a car gives itself with a Nitro Rocket or Shark Dive, or the Monster Truck's leap before its Ground
+-- Pound (nil for anything else).
 function Powers.launch(kind: string, carCFrame: CFrame): Vector3?
 	local t = Powers.Tuning
 	if kind == "nitro" then
 		return carCFrame.LookVector * t.NitroBurst
 	elseif kind == "dive" then
 		return carCFrame.LookVector * t.DiveBurst
+	elseif kind == "pound" then
+		return Vector3.new(0, t.PoundHop, 0)
 	end
 	return nil
-end
-
--- Where each banana peel of a Banana Storm lands, side to side (studs to the right of the car).
-function Powers.peelOffsets(): { number }
-	local t = Powers.Tuning
-	local offsets = {}
-	for i = 1, t.PeelCount do
-		table.insert(offsets, (i - (t.PeelCount + 1) / 2) * t.PeelSpread)
-	end
-	return offsets
 end
 
 -- The shove a Ground Pound at `centre` gives something at `position` (a car or the ball): strongest close
@@ -297,6 +315,7 @@ export type BotView = {
 	shotLinedUp: boolean, -- the ball is between the bot and the other team's goal
 	nearestEnemy: number, -- distance to the closest car on the other team
 	enemyBehind: boolean, -- a car on the other team is right behind
+	enemyAhead: boolean, -- a car on the other team is a little way ahead
 	readyFor: number, -- seconds the bot's ultimate has been ready
 }
 
@@ -305,8 +324,10 @@ function Powers.botWantsPower(power: string, v: BotView): boolean
 	local t = Powers.Tuning
 	if v.readyFor > 12 then
 		return true
-	elseif power == "cheese" or power == "peel" or power == "ketchup" then
-		return v.enemyBehind
+	elseif power == "cheese" then
+		return v.nearestEnemy < t.CheeseRadius or v.enemyBehind
+	elseif power == "peel" or power == "ketchup" then
+		return v.enemyAhead
 	elseif power == "hotsauce" then
 		return v.role == "attack" and v.ballInFront and v.ballDistance < 35
 	elseif power == "quack" then

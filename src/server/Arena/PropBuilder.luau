@@ -150,37 +150,44 @@ local function buildPeel(model: Model, surface: CFrame, teamColor: Color3)
 	stem.Shape = Enum.PartType.Cylinder
 end
 
--- A long, glossy trail of ketchup (lying along the surface's Z axis), edged in the dropping team's colour.
+-- A long, glossy slick of ketchup (lying along the surface's Z axis), edged in the dropping team's colour. It's
+-- made of short blobs end to end, so every screen can show it squirting out one blob after another.
 local function buildKetchup(model: Model, surface: CFrame, teamColor: Color3)
 	local length, width = T.KetchupLength, T.KetchupWidth
 	local red = rgb(214, 28, 30)
-	local slick = piece(model, "Ketchup", Vector3.new(width, 0.16, length), surface * CFrame.new(0, 0.08, 0), red)
-	slick.Reflectance = 0.25
+	local blobs = 8
+	local step = length / blobs
+	for k = 0, blobs - 1 do
+		local z = -length / 2 + (k + 0.5) * step
+		local wobble = math.sin(k * 1.9) * 0.45
+		local blob =
+			piece(model, "Ketchup", Vector3.new(width + wobble, 0.16, step + 1), surface * CFrame.new(0, 0.08, z), red)
+		blob.Reflectance = 0.25
+		for _, side in { -1, 1 } do
+			local edge = piece(
+				model,
+				"TeamEdge",
+				Vector3.new(0.18, 0.1, step),
+				surface * CFrame.new(side * (width / 2 + 0.45), 0.05, z),
+				teamColor
+			)
+			edge.Material = Enum.Material.Neon
+		end
+		if k % 2 == 1 then
+			-- A darker splat now and then.
+			disc(
+				model,
+				"Splat",
+				surface * CFrame.new((k % 4 - 1.5) * 0.9, 0.02, z),
+				0.6 + (k % 3) * 0.2,
+				0.2,
+				rgb(150, 14, 20)
+			)
+		end
+	end
 	for _, z in { -length / 2, length / 2 } do
 		local cap = disc(model, "KetchupEnd", surface * CFrame.new(0, 0, z), width / 2, 0.16, red)
 		cap.Reflectance = 0.25
-	end
-	for _, side in { -1, 1 } do
-		local edge = piece(
-			model,
-			"TeamEdge",
-			Vector3.new(0.18, 0.1, length),
-			surface * CFrame.new(side * (width / 2 + 0.15), 0.05, 0),
-			teamColor
-		)
-		edge.Material = Enum.Material.Neon
-	end
-	-- A few darker splats.
-	for k = 1, 5 do
-		local z = -length / 2 + k * length / 6
-		disc(
-			model,
-			"Splat",
-			surface * CFrame.new((k % 2 - 0.5) * 1.6, 0.02, z),
-			0.6 + (k % 3) * 0.2,
-			0.2,
-			rgb(150, 14, 20)
-		)
 	end
 end
 

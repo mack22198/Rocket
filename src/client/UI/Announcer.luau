@@ -174,10 +174,13 @@ function Announcer.start()
 			addFeedLine(text, color)
 			return
 		elseif kind == "ult" then
-			-- Someone set off their ultimate ("CHEESE FLOOD"): everyone gets a popup, so they see it coming.
+			-- Someone set off their ultimate ("CHEESE FLOOD"): everyone else gets a popup, so they see it coming.
+			-- (Your own gets the HUD's big banner instead.)
 			local mine = who ~= nil and who == localPlayer.DisplayName
 			addFeedLine(if mine then `You used {text}!` else `{who or "Someone"} used {text}!`, color)
-			Announcer.popup(if mine or not who then `{text}!` else `{who}: {text}!`, color)
+			if not mine then
+				Announcer.popup(if who then `{who}: {text}!` else `{text}!`, color)
+			end
 			return
 		elseif kind == "orb" then
 			-- "Bolt grabbed the charge orb!" (and a popup when it was you).

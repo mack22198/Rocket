@@ -228,11 +228,28 @@ local function firework(target: Vector3, color: Color3, delay: number)
 	end)
 end
 
--- For other effects code (items and powers) to use: burst(position, color, count, speed, size, lifetime,
--- gravity?), shockwave(position, color, radius, duration), flash(position, color, range, brightness, duration).
+-- A glowing ring that races out across the ground from `position` to `radius` studs and fades: the edge of a
+-- shockwave, easy to see from anywhere.
+local function ring(position: Vector3, color: Color3, radius: number, duration: number)
+	local disc = holder(position + Vector3.new(0, 0.3, 0), Vector3.new(0.2, 2, 2), duration + 0.1)
+	disc.Shape = Enum.PartType.Cylinder
+	disc.CFrame = CFrame.new(disc.Position) * CFrame.Angles(0, 0, math.rad(90))
+	disc.Material = Enum.Material.Neon
+	disc.Color = color
+	disc.Transparency = 0.15
+	TweenService:Create(disc, TweenInfo.new(duration, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.2, radius * 2, radius * 2),
+		Transparency = 1,
+	}):Play()
+end
+
+-- For other effects code (ultimates and the charge orb) to use: burst(position, color, count, speed, size,
+-- lifetime, gravity?), shockwave(position, color, radius, duration), flash(position, color, range, brightness,
+-- duration), ring(position, color, radius, duration).
 EffectsController.burst = burst
 EffectsController.shockwave = shockwave
 EffectsController.flash = flash
+EffectsController.ring = ring
 
 -- Toy-car bits (panels in the car's colour, dark tyres) that fly out of a demolition, tumble and fade.
 local function flyingBits(position: Vector3, color: Color3)

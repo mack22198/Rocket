@@ -252,7 +252,7 @@ local function build()
 		name = "Explain",
 		size = UDim2.new(1, 0, 0, 44),
 		position = UDim2.fromOffset(0, 48),
-		text = "A bot will drive your car for the rest of the match, and you won't get Scrap for it.",
+		text = "Someone else takes your seat for the rest of the match, and you won't get Scrap for it.",
 		font = Theme.Body,
 		textSize = 16,
 	})

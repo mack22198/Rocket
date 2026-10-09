@@ -84,7 +84,8 @@ return function(t)
 		for _, name in { "Wall", "Boards" } do
 			for _, part in parts(name) do
 				local centre = part.CFrame.Position
-				if math.abs(centre.Z) < 70 and math.abs(centre.X) > 100 then
+				local straight = GameConfig.Arena.Length / 2 - GameConfig.Arena.CornerCut -- (the side, not a corner)
+				if math.abs(centre.Z) < straight and math.abs(centre.X) > GameConfig.Arena.Width / 2 - 10 then
 					local nearest = math.huge
 					for _, corner in corners(part) do
 						nearest = math.min(nearest, math.abs(corner.X))
